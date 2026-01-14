@@ -62,6 +62,9 @@ function createWindow() {
     },
   });
 
+  // Make window visible on all workspaces/Spaces including fullscreen apps (macOS)
+  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
   // Stealth Mode: Hide window from screen capture software
   // Per PLAN.md Phase 6:
   // - MVP: Use Electron's setContentProtection(true)
