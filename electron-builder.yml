@@ -1,0 +1,61 @@
+# Electron Builder Configuration
+# See: https://www.electron.build/configuration/configuration
+
+appId: com.overlay-ai.app
+productName: Overlay AI
+copyright: Copyright © 2024
+
+# Directories
+directories:
+  output: dist/release
+  buildResources: resources
+
+# Files to include in the app
+files:
+  - dist/main/**/*
+  - dist/renderer/**/*
+  - package.json
+
+# asar packaging
+asar: true
+
+# macOS specific
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  category: public.app-category.productivity
+  hardenedRuntime: false
+  gatekeeperAssess: false
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+# Windows placeholder
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+# Linux placeholder
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Utility
+
+# Include the Rust audio sidecar binary if it exists
+extraResources:
+  - from: resources/bin/
+    to: bin/
+    filter:
+      - "**/*"
