@@ -152,15 +152,20 @@ function unregisterShortcuts() {
 
 // This method will be called when Electron has finished initialization
 app.whenReady().then(() => {
+  // Stealth Mode: Hide from Dock and Cmd+Tab on macOS
+  // This makes the app an "accessory" application that doesn't appear in:
+  // - The Dock
+  // - Cmd+Tab application switcher
+  // - Force Quit dialog
+  // Note: LSUIElement in Info.plist (via electron-builder) handles this for production builds
+  // This call ensures it works during development as well
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.hide();
+    console.log('[Stealth] Hidden from Dock and Cmd+Tab switcher');
+  }
+
   createWindow();
   registerShortcuts();
-
-  app.on('activate', () => {
-    // On macOS re-create window when dock icon is clicked and no windows are open
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
 });
 
 // Quit when all windows are closed (including on macOS)

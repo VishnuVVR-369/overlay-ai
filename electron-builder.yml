@@ -29,6 +29,10 @@ mac:
   category: public.app-category.productivity
   hardenedRuntime: false
   gatekeeperAssess: false
+  # Stealth mode: Hide from Dock and Cmd+Tab switcher
+  # LSUIElement makes the app an "agent" application (no dock icon, no app switcher)
+  extendInfo:
+    LSUIElement: true
 
 dmg:
   contents:
