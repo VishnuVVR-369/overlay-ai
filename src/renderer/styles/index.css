@@ -2,67 +2,1196 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Dark mode, high contrast text, subtle dark background */
+/* ============================================================================
+   CYBER-MINIMALIST HUD DESIGN SYSTEM
+
+   A professional overlay interface inspired by:
+   - Linear, Raycast, Vercel aesthetics
+   - Subtle sci-fi HUD elements
+   - High readability on any background
+   ============================================================================ */
+
+/* Google Fonts - JetBrains Mono for code, Outfit for UI */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+/* ============================================================================
+   CSS CUSTOM PROPERTIES - THE HUD COLOR SYSTEM
+   ============================================================================ */
 :root {
   color-scheme: dark;
+
+  /* Base Colors */
+  --hud-bg-deep: rgba(8, 10, 14, 0.92);
+  --hud-bg-panel: rgba(14, 17, 23, 0.88);
+  --hud-bg-surface: rgba(22, 26, 35, 0.85);
+  --hud-bg-elevated: rgba(32, 38, 50, 0.9);
+
+  /* Accent Colors - Cyan Primary */
+  --hud-accent-primary: #00FFE0;
+  --hud-accent-primary-dim: rgba(0, 255, 224, 0.15);
+  --hud-accent-primary-glow: rgba(0, 255, 224, 0.4);
+
+  /* Status Colors */
+  --hud-status-active: #00FFE0;
+  --hud-status-warning: #FFB800;
+  --hud-status-error: #FF3D5A;
+  --hud-status-idle: #4A5568;
+
+  /* Text Colors */
+  --hud-text-primary: rgba(255, 255, 255, 0.95);
+  --hud-text-secondary: rgba(255, 255, 255, 0.65);
+  --hud-text-tertiary: rgba(255, 255, 255, 0.4);
+  --hud-text-accent: var(--hud-accent-primary);
+
+  /* Speaker Colors */
+  --hud-speaker-interviewer: #60A5FA;
+  --hud-speaker-you: #34D399;
+
+  /* Border & Dividers */
+  --hud-border-subtle: rgba(255, 255, 255, 0.06);
+  --hud-border-default: rgba(255, 255, 255, 0.1);
+  --hud-border-accent: rgba(0, 255, 224, 0.3);
+
+  /* Spacing */
+  --hud-radius-sm: 6px;
+  --hud-radius-md: 10px;
+  --hud-radius-lg: 14px;
+
+  /* Shadows */
+  --hud-shadow-glow: 0 0 20px rgba(0, 255, 224, 0.15);
+  --hud-shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
+/* ============================================================================
+   BASE STYLES
+   ============================================================================ */
 html, body {
-  background-color: rgba(10, 12, 18, 0.25);
+  background-color: transparent;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
 }
 
-/* Custom scrollbar styling */
-.scrollbar-thin {
+/* Monospace font class */
+.font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* ============================================================================
+   HUD FRAME ELEMENTS
+   ============================================================================ */
+
+/* Main container with subtle grid pattern */
+.hud-container {
+  position: relative;
+  background: var(--hud-bg-deep);
+  min-height: 100vh;
+}
+
+.hud-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 255, 224, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 224, 0.02) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Scan line effect overlay */
+.hud-scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+/* Corner brackets - HUD frame accent */
+.hud-corner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+.hud-corner::before,
+.hud-corner::after {
+  content: '';
+  position: absolute;
+  background: var(--hud-accent-primary);
+  opacity: 0.5;
+}
+
+.hud-corner--tl { top: 0; left: 0; }
+.hud-corner--tl::before { top: 0; left: 0; width: 100%; height: 1px; }
+.hud-corner--tl::after { top: 0; left: 0; width: 1px; height: 100%; }
+
+.hud-corner--tr { top: 0; right: 0; }
+.hud-corner--tr::before { top: 0; right: 0; width: 100%; height: 1px; }
+.hud-corner--tr::after { top: 0; right: 0; width: 1px; height: 100%; }
+
+.hud-corner--bl { bottom: 0; left: 0; }
+.hud-corner--bl::before { bottom: 0; left: 0; width: 100%; height: 1px; }
+.hud-corner--bl::after { bottom: 0; left: 0; width: 1px; height: 100%; }
+
+.hud-corner--br { bottom: 0; right: 0; }
+.hud-corner--br::before { bottom: 0; right: 0; width: 100%; height: 1px; }
+.hud-corner--br::after { bottom: 0; right: 0; width: 1px; height: 100%; }
+
+/* ============================================================================
+   PANEL STYLES
+   ============================================================================ */
+
+.hud-panel {
+  background: var(--hud-bg-panel);
+  border: 1px solid var(--hud-border-subtle);
+  border-radius: var(--hud-radius-lg);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--hud-shadow-panel);
+  position: relative;
+  overflow: hidden;
+}
+
+.hud-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--hud-border-accent),
+    transparent
+  );
+  opacity: 0.6;
+}
+
+.hud-panel-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hud-border-subtle);
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hud-panel-header h2 {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hud-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-panel-header h2::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--hud-accent-primary);
+  transform: rotate(45deg);
+  opacity: 0.6;
+}
+
+.hud-panel-content {
+  padding: 16px;
+}
+
+/* ============================================================================
+   STATUS INDICATOR STYLES
+   ============================================================================ */
+
+.hud-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: var(--hud-bg-surface);
+  border: 1px solid var(--hud-border-subtle);
+  border-radius: 100px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.hud-status-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+}
+
+.hud-status-dot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Active/Connected state */
+.hud-status--active {
+  color: var(--hud-status-active);
+  border-color: rgba(0, 255, 224, 0.2);
+}
+
+.hud-status--active .hud-status-dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.3;
+  animation: hud-pulse 2s ease-in-out infinite;
+}
+
+/* Connecting state */
+.hud-status--connecting {
+  color: var(--hud-status-warning);
+  border-color: rgba(255, 184, 0, 0.2);
+}
+
+.hud-status--connecting .hud-status-dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  opacity: 0.5;
+  animation: hud-ping 1.5s ease-out infinite;
+}
+
+/* Error state */
+.hud-status--error {
+  color: var(--hud-status-error);
+  border-color: rgba(255, 61, 90, 0.2);
+}
+
+/* Idle/Disconnected state */
+.hud-status--idle {
+  color: var(--hud-status-idle);
+}
+
+/* ============================================================================
+   TRANSCRIPT STYLES
+   ============================================================================ */
+
+.hud-transcript-line {
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border-radius: var(--hud-radius-md);
+  border-left: 2px solid transparent;
+  background: var(--hud-bg-surface);
+  transition: all 0.15s ease;
+}
+
+.hud-transcript-line:hover {
+  background: var(--hud-bg-elevated);
+}
+
+/* Interviewer style */
+.hud-transcript-line--interviewer {
+  border-left-color: var(--hud-speaker-interviewer);
+}
+
+.hud-transcript-line--interviewer .hud-speaker-label {
+  color: var(--hud-speaker-interviewer);
+}
+
+/* You style */
+.hud-transcript-line--you {
+  border-left-color: var(--hud-speaker-you);
+}
+
+.hud-transcript-line--you .hud-speaker-label {
+  color: var(--hud-speaker-you);
+}
+
+/* Interim/typing style */
+.hud-transcript-line--interim {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+.hud-speaker-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-speaker-label::before {
+  content: '>';
+  opacity: 0.5;
+}
+
+.hud-transcript-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--hud-text-primary);
+}
+
+/* Empty state */
+.hud-transcript-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.hud-transcript-empty-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 12px;
+  border: 1px dashed var(--hud-border-default);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hud-text-tertiary);
+}
+
+/* ============================================================================
+   ANSWER CARD STYLES
+   ============================================================================ */
+
+.hud-answer {
+  background: var(--hud-bg-panel);
+  border: 1px solid var(--hud-border-subtle);
+  border-radius: var(--hud-radius-lg);
+  overflow: hidden;
+}
+
+.hud-answer-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hud-border-subtle);
+  background: linear-gradient(180deg, rgba(0, 255, 224, 0.03) 0%, transparent 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hud-answer-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hud-accent-primary);
+}
+
+.hud-answer-title-icon {
+  width: 14px;
+  height: 14px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+.hud-model-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 4px 10px;
+  background: var(--hud-bg-surface);
+  border: 1px solid var(--hud-border-subtle);
+  border-radius: 100px;
+  color: var(--hud-text-tertiary);
+}
+
+/* Generating indicator */
+.hud-generating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 10px;
+  background: rgba(0, 255, 224, 0.1);
+  border-radius: 100px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--hud-accent-primary);
+}
+
+.hud-generating-dot {
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  border-radius: 50%;
+  animation: hud-pulse 1s ease-in-out infinite;
+}
+
+/* Answer content area */
+.hud-answer-content {
+  padding: 20px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Idle state */
+.hud-answer-idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.hud-answer-idle-icon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 16px;
+  border: 1px dashed var(--hud-border-default);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hud-answer-idle-icon svg {
+  width: 24px;
+  height: 24px;
+  color: var(--hud-text-tertiary);
+}
+
+.hud-answer-idle h3 {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--hud-text-secondary);
+  margin-bottom: 8px;
+}
+
+.hud-answer-idle p {
+  font-size: 12px;
+  color: var(--hud-text-tertiary);
+}
+
+/* Keyboard shortcut style */
+.hud-kbd {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: var(--hud-bg-elevated);
+  border: 1px solid var(--hud-border-subtle);
+  border-radius: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--hud-text-secondary);
+}
+
+/* Error state */
+.hud-answer-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 61, 90, 0.08);
+  border: 1px solid rgba(255, 61, 90, 0.2);
+  border-radius: var(--hud-radius-md);
+}
+
+.hud-answer-error-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 61, 90, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hud-status-error);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.hud-answer-error h4 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--hud-status-error);
+  margin-bottom: 4px;
+}
+
+.hud-answer-error p {
+  font-size: 11px;
+  color: rgba(255, 61, 90, 0.8);
+}
+
+/* ============================================================================
+   MARKDOWN PROSE STYLES
+   ============================================================================ */
+
+.hud-prose {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--hud-text-primary);
+}
+
+.hud-prose h1,
+.hud-prose h2,
+.hud-prose h3 {
+  color: var(--hud-text-primary);
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+.hud-prose h1 { font-size: 1.25em; }
+.hud-prose h2 { font-size: 1.1em; }
+.hud-prose h3 { font-size: 1em; }
+
+.hud-prose p {
+  margin-bottom: 1em;
+}
+
+.hud-prose strong {
+  color: var(--hud-text-primary);
+  font-weight: 600;
+}
+
+.hud-prose code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9em;
+  padding: 2px 6px;
+  background: var(--hud-bg-elevated);
+  border: 1px solid var(--hud-border-subtle);
+  border-radius: 4px;
+  color: var(--hud-accent-primary);
+}
+
+.hud-prose pre {
+  margin: 1em 0;
+  padding: 16px;
+  background: var(--hud-bg-deep);
+  border: 1px solid var(--hud-border-subtle);
+  border-radius: var(--hud-radius-md);
+  overflow-x: auto;
+  position: relative;
+}
+
+.hud-prose pre::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--hud-accent-primary), transparent);
+  opacity: 0.3;
+}
+
+.hud-prose pre code {
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--hud-text-primary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.hud-prose ul,
+.hud-prose ol {
+  margin: 1em 0;
+  padding-left: 1.5em;
+}
+
+.hud-prose li {
+  margin-bottom: 0.5em;
+}
+
+.hud-prose ul li::marker {
+  color: var(--hud-accent-primary);
+}
+
+.hud-prose ol li::marker {
+  color: var(--hud-text-tertiary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9em;
+}
+
+.hud-prose blockquote {
+  margin: 1em 0;
+  padding: 12px 16px;
+  border-left: 2px solid var(--hud-accent-primary);
+  background: var(--hud-bg-surface);
+  border-radius: 0 var(--hud-radius-sm) var(--hud-radius-sm) 0;
+  color: var(--hud-text-secondary);
+  font-style: italic;
+}
+
+.hud-prose hr {
+  margin: 1.5em 0;
+  border: none;
+  height: 1px;
+  background: var(--hud-border-subtle);
+}
+
+.hud-prose a {
+  color: var(--hud-accent-primary);
+  text-decoration: none;
+}
+
+.hud-prose a:hover {
+  text-decoration: underline;
+}
+
+/* Streaming cursor */
+.hud-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--hud-accent-primary);
+  margin-left: 2px;
+  animation: hud-blink 1s step-end infinite;
+  vertical-align: text-bottom;
+}
+
+/* ============================================================================
+   MODAL STYLES
+   ============================================================================ */
+
+.hud-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.hud-modal {
+  width: 100%;
+  max-width: 440px;
+  margin: 16px;
+  background: var(--hud-bg-panel);
+  border: 1px solid var(--hud-border-subtle);
+  border-radius: var(--hud-radius-lg);
+  box-shadow: var(--hud-shadow-panel), var(--hud-shadow-glow);
+  overflow: hidden;
+}
+
+.hud-modal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--hud-accent-primary), transparent);
+  opacity: 0.5;
+}
+
+.hud-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--hud-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hud-modal-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hud-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hud-modal-title::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--hud-accent-primary);
+  transform: rotate(45deg);
+}
+
+.hud-modal-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--hud-text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.hud-modal-close:hover {
+  background: var(--hud-bg-surface);
+  color: var(--hud-text-primary);
+}
+
+.hud-modal-body {
+  padding: 20px;
+}
+
+.hud-modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--hud-border-subtle);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* ============================================================================
+   FORM ELEMENTS
+   ============================================================================ */
+
+.hud-input-group {
+  margin-bottom: 20px;
+}
+
+.hud-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--hud-text-secondary);
+  margin-bottom: 8px;
+}
+
+.hud-input-hint {
+  font-size: 11px;
+  color: var(--hud-text-tertiary);
+  margin-bottom: 10px;
+}
+
+.hud-input-hint a {
+  color: var(--hud-accent-primary);
+  text-decoration: none;
+}
+
+.hud-input-hint a:hover {
+  text-decoration: underline;
+}
+
+.hud-input-wrapper {
+  position: relative;
+}
+
+.hud-input {
+  width: 100%;
+  padding: 10px 14px;
+  padding-right: 44px;
+  background: var(--hud-bg-deep);
+  border: 1px solid var(--hud-border-subtle);
+  border-radius: var(--hud-radius-md);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--hud-text-primary);
+  transition: all 0.15s ease;
+}
+
+.hud-input::placeholder {
+  color: var(--hud-text-tertiary);
+}
+
+.hud-input:focus {
+  outline: none;
+  border-color: var(--hud-accent-primary);
+  box-shadow: 0 0 0 2px var(--hud-accent-primary-dim);
+}
+
+.hud-input-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--hud-text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.hud-input-toggle:hover {
+  color: var(--hud-text-primary);
+  background: var(--hud-bg-surface);
+}
+
+/* ============================================================================
+   BUTTONS
+   ============================================================================ */
+
+.hud-btn {
+  padding: 8px 16px;
+  border-radius: var(--hud-radius-sm);
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.hud-btn--ghost {
+  background: transparent;
+  border: 1px solid var(--hud-border-subtle);
+  color: var(--hud-text-secondary);
+}
+
+.hud-btn--ghost:hover {
+  background: var(--hud-bg-surface);
+  color: var(--hud-text-primary);
+}
+
+.hud-btn--primary {
+  background: var(--hud-accent-primary);
+  border: none;
+  color: #000;
+  font-weight: 600;
+}
+
+.hud-btn--primary:hover {
+  background: #00E6CB;
+  box-shadow: 0 0 16px var(--hud-accent-primary-glow);
+}
+
+.hud-btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hud-btn--icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--hud-radius-sm);
+  color: var(--hud-text-tertiary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hud-btn--icon:hover {
+  background: var(--hud-bg-surface);
+  color: var(--hud-text-primary);
+}
+
+/* ============================================================================
+   HEADER STYLES
+   ============================================================================ */
+
+.hud-header {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--hud-border-subtle);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.hud-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hud-logo-mark {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--hud-accent-primary);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.hud-logo-mark::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--hud-accent-primary-dim), transparent);
+}
+
+.hud-logo-mark svg {
+  width: 16px;
+  height: 16px;
+  color: var(--hud-accent-primary);
+  position: relative;
+  z-index: 1;
+}
+
+.hud-logo-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--hud-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.hud-shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.hud-shortcut {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--hud-text-tertiary);
+}
+
+.hud-shortcut kbd {
+  padding: 2px 6px;
+  background: var(--hud-bg-surface);
+  border: 1px solid var(--hud-border-subtle);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+}
+
+/* ============================================================================
+   CONFIG WARNING
+   ============================================================================ */
+
+.hud-warning {
+  margin: 12px;
+  padding: 12px 16px;
+  background: rgba(255, 184, 0, 0.08);
+  border: 1px solid rgba(255, 184, 0, 0.2);
+  border-radius: var(--hud-radius-md);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.hud-warning-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 184, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hud-status-warning);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hud-warning h4 {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--hud-status-warning);
+  margin-bottom: 4px;
+}
+
+.hud-warning ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hud-warning li {
+  font-size: 11px;
+  color: rgba(255, 184, 0, 0.75);
+  padding-left: 12px;
+  position: relative;
+}
+
+.hud-warning li::before {
+  content: '>';
+  position: absolute;
+  left: 0;
+  color: rgba(255, 184, 0, 0.4);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+
+/* ============================================================================
+   LOADING STATES
+   ============================================================================ */
+
+.hud-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+}
+
+.hud-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--hud-border-subtle);
+  border-top-color: var(--hud-accent-primary);
+  border-radius: 50%;
+  animation: hud-spin 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+.hud-loading-text {
+  font-size: 12px;
+  color: var(--hud-text-tertiary);
+}
+
+.hud-loading-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.hud-loading-dots span {
+  width: 6px;
+  height: 6px;
+  background: var(--hud-accent-primary);
+  border-radius: 50%;
+  animation: hud-bounce 0.6s ease-in-out infinite;
+}
+
+.hud-loading-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.hud-loading-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* ============================================================================
+   ERROR TOAST
+   ============================================================================ */
+
+.hud-toast {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  padding: 12px 16px;
+  background: var(--hud-bg-panel);
+  border: 1px solid rgba(255, 61, 90, 0.3);
+  border-radius: var(--hud-radius-md);
+  box-shadow: var(--hud-shadow-panel);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 320px;
+  animation: hud-slide-in 0.2s ease-out;
+}
+
+.hud-toast-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 61, 90, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hud-status-error);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hud-toast-text {
+  font-size: 12px;
+  color: var(--hud-text-primary);
+}
+
+/* ============================================================================
+   SCROLLBARS
+   ============================================================================ */
+
+.hud-scrollbar {
   scrollbar-width: thin;
+  scrollbar-color: var(--hud-border-default) transparent;
 }
 
-.scrollbar-thumb-gray-700::-webkit-scrollbar {
+.hud-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-.scrollbar-thumb-gray-700::-webkit-scrollbar-track {
+.hud-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.scrollbar-thumb-gray-700::-webkit-scrollbar-thumb {
-  background-color: rgb(55, 65, 81);
+.hud-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--hud-border-default);
   border-radius: 3px;
 }
 
-.scrollbar-thumb-gray-700::-webkit-scrollbar-thumb:hover {
-  background-color: rgb(75, 85, 99);
+.hud-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--hud-text-tertiary);
 }
 
-.scrollbar-track-transparent::-webkit-scrollbar-track {
-  background: transparent;
+/* ============================================================================
+   ANIMATIONS
+   ============================================================================ */
+
+@keyframes hud-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
 }
 
-/* Prose styling for markdown content */
-.prose-invert {
-  --tw-prose-body: rgb(229, 231, 235);
-  --tw-prose-headings: rgb(255, 255, 255);
-  --tw-prose-links: rgb(96, 165, 250);
-  --tw-prose-bold: rgb(255, 255, 255);
-  --tw-prose-counters: rgb(156, 163, 175);
-  --tw-prose-bullets: rgb(156, 163, 175);
-  --tw-prose-hr: rgb(55, 65, 81);
-  --tw-prose-quotes: rgb(209, 213, 219);
-  --tw-prose-quote-borders: rgb(75, 85, 99);
-  --tw-prose-captions: rgb(156, 163, 175);
-  --tw-prose-code: rgb(52, 211, 153);
-  --tw-prose-pre-code: rgb(229, 231, 235);
-  --tw-prose-pre-bg: rgb(31, 41, 55);
-  --tw-prose-th-borders: rgb(75, 85, 99);
-  --tw-prose-td-borders: rgb(55, 65, 81);
+@keyframes hud-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
 }
 
-/* Animation for streaming cursor */
-@keyframes blink {
+@keyframes hud-blink {
   0%, 50% {
     opacity: 1;
   }
@@ -71,16 +1200,50 @@ body {
   }
 }
 
-.animate-blink {
-  animation: blink 1s step-end infinite;
+@keyframes hud-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-/* Smooth transitions for state changes */
-.transition-overlay {
-  transition: all 0.2s ease-in-out;
+@keyframes hud-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }
 
-/* Ensure the app container can be dragged (for frameless window) */
+@keyframes hud-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hud-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Entrance animation for panels */
+.hud-animate-in {
+  animation: hud-fade-in 0.2s ease-out, hud-slide-in 0.3s ease-out;
+}
+
+/* ============================================================================
+   DRAGGABLE REGIONS
+   ============================================================================ */
+
 .draggable {
   -webkit-app-region: drag;
 }
@@ -89,18 +1252,18 @@ body {
   -webkit-app-region: no-drag;
 }
 
-/* Focus visible styling for accessibility */
-.focus-visible:focus-visible {
-  outline: 2px solid rgb(96, 165, 250);
-  outline-offset: 2px;
+/* ============================================================================
+   UTILITY CLASSES
+   ============================================================================ */
+
+.hud-glow {
+  box-shadow: var(--hud-shadow-glow);
 }
 
-/* Hide scrollbar but keep functionality */
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.hud-border-accent {
+  border-color: var(--hud-border-accent);
 }
 
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
+.hud-text-accent {
+  color: var(--hud-accent-primary);
 }

@@ -1,10 +1,8 @@
 /**
- * LiveTranscript Component
+ * LiveTranscript Component - Cyber-Minimalist HUD Design
  *
- * Per PLAN.md Phase 7.1:
- * LiveTranscript: Scrolling text of the last 30s (for confidence check)
- *
- * Displays real-time transcript segments with speaker labels.
+ * Real-time transcript display with HUD-style speaker indicators
+ * and sleek scrolling behavior.
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -15,34 +13,26 @@ import type { TranscriptSegment, Speaker } from '../../lib/transcript';
 // ============================================================================
 
 export interface LiveTranscriptProps {
-  /** Transcript segments to display */
   segments: TranscriptSegment[];
-  /** Interim (non-final) transcript text */
   interimText?: string;
-  /** Speaker of the interim text */
   interimSpeaker?: Speaker;
-  /** Maximum height of the transcript area */
   maxHeight?: string;
-  /** Whether to auto-scroll to bottom */
   autoScroll?: boolean;
-  /** Show timestamps */
   showTimestamps?: boolean;
 }
 
 // ============================================================================
-// Speaker Styling
+// Speaker Configuration
 // ============================================================================
 
-const SPEAKER_STYLES: Record<Speaker, { label: string; color: string; bgColor: string }> = {
+const SPEAKER_CONFIG: Record<Speaker, { label: string; lineClass: string }> = {
   interviewer: {
-    label: 'Interviewer',
-    color: 'text-blue-400',
-    bgColor: 'bg-blue-500/10',
+    label: 'INTERVIEWER',
+    lineClass: 'hud-transcript-line--interviewer',
   },
   me: {
-    label: 'You',
-    color: 'text-green-400',
-    bgColor: 'bg-green-500/10',
+    label: 'YOU',
+    lineClass: 'hud-transcript-line--you',
   },
 };
 
@@ -50,18 +40,15 @@ const SPEAKER_STYLES: Record<Speaker, { label: string; color: string; bgColor: s
 // Helper Functions
 // ============================================================================
 
-/**
- * Format timestamp for display
- */
 function formatTimestamp(timestamp: number): string {
   const date = new Date(timestamp);
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 }
 
-/**
- * Filter segments to last N seconds
- * TODO: Per PLAN.md, this should show ~30 seconds. Implement time-window filter.
- */
 function filterRecentSegments(
   segments: TranscriptSegment[],
   windowMs: number = 30000
@@ -78,48 +65,63 @@ function filterRecentSegments(
 interface TranscriptLineProps {
   segment: TranscriptSegment;
   showTimestamp: boolean;
+  isInterim?: boolean;
 }
 
-function TranscriptLine({ segment, showTimestamp }: TranscriptLineProps): React.ReactElement {
-  const style = SPEAKER_STYLES[segment.speaker];
+function TranscriptLine({
+  segment,
+  showTimestamp,
+  isInterim = false,
+}: TranscriptLineProps): React.ReactElement {
+  const config = SPEAKER_CONFIG[segment.speaker];
 
   return (
-    <div className={`px-3 py-2 rounded-lg ${style.bgColor} mb-2`}>
-      <div className="flex items-center gap-2 mb-1">
-        <span className={`text-xs font-semibold ${style.color}`}>
-          {style.label}
-        </span>
+    <div
+      className={`hud-transcript-line ${config.lineClass} ${
+        isInterim ? 'hud-transcript-line--interim' : ''
+      }`}
+    >
+      <div className="hud-speaker-label">
+        {config.label}
         {showTimestamp && (
-          <span className="text-xs text-gray-500">
+          <span className="ml-2 opacity-50 font-normal">
             {formatTimestamp(segment.timestamp)}
           </span>
         )}
+        {isInterim && (
+          <span className="ml-2 opacity-50 italic font-normal">typing...</span>
+        )}
       </div>
-      <p className="text-sm text-gray-200 leading-relaxed">
-        {segment.text}
-      </p>
+      <p className="hud-transcript-text">{segment.text}</p>
     </div>
   );
 }
 
-interface InterimTextProps {
-  text: string;
-  speaker: Speaker;
-}
+// ============================================================================
+// Empty State
+// ============================================================================
 
-function InterimText({ text, speaker }: InterimTextProps): React.ReactElement {
-  const style = SPEAKER_STYLES[speaker];
-
+function EmptyState(): React.ReactElement {
   return (
-    <div className={`px-3 py-2 rounded-lg ${style.bgColor} mb-2 opacity-60`}>
-      <div className="flex items-center gap-2 mb-1">
-        <span className={`text-xs font-semibold ${style.color}`}>
-          {style.label}
-        </span>
-        <span className="text-xs text-gray-500 italic">typing...</span>
+    <div className="hud-transcript-empty">
+      <div className="hud-transcript-empty-icon">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          <line x1="12" x2="12" y1="19" y2="22" />
+        </svg>
       </div>
-      <p className="text-sm text-gray-300 leading-relaxed italic">
-        {text}
+      <p className="text-xs text-[var(--hud-text-tertiary)] font-mono">
+        AWAITING TRANSCRIPT...
       </p>
     </div>
   );
@@ -129,18 +131,6 @@ function InterimText({ text, speaker }: InterimTextProps): React.ReactElement {
 // Main Component
 // ============================================================================
 
-/**
- * LiveTranscript displays scrolling transcript text
- *
- * @example
- * ```tsx
- * <LiveTranscript
- *   segments={transcriptSegments}
- *   interimText="The candidate is..."
- *   interimSpeaker="interviewer"
- * />
- * ```
- */
 export function LiveTranscript({
   segments,
   interimText,
@@ -161,20 +151,25 @@ export function LiveTranscript({
   // Filter to recent segments (last 30 seconds per PLAN.md)
   const recentSegments = filterRecentSegments(segments);
 
-  if (recentSegments.length === 0 && !interimText) {
-    return (
-      <div className="px-3 py-4 text-center">
-        <p className="text-sm text-gray-500">
-          Waiting for transcript...
-        </p>
-      </div>
-    );
+  // Create interim segment for display
+  const interimSegment: TranscriptSegment | null =
+    interimText && interimSpeaker
+      ? {
+          timestamp: Date.now(),
+          speaker: interimSpeaker,
+          text: interimText,
+          wordCount: interimText.split(/\s+/).length,
+        }
+      : null;
+
+  if (recentSegments.length === 0 && !interimSegment) {
+    return <EmptyState />;
   }
 
   return (
     <div
       ref={scrollRef}
-      className="overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent"
+      className="overflow-y-auto hud-scrollbar"
       style={{ maxHeight }}
     >
       {/* Final transcript segments */}
@@ -187,8 +182,12 @@ export function LiveTranscript({
       ))}
 
       {/* Interim (non-final) text */}
-      {interimText && interimSpeaker && (
-        <InterimText text={interimText} speaker={interimSpeaker} />
+      {interimSegment && (
+        <TranscriptLine
+          segment={interimSegment}
+          showTimestamp={false}
+          isInterim={true}
+        />
       )}
     </div>
   );
@@ -198,36 +197,46 @@ export function LiveTranscript({
 // Compact Variant
 // ============================================================================
 
-/**
- * Compact transcript showing only the most recent text
- */
 export function CompactTranscript({
   segments,
   interimText,
   interimSpeaker,
-}: Pick<LiveTranscriptProps, 'segments' | 'interimText' | 'interimSpeaker'>): React.ReactElement {
-  // Show only the last segment or interim text
+}: Pick<
+  LiveTranscriptProps,
+  'segments' | 'interimText' | 'interimSpeaker'
+>): React.ReactElement {
   const lastSegment = segments[segments.length - 1];
   const displayText = interimText || lastSegment?.text;
   const displaySpeaker = interimSpeaker || lastSegment?.speaker;
 
   if (!displayText || !displaySpeaker) {
     return (
-      <p className="text-sm text-gray-500 italic">
-        Waiting for transcript...
+      <p className="text-xs text-[var(--hud-text-tertiary)] font-mono">
+        AWAITING TRANSCRIPT...
       </p>
     );
   }
 
-  const style = SPEAKER_STYLES[displaySpeaker];
+  const config = SPEAKER_CONFIG[displaySpeaker];
   const isInterim = !!interimText;
 
+  const speakerColorClass =
+    displaySpeaker === 'interviewer'
+      ? 'text-[var(--hud-speaker-interviewer)]'
+      : 'text-[var(--hud-speaker-you)]';
+
   return (
-    <div className="flex items-start gap-2">
-      <span className={`text-xs font-semibold ${style.color} shrink-0`}>
-        {style.label}:
+    <div className="flex items-start gap-3">
+      <span
+        className={`text-[10px] font-mono font-semibold shrink-0 ${speakerColorClass}`}
+      >
+        {'>'} {config.label}:
       </span>
-      <p className={`text-sm text-gray-200 ${isInterim ? 'italic opacity-60' : ''}`}>
+      <p
+        className={`text-sm text-[var(--hud-text-primary)] ${
+          isInterim ? 'italic opacity-50' : ''
+        }`}
+      >
         {displayText}
       </p>
     </div>
