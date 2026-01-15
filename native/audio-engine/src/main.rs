@@ -239,10 +239,7 @@ mod system_audio {
         /// Requires:
         /// - macOS 12.3 or later
         /// - Screen Recording permission granted in System Preferences
-        pub fn new(
-            sample_rate: u32,
-            producer: RingBufferProducer,
-        ) -> Result<Self> {
+        pub fn new(sample_rate: u32, producer: RingBufferProducer) -> Result<Self> {
             eprintln!("[INFO] Initializing system audio capture via ScreenCaptureKit");
             eprintln!("[INFO] Note: Screen Recording permission required");
 
@@ -367,10 +364,7 @@ mod system_audio {
     }
 
     impl SystemAudioCapture {
-        pub fn new(
-            _sample_rate: u32,
-            producer: RingBufferProducer,
-        ) -> Result<Self> {
+        pub fn new(_sample_rate: u32, producer: RingBufferProducer) -> Result<Self> {
             eprintln!("[WARN] System audio capture only supported on macOS");
             eprintln!("[WARN] Currently outputting silence on Channel 0 (System)");
             Ok(Self {
