@@ -102,6 +102,11 @@ jobs:
         with:
           components: clippy, rustfmt
 
+      - name: Install system dependencies (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev pkg-config
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:

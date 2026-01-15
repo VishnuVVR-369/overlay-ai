@@ -35,3 +35,6 @@ docs/
 
 # Rust Binaries
 resources/
+
+# Coverage reports
+coverage/
