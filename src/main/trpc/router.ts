@@ -150,7 +150,7 @@ export const appRouter = router({
         modelId: z.string().optional(),
       })
     )
-    .mutation(({ input }): AnswerData => {
+    .mutation((): AnswerData => {
       // The actual generation is handled via IPC events in ipc.ts
       return answerData;
     }),

@@ -1,10 +1,8 @@
 /**
- * AnswerCard Component
+ * AnswerCard Component - Cyber-Minimalist HUD Design
  *
- * Per PLAN.md Phase 7.1:
- * AnswerCard: The Markdown-rendered response from the LLM
- *
- * Displays streaming LLM responses with markdown formatting.
+ * Displays LLM-generated answers with sleek markdown rendering
+ * and HUD-style visual elements.
  */
 
 import React from 'react';
@@ -16,77 +14,114 @@ import type { AnswerState } from '../../lib/ipc';
 // ============================================================================
 
 export interface AnswerCardProps {
-  /** Current answer generation state */
   state: AnswerState;
-  /** The answer text (may be partial during streaming) */
   text: string;
-  /** Error message if state is 'error' */
   error?: string;
-  /** Model ID used for generation */
   modelId?: string;
-  /** Whether to show the model badge */
   showModel?: boolean;
-  /** Maximum height (scrollable) */
   maxHeight?: string;
 }
 
 // ============================================================================
-// State Configuration
+// Icons
 // ============================================================================
 
-interface StateConfig {
-  icon: string;
-  label: string;
-  showContent: boolean;
-}
+const CommandIcon = () => (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />
+  </svg>
+);
 
-const STATE_CONFIG: Record<AnswerState, StateConfig> = {
-  idle: {
-    icon: '',
-    label: 'Press Cmd+Shift+X to get answer',
-    showContent: false,
-  },
-  generating: {
-    icon: '',
-    label: 'Generating...',
-    showContent: true,
-  },
-  complete: {
-    icon: '',
-    label: '',
-    showContent: true,
-  },
-  error: {
-    icon: '',
-    label: 'Error',
-    showContent: false,
-  },
-};
+const SparkleIcon = () => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+    <path d="M5 3v4" />
+    <path d="M19 17v4" />
+    <path d="M3 5h4" />
+    <path d="M17 19h4" />
+  </svg>
+);
+
+const AlertIcon = () => (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" x2="12" y1="8" y2="12" />
+    <line x1="12" x2="12.01" y1="16" y2="16" />
+  </svg>
+);
 
 // ============================================================================
 // Sub-Components
 // ============================================================================
 
-function LoadingIndicator(): React.ReactElement {
+function ModelBadge({ modelId }: { modelId: string }): React.ReactElement {
+  // Extract short model name
+  const shortName =
+    modelId.split('/').pop()?.split('-').slice(0, 2).join('-') || modelId;
+
+  return <span className="hud-model-badge">{shortName}</span>;
+}
+
+function GeneratingIndicator(): React.ReactElement {
   return (
-    <div className="flex items-center gap-2 text-gray-400">
-      <div className="flex gap-1">
-        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-      </div>
-      <span className="text-sm">Generating response...</span>
+    <div className="hud-generating">
+      <span className="hud-generating-dot" />
+      <span>GENERATING</span>
     </div>
   );
 }
 
-function ErrorDisplay({ message }: { message: string }): React.ReactElement {
+function LoadingState(): React.ReactElement {
   return (
-    <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-      <span className="text-red-400 text-lg">!</span>
+    <div className="flex flex-col items-center justify-center py-8">
+      <div className="hud-loading-dots mb-4">
+        <span />
+        <span />
+        <span />
+      </div>
+      <p className="text-xs text-[var(--hud-text-tertiary)] font-mono">
+        GENERATING RESPONSE...
+      </p>
+    </div>
+  );
+}
+
+function ErrorState({ message }: { message: string }): React.ReactElement {
+  return (
+    <div className="hud-answer-error">
+      <div className="hud-answer-error-icon">
+        <AlertIcon />
+      </div>
       <div>
-        <p className="text-sm font-medium text-red-400">Error generating answer</p>
-        <p className="text-xs text-red-300/80 mt-1">{message}</p>
+        <h4>Generation Failed</h4>
+        <p>{message}</p>
       </div>
     </div>
   );
@@ -94,45 +129,72 @@ function ErrorDisplay({ message }: { message: string }): React.ReactElement {
 
 function IdleState(): React.ReactElement {
   return (
-    <div className="flex flex-col items-center justify-center py-8 text-center">
-      <div className="text-4xl mb-3 opacity-30">?</div>
-      <p className="text-sm text-gray-500">
-        Press <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-xs font-mono">Cmd+Shift+X</kbd> to generate an answer
+    <div className="hud-answer-idle">
+      <div className="hud-answer-idle-icon">
+        <SparkleIcon />
+      </div>
+      <h3>Ready to assist</h3>
+      <p>
+        Press <kbd className="hud-kbd">Cmd+Shift+X</kbd> to generate an answer
       </p>
-      <p className="text-xs text-gray-600 mt-2">
+      <p className="mt-2 text-[10px] text-[var(--hud-text-tertiary)]">
         Based on the last 20 minutes of conversation
       </p>
     </div>
   );
 }
 
-function ModelBadge({ modelId }: { modelId: string }): React.ReactElement {
-  // Extract short model name
-  const shortName = modelId.split('/').pop()?.split('-').slice(0, 2).join('-') || modelId;
+// ============================================================================
+// Markdown Components
+// ============================================================================
 
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 bg-gray-700/50 rounded text-xs text-gray-400">
-      {shortName}
-    </span>
-  );
-}
+const markdownComponents = {
+  code: ({
+    className,
+    children,
+    ...props
+  }: React.HTMLAttributes<HTMLElement> & { className?: string }) => {
+    const isInline = !className;
+    if (isInline) {
+      return <code {...props}>{children}</code>;
+    }
+    return (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    );
+  },
+  pre: ({ children }: { children?: React.ReactNode }) => <pre>{children}</pre>,
+  h1: ({ children }: { children?: React.ReactNode }) => <h1>{children}</h1>,
+  h2: ({ children }: { children?: React.ReactNode }) => <h2>{children}</h2>,
+  h3: ({ children }: { children?: React.ReactNode }) => <h3>{children}</h3>,
+  ul: ({ children }: { children?: React.ReactNode }) => <ul>{children}</ul>,
+  ol: ({ children }: { children?: React.ReactNode }) => <ol>{children}</ol>,
+  li: ({ children }: { children?: React.ReactNode }) => <li>{children}</li>,
+  p: ({ children }: { children?: React.ReactNode }) => <p>{children}</p>,
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong>{children}</strong>
+  ),
+  blockquote: ({ children }: { children?: React.ReactNode }) => (
+    <blockquote>{children}</blockquote>
+  ),
+  a: ({
+    href,
+    children,
+  }: {
+    href?: string;
+    children?: React.ReactNode;
+  }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  ),
+};
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
-/**
- * AnswerCard displays the LLM-generated answer
- *
- * @example
- * ```tsx
- * <AnswerCard
- *   state="generating"
- *   text="The solution involves..."
- *   modelId="openai/gpt-oss-120b"
- * />
- * ```
- */
 export function AnswerCard({
   state,
   text,
@@ -141,101 +203,50 @@ export function AnswerCard({
   showModel = true,
   maxHeight = '400px',
 }: AnswerCardProps): React.ReactElement {
-  const config = STATE_CONFIG[state];
+  const showContent = state === 'generating' || state === 'complete';
 
   return (
-    <div className="bg-gray-900/80 backdrop-blur-sm rounded-xl border border-gray-700/50 overflow-hidden">
+    <div className="hud-answer hud-animate-in">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700/50 bg-gray-800/50">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-300">Answer</span>
-          {state === 'generating' && (
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+      <div className="hud-answer-header">
+        <div className="hud-answer-title">
+          <span className="hud-answer-title-icon">
+            <CommandIcon />
+          </span>
+          <span>RESPONSE</span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {state === 'generating' && <GeneratingIndicator />}
+          {showModel && modelId && state !== 'idle' && (
+            <ModelBadge modelId={modelId} />
           )}
         </div>
-        {showModel && modelId && state !== 'idle' && (
-          <ModelBadge modelId={modelId} />
-        )}
       </div>
 
       {/* Content */}
       <div
-        className="p-4 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent"
+        className="hud-answer-content hud-scrollbar"
         style={{ maxHeight }}
       >
         {/* Idle state */}
         {state === 'idle' && <IdleState />}
 
         {/* Error state */}
-        {state === 'error' && error && <ErrorDisplay message={error} />}
+        {state === 'error' && error && <ErrorState message={error} />}
 
-        {/* Generating state with no text yet */}
-        {state === 'generating' && !text && <LoadingIndicator />}
+        {/* Loading state (generating with no text yet) */}
+        {state === 'generating' && !text && <LoadingState />}
 
         {/* Content (generating or complete) */}
-        {config.showContent && text && (
-          <div className="prose prose-invert prose-sm max-w-none">
-            <ReactMarkdown
-              components={{
-                // Custom styling for code blocks
-                code: ({ className, children, ...props }) => {
-                  const isInline = !className;
-                  if (isInline) {
-                    return (
-                      <code
-                        className="px-1.5 py-0.5 bg-gray-800 rounded text-green-400 text-sm font-mono"
-                        {...props}
-                      >
-                        {children}
-                      </code>
-                    );
-                  }
-                  return (
-                    <code className={className} {...props}>
-                      {children}
-                    </code>
-                  );
-                },
-                // Style code blocks
-                pre: ({ children }) => (
-                  <pre className="bg-gray-800 rounded-lg p-4 overflow-x-auto text-sm">
-                    {children}
-                  </pre>
-                ),
-                // Style headings
-                h1: ({ children }) => (
-                  <h1 className="text-lg font-bold text-white mt-4 mb-2">{children}</h1>
-                ),
-                h2: ({ children }) => (
-                  <h2 className="text-base font-bold text-white mt-3 mb-2">{children}</h2>
-                ),
-                h3: ({ children }) => (
-                  <h3 className="text-sm font-bold text-white mt-2 mb-1">{children}</h3>
-                ),
-                // Style lists
-                ul: ({ children }) => (
-                  <ul className="list-disc list-inside space-y-1 text-gray-200">{children}</ul>
-                ),
-                ol: ({ children }) => (
-                  <ol className="list-decimal list-inside space-y-1 text-gray-200">{children}</ol>
-                ),
-                // Style paragraphs
-                p: ({ children }) => (
-                  <p className="text-gray-200 leading-relaxed mb-3">{children}</p>
-                ),
-                // Style strong/bold
-                strong: ({ children }) => (
-                  <strong className="font-semibold text-white">{children}</strong>
-                ),
-              }}
-            >
+        {showContent && text && (
+          <div className="hud-prose">
+            <ReactMarkdown components={markdownComponents}>
               {text}
             </ReactMarkdown>
 
             {/* Streaming cursor */}
-            {state === 'generating' && (
-              <span className="inline-block w-2 h-4 bg-green-500 animate-pulse ml-1" />
-            )}
+            {state === 'generating' && <span className="hud-cursor" />}
           </div>
         )}
       </div>
@@ -247,23 +258,22 @@ export function AnswerCard({
 // Compact Variant
 // ============================================================================
 
-/**
- * Compact answer display (no card wrapper)
- */
 export function CompactAnswer({
   state,
   text,
 }: Pick<AnswerCardProps, 'state' | 'text'>): React.ReactElement {
   if (state === 'idle' || !text) {
-    return <p className="text-sm text-gray-500">No answer yet</p>;
+    return (
+      <p className="text-xs text-[var(--hud-text-tertiary)] font-mono">
+        NO RESPONSE YET
+      </p>
+    );
   }
 
   return (
-    <div className="prose prose-invert prose-sm max-w-none">
-      <ReactMarkdown>{text}</ReactMarkdown>
-      {state === 'generating' && (
-        <span className="inline-block w-2 h-4 bg-green-500 animate-pulse ml-1" />
-      )}
+    <div className="hud-prose">
+      <ReactMarkdown components={markdownComponents}>{text}</ReactMarkdown>
+      {state === 'generating' && <span className="hud-cursor" />}
     </div>
   );
 }

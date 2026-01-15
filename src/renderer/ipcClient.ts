@@ -19,7 +19,6 @@ import {
   type ContextStats,
   type IPCEvents,
 } from '../lib/ipc';
-import type { TranscriptSegment, Speaker } from '../lib/transcript';
 
 // ============================================================================
 // tRPC Client

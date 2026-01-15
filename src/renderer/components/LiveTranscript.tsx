@@ -1,13 +1,12 @@
 /**
- * LiveTranscript Component
+ * LiveTranscript Component - Space-Efficient Terminal Log Design
  *
- * Per PLAN.md Phase 7.1:
- * LiveTranscript: Scrolling text of the last 30s (for confidence check)
- *
- * Displays real-time transcript segments with speaker labels.
+ * A compact, flowing transcript display that maximizes content density
+ * while maintaining the cyber-minimalist HUD aesthetic. Speaker changes
+ * are indicated inline, and consecutive messages flow together naturally.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import type { TranscriptSegment, Speaker } from '../../lib/transcript';
 
 // ============================================================================
@@ -15,34 +14,32 @@ import type { TranscriptSegment, Speaker } from '../../lib/transcript';
 // ============================================================================
 
 export interface LiveTranscriptProps {
-  /** Transcript segments to display */
   segments: TranscriptSegment[];
-  /** Interim (non-final) transcript text */
   interimText?: string;
-  /** Speaker of the interim text */
   interimSpeaker?: Speaker;
-  /** Maximum height of the transcript area */
   maxHeight?: string;
-  /** Whether to auto-scroll to bottom */
   autoScroll?: boolean;
-  /** Show timestamps */
   showTimestamps?: boolean;
 }
 
+interface GroupedSegment {
+  speaker: Speaker;
+  texts: Array<{ text: string; timestamp: number; isInterim?: boolean }>;
+  startTimestamp: number;
+}
+
 // ============================================================================
-// Speaker Styling
+// Speaker Configuration
 // ============================================================================
 
-const SPEAKER_STYLES: Record<Speaker, { label: string; color: string; bgColor: string }> = {
+const SPEAKER_CONFIG: Record<Speaker, { label: string; colorClass: string }> = {
   interviewer: {
-    label: 'Interviewer',
-    color: 'text-blue-400',
-    bgColor: 'bg-blue-500/10',
+    label: 'INT',
+    colorClass: 'transcript-speaker--interviewer',
   },
   me: {
-    label: 'You',
-    color: 'text-green-400',
-    bgColor: 'bg-green-500/10',
+    label: 'YOU',
+    colorClass: 'transcript-speaker--you',
   },
 };
 
@@ -50,77 +47,166 @@ const SPEAKER_STYLES: Record<Speaker, { label: string; color: string; bgColor: s
 // Helper Functions
 // ============================================================================
 
-/**
- * Format timestamp for display
- */
 function formatTimestamp(timestamp: number): string {
   const date = new Date(timestamp);
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
-/**
- * Filter segments to last N seconds
- * TODO: Per PLAN.md, this should show ~30 seconds. Implement time-window filter.
- */
 function filterRecentSegments(
   segments: TranscriptSegment[],
-  windowMs: number = 30000
+  windowMs: number = 60000 // Increased to 60s for more context
 ): TranscriptSegment[] {
   const now = Date.now();
   const cutoff = now - windowMs;
   return segments.filter((seg) => seg.timestamp >= cutoff);
 }
 
+/**
+ * Groups consecutive segments from the same speaker together
+ * for a more compact display
+ */
+function groupSegmentsBySpeaker(
+  segments: TranscriptSegment[],
+  interimText?: string,
+  interimSpeaker?: Speaker
+): GroupedSegment[] {
+  const groups: GroupedSegment[] = [];
+
+  for (const segment of segments) {
+    const lastGroup = groups[groups.length - 1];
+
+    if (lastGroup && lastGroup.speaker === segment.speaker) {
+      // Same speaker - add to existing group
+      lastGroup.texts.push({
+        text: segment.text,
+        timestamp: segment.timestamp,
+      });
+    } else {
+      // Different speaker - create new group
+      groups.push({
+        speaker: segment.speaker,
+        texts: [{ text: segment.text, timestamp: segment.timestamp }],
+        startTimestamp: segment.timestamp,
+      });
+    }
+  }
+
+  // Add interim text
+  if (interimText && interimSpeaker) {
+    const lastGroup = groups[groups.length - 1];
+
+    if (lastGroup && lastGroup.speaker === interimSpeaker) {
+      lastGroup.texts.push({
+        text: interimText,
+        timestamp: Date.now(),
+        isInterim: true,
+      });
+    } else {
+      groups.push({
+        speaker: interimSpeaker,
+        texts: [{ text: interimText, timestamp: Date.now(), isInterim: true }],
+        startTimestamp: Date.now(),
+      });
+    }
+  }
+
+  return groups;
+}
+
 // ============================================================================
 // Sub-Components
 // ============================================================================
 
-interface TranscriptLineProps {
-  segment: TranscriptSegment;
-  showTimestamp: boolean;
+interface SpeakerTagProps {
+  speaker: Speaker;
+  timestamp?: number;
+  showTimestamp?: boolean;
 }
 
-function TranscriptLine({ segment, showTimestamp }: TranscriptLineProps): React.ReactElement {
-  const style = SPEAKER_STYLES[segment.speaker];
+function SpeakerTag({
+  speaker,
+  timestamp,
+  showTimestamp,
+}: SpeakerTagProps): React.ReactElement {
+  const config = SPEAKER_CONFIG[speaker];
 
   return (
-    <div className={`px-3 py-2 rounded-lg ${style.bgColor} mb-2`}>
-      <div className="flex items-center gap-2 mb-1">
-        <span className={`text-xs font-semibold ${style.color}`}>
-          {style.label}
-        </span>
-        {showTimestamp && (
-          <span className="text-xs text-gray-500">
-            {formatTimestamp(segment.timestamp)}
+    <span className={`transcript-tag ${config.colorClass}`}>
+      <span className="transcript-tag__chevron">›</span>
+      <span className="transcript-tag__label">{config.label}</span>
+      {showTimestamp && timestamp && (
+        <span className="transcript-tag__time">{formatTimestamp(timestamp)}</span>
+      )}
+    </span>
+  );
+}
+
+interface TranscriptGroupProps {
+  group: GroupedSegment;
+  showTimestamp: boolean;
+  isFirst: boolean;
+}
+
+function TranscriptGroup({
+  group,
+  showTimestamp,
+  isFirst,
+}: TranscriptGroupProps): React.ReactElement {
+  const config = SPEAKER_CONFIG[group.speaker];
+
+  return (
+    <div className={`transcript-group ${isFirst ? 'transcript-group--first' : ''}`}>
+      <SpeakerTag
+        speaker={group.speaker}
+        timestamp={group.startTimestamp}
+        showTimestamp={showTimestamp}
+      />
+      <div className={`transcript-content ${config.colorClass}`}>
+        {group.texts.map((item, idx) => (
+          <span
+            key={`${item.timestamp}-${idx}`}
+            className={`transcript-text ${item.isInterim ? 'transcript-text--interim' : ''}`}
+          >
+            {item.text}
+            {idx < group.texts.length - 1 && ' '}
           </span>
+        ))}
+        {group.texts.some((t) => t.isInterim) && (
+          <span className="transcript-cursor" />
         )}
       </div>
-      <p className="text-sm text-gray-200 leading-relaxed">
-        {segment.text}
-      </p>
     </div>
   );
 }
 
-interface InterimTextProps {
-  text: string;
-  speaker: Speaker;
-}
+// ============================================================================
+// Empty State
+// ============================================================================
 
-function InterimText({ text, speaker }: InterimTextProps): React.ReactElement {
-  const style = SPEAKER_STYLES[speaker];
-
+function EmptyState(): React.ReactElement {
   return (
-    <div className={`px-3 py-2 rounded-lg ${style.bgColor} mb-2 opacity-60`}>
-      <div className="flex items-center gap-2 mb-1">
-        <span className={`text-xs font-semibold ${style.color}`}>
-          {style.label}
-        </span>
-        <span className="text-xs text-gray-500 italic">typing...</span>
+    <div className="transcript-empty">
+      <div className="transcript-empty__icon">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+          <line x1="12" x2="12" y1="19" y2="22" />
+        </svg>
       </div>
-      <p className="text-sm text-gray-300 leading-relaxed italic">
-        {text}
-      </p>
+      <span className="transcript-empty__text">AWAITING INPUT</span>
+      <span className="transcript-empty__hint">Audio transcript will appear here</span>
     </div>
   );
 }
@@ -129,23 +215,11 @@ function InterimText({ text, speaker }: InterimTextProps): React.ReactElement {
 // Main Component
 // ============================================================================
 
-/**
- * LiveTranscript displays scrolling transcript text
- *
- * @example
- * ```tsx
- * <LiveTranscript
- *   segments={transcriptSegments}
- *   interimText="The candidate is..."
- *   interimSpeaker="interviewer"
- * />
- * ```
- */
 export function LiveTranscript({
   segments,
   interimText,
   interimSpeaker,
-  maxHeight = '200px',
+  maxHeight = '240px',
   autoScroll = true,
   showTimestamps = false,
 }: LiveTranscriptProps): React.ReactElement {
@@ -158,78 +232,97 @@ export function LiveTranscript({
     }
   }, [segments, interimText, autoScroll]);
 
-  // Filter to recent segments (last 30 seconds per PLAN.md)
-  const recentSegments = filterRecentSegments(segments);
+  // Filter to recent segments (60 seconds for more context)
+  const recentSegments = useMemo(
+    () => filterRecentSegments(segments),
+    [segments]
+  );
 
-  if (recentSegments.length === 0 && !interimText) {
-    return (
-      <div className="px-3 py-4 text-center">
-        <p className="text-sm text-gray-500">
-          Waiting for transcript...
-        </p>
-      </div>
-    );
+  // Group segments by speaker for compact display
+  const groupedSegments = useMemo(
+    () => groupSegmentsBySpeaker(recentSegments, interimText, interimSpeaker),
+    [recentSegments, interimText, interimSpeaker]
+  );
+
+  if (groupedSegments.length === 0) {
+    return <EmptyState />;
   }
 
   return (
-    <div
-      ref={scrollRef}
-      className="overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent"
-      style={{ maxHeight }}
-    >
-      {/* Final transcript segments */}
-      {recentSegments.map((segment, index) => (
-        <TranscriptLine
-          key={`${segment.timestamp}-${index}`}
-          segment={segment}
-          showTimestamp={showTimestamps}
-        />
-      ))}
-
-      {/* Interim (non-final) text */}
-      {interimText && interimSpeaker && (
-        <InterimText text={interimText} speaker={interimSpeaker} />
-      )}
+    <div className="transcript-container">
+      <div className="transcript-header">
+        <span className="transcript-header__title">
+          <span className="transcript-header__dot" />
+          LIVE TRANSCRIPT
+        </span>
+        <span className="transcript-header__count">
+          {recentSegments.length} segments
+        </span>
+      </div>
+      <div
+        ref={scrollRef}
+        className="transcript-scroll hud-scrollbar"
+        style={{ maxHeight }}
+      >
+        <div className="transcript-log">
+          {groupedSegments.map((group, index) => (
+            <TranscriptGroup
+              key={`${group.speaker}-${group.startTimestamp}`}
+              group={group}
+              showTimestamp={showTimestamps}
+              isFirst={index === 0}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="transcript-fade" />
     </div>
   );
 }
 
 // ============================================================================
-// Compact Variant
+// Compact Variant (Single Line Display)
 // ============================================================================
 
-/**
- * Compact transcript showing only the most recent text
- */
 export function CompactTranscript({
   segments,
   interimText,
   interimSpeaker,
-}: Pick<LiveTranscriptProps, 'segments' | 'interimText' | 'interimSpeaker'>): React.ReactElement {
-  // Show only the last segment or interim text
+}: Pick<
+  LiveTranscriptProps,
+  'segments' | 'interimText' | 'interimSpeaker'
+>): React.ReactElement {
   const lastSegment = segments[segments.length - 1];
   const displayText = interimText || lastSegment?.text;
   const displaySpeaker = interimSpeaker || lastSegment?.speaker;
 
   if (!displayText || !displaySpeaker) {
     return (
-      <p className="text-sm text-gray-500 italic">
-        Waiting for transcript...
-      </p>
+      <div className="transcript-compact transcript-compact--empty">
+        <span className="transcript-compact__waiting">
+          <span className="transcript-compact__dot" />
+          Waiting for audio...
+        </span>
+      </div>
     );
   }
 
-  const style = SPEAKER_STYLES[displaySpeaker];
+  const config = SPEAKER_CONFIG[displaySpeaker];
   const isInterim = !!interimText;
 
   return (
-    <div className="flex items-start gap-2">
-      <span className={`text-xs font-semibold ${style.color} shrink-0`}>
-        {style.label}:
+    <div className="transcript-compact">
+      <span className={`transcript-compact__speaker ${config.colorClass}`}>
+        {config.label}:
       </span>
-      <p className={`text-sm text-gray-200 ${isInterim ? 'italic opacity-60' : ''}`}>
-        {displayText}
-      </p>
+      <span
+        className={`transcript-compact__text ${
+          isInterim ? 'transcript-compact__text--interim' : ''
+        }`}
+      >
+        {displayText.length > 80 ? `${displayText.slice(-80)}...` : displayText}
+      </span>
+      {isInterim && <span className="transcript-cursor transcript-cursor--sm" />}
     </div>
   );
 }

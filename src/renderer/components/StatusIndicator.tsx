@@ -1,10 +1,8 @@
 /**
- * StatusIndicator Component
+ * StatusIndicator Component - Cyber-Minimalist HUD Design
  *
- * Per PLAN.md Phase 7.1:
- * StatusIndicator: Green dot (Listening), Red dot (Error)
- *
- * Shows the current connection status of the live audio/transcription pipeline.
+ * A sleek status indicator inspired by professional dev tools
+ * with subtle HUD aesthetics for the overlay interface.
  */
 
 import React from 'react';
@@ -15,13 +13,9 @@ import type { LiveModeState } from '../../lib/ipc';
 // ============================================================================
 
 export interface StatusIndicatorProps {
-  /** Current live mode state */
   state: LiveModeState;
-  /** Optional error message to display */
   error?: string;
-  /** Whether to show the status label */
   showLabel?: boolean;
-  /** Size variant */
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -30,101 +24,46 @@ export interface StatusIndicatorProps {
 // ============================================================================
 
 interface StatusConfig {
-  color: string;
-  pulseColor: string;
   label: string;
-  animate: boolean;
+  stateClass: string;
 }
 
 const STATUS_CONFIG: Record<LiveModeState, StatusConfig> = {
   disconnected: {
-    color: 'bg-gray-500',
-    pulseColor: 'bg-gray-400',
-    label: 'Disconnected',
-    animate: false,
+    label: 'OFFLINE',
+    stateClass: 'hud-status--idle',
   },
   connecting: {
-    color: 'bg-yellow-500',
-    pulseColor: 'bg-yellow-400',
-    label: 'Connecting...',
-    animate: true,
+    label: 'CONNECTING',
+    stateClass: 'hud-status--connecting',
   },
   connected: {
-    color: 'bg-green-500',
-    pulseColor: 'bg-green-400',
-    label: 'Listening',
-    animate: true,
+    label: 'LISTENING',
+    stateClass: 'hud-status--active',
   },
   error: {
-    color: 'bg-red-500',
-    pulseColor: 'bg-red-400',
-    label: 'Error',
-    animate: false,
-  },
-};
-
-const SIZE_CLASSES = {
-  sm: {
-    dot: 'h-2 w-2',
-    pulse: 'h-2 w-2',
-    text: 'text-xs',
-    gap: 'gap-1.5',
-  },
-  md: {
-    dot: 'h-3 w-3',
-    pulse: 'h-3 w-3',
-    text: 'text-sm',
-    gap: 'gap-2',
-  },
-  lg: {
-    dot: 'h-4 w-4',
-    pulse: 'h-4 w-4',
-    text: 'text-base',
-    gap: 'gap-2.5',
+    label: 'ERROR',
+    stateClass: 'hud-status--error',
   },
 };
 
 // ============================================================================
-// Component
+// Main Component
 // ============================================================================
 
-/**
- * StatusIndicator shows the current live mode status
- *
- * @example
- * ```tsx
- * <StatusIndicator state="connected" />
- * <StatusIndicator state="error" error="Connection failed" showLabel />
- * ```
- */
 export function StatusIndicator({
   state,
   error,
   showLabel = true,
-  size = 'md',
 }: StatusIndicatorProps): React.ReactElement {
   const config = STATUS_CONFIG[state];
-  const sizeClasses = SIZE_CLASSES[size];
+  const displayLabel = state === 'error' && error ? 'ERROR' : config.label;
 
   return (
-    <div className={`flex items-center ${sizeClasses.gap}`}>
-      {/* Status dot with optional pulse animation */}
-      <div className="relative flex items-center justify-center">
-        {config.animate && (
-          <span
-            className={`absolute ${sizeClasses.pulse} ${config.pulseColor} rounded-full animate-ping opacity-75`}
-          />
-        )}
-        <span
-          className={`relative ${sizeClasses.dot} ${config.color} rounded-full`}
-        />
-      </div>
-
-      {/* Status label */}
+    <div className={`hud-status ${config.stateClass}`}>
+      <span className="hud-status-dot" aria-hidden="true" />
       {showLabel && (
-        <span className={`${sizeClasses.text} text-gray-300 font-medium`}>
-          {state === 'error' && error ? error : config.label}
-        </span>
+        <span className="hud-status-label">{displayLabel}</span>
       )}
     </div>
   );
@@ -135,31 +74,50 @@ export function StatusIndicator({
 // ============================================================================
 
 /**
- * Compact status indicator (dot only)
+ * Compact status dot only
  */
 export function StatusDot({
   state,
-  size = 'sm',
-}: Pick<StatusIndicatorProps, 'state' | 'size'>): React.ReactElement {
-  return <StatusIndicator state={state} showLabel={false} size={size} />;
+}: Pick<StatusIndicatorProps, 'state'>): React.ReactElement {
+  return <StatusIndicator state={state} showLabel={false} />;
 }
 
 /**
- * Status badge with background
+ * Status badge - the main variant used in the header
  */
 export function StatusBadge({
   state,
   error,
 }: Pick<StatusIndicatorProps, 'state' | 'error'>): React.ReactElement {
+  return <StatusIndicator state={state} error={error} showLabel={true} />;
+}
+
+// ============================================================================
+// Inline Status (for compact displays)
+// ============================================================================
+
+export function InlineStatus({
+  state,
+}: Pick<StatusIndicatorProps, 'state'>): React.ReactElement {
   const config = STATUS_CONFIG[state];
 
+  const colorClass = {
+    disconnected: 'text-[var(--hud-status-idle)]',
+    connecting: 'text-[var(--hud-status-warning)]',
+    connected: 'text-[var(--hud-status-active)]',
+    error: 'text-[var(--hud-status-error)]',
+  }[state];
+
   return (
-    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 rounded-full backdrop-blur-sm">
-      <StatusDot state={state} />
-      <span className="text-sm text-gray-200 font-medium">
-        {state === 'error' && error ? error : config.label}
+    <span className={`inline-flex items-center gap-1.5 font-mono text-[10px] ${colorClass}`}>
+      <span className="relative flex h-1.5 w-1.5">
+        {(state === 'connected' || state === 'connecting') && (
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-50" />
+        )}
+        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-current" />
       </span>
-    </div>
+      {config.label}
+    </span>
   );
 }
 
