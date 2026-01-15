@@ -39,6 +39,16 @@ const RING_BUFFER_SIZE: usize = TARGET_SAMPLE_RATE as usize * OUTPUT_CHANNELS as
 const SYSTEM_AUDIO_BUFFER_SIZE: usize = TARGET_SAMPLE_RATE as usize * 2;
 
 // ============================================================================
+// Type Aliases
+// ============================================================================
+
+/// Type alias for ring buffer producer wrapped in Arc<Mutex<...>>
+type RingBufferProducer = Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>;
+
+/// Type alias for ring buffer consumer wrapped in Arc<Mutex<...>>
+type RingBufferConsumer = Arc<std::sync::Mutex<ringbuf::Consumer<i16, Arc<HeapRb<i16>>>>>;
+
+// ============================================================================
 // CLI Arguments
 // ============================================================================
 
@@ -85,7 +95,6 @@ struct Args {
 #[cfg(target_os = "macos")]
 mod system_audio {
     use super::*;
-    use ringbuf::HeapRb;
     use screencapturekit::cm::CMTime;
     use screencapturekit::prelude::*;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -97,7 +106,7 @@ mod system_audio {
         /// Sample rate for audio capture
         sample_rate: u32,
         /// Ring buffer producer for captured audio
-        producer: Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>,
+        producer: RingBufferProducer,
         /// Flag indicating if capture is active
         is_running: Arc<AtomicBool>,
     }
@@ -105,7 +114,7 @@ mod system_audio {
     /// Handler for ScreenCaptureKit stream output
     struct SystemAudioHandler {
         /// Producer to push audio samples to
-        producer: Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>,
+        producer: RingBufferProducer,
         /// Source sample rate from ScreenCaptureKit
         source_sample_rate: u32,
         /// Target sample rate (16kHz)
@@ -115,7 +124,11 @@ mod system_audio {
     }
 
     impl SCStreamOutputTrait for SystemAudioHandler {
-        fn did_output_sample_buffer(&self, sample: CMSampleBuffer, output_type: SCStreamOutputType) {
+        fn did_output_sample_buffer(
+            &self,
+            sample: CMSampleBuffer,
+            output_type: SCStreamOutputType,
+        ) {
             // Only process audio buffers
             if output_type != SCStreamOutputType::Audio {
                 return;
@@ -171,7 +184,11 @@ mod system_audio {
 
                 // Resample to target rate if needed
                 let resampled = if self.source_sample_rate != self.target_sample_rate {
-                    resample_linear(&mono_samples, self.source_sample_rate, self.target_sample_rate)
+                    resample_linear(
+                        &mono_samples,
+                        self.source_sample_rate,
+                        self.target_sample_rate,
+                    )
                 } else {
                     mono_samples
                 };
@@ -182,8 +199,10 @@ mod system_audio {
                 }
 
                 // Log occasionally
-                let count = self.buffer_count.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                if count % 100 == 0 && count > 0 {
+                let count = self
+                    .buffer_count
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if count.is_multiple_of(100) && count > 0 {
                     eprintln!("[DEBUG] System audio: {} buffers processed", count);
                 }
             }
@@ -220,10 +239,7 @@ mod system_audio {
         /// Requires:
         /// - macOS 12.3 or later
         /// - Screen Recording permission granted in System Preferences
-        pub fn new(
-            sample_rate: u32,
-            producer: Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>,
-        ) -> Result<Self> {
+        pub fn new(sample_rate: u32, producer: RingBufferProducer) -> Result<Self> {
             eprintln!("[INFO] Initializing system audio capture via ScreenCaptureKit");
             eprintln!("[INFO] Note: Screen Recording permission required");
 
@@ -245,8 +261,9 @@ mod system_audio {
             eprintln!("[INFO] Starting system audio capture...");
 
             // Get shareable content (displays)
-            let content = SCShareableContent::get()
-                .context("Failed to get shareable content. Is Screen Recording permission granted?")?;
+            let content = SCShareableContent::get().context(
+                "Failed to get shareable content. Is Screen Recording permission granted?",
+            )?;
 
             // Get the primary display
             let display = content
@@ -255,7 +272,10 @@ mod system_audio {
                 .next()
                 .context("No displays found for audio capture")?;
 
-            eprintln!("[INFO] Capturing system audio from display: {:?}", display.display_id());
+            eprintln!(
+                "[INFO] Capturing system audio from display: {:?}",
+                display.display_id()
+            );
 
             // Create content filter for display capture (audio only needs a display context)
             let filter = SCContentFilter::builder()
@@ -266,10 +286,10 @@ mod system_audio {
             // Configure for audio-only capture
             // We use minimal video settings since we only need audio
             let sck_sample_rate = 48000i32; // ScreenCaptureKit commonly uses 48kHz
-            
+
             // Create a CMTime for 1 FPS (minimum video framerate)
             let one_fps = CMTime::new(1, 1); // 1 frame per second
-            
+
             let mut config = SCStreamConfiguration::default();
             config.set_width(1); // Minimal video (required for stream)
             config.set_height(1);
@@ -291,13 +311,17 @@ mod system_audio {
             let mut stream = SCStream::new(&filter, &config);
             stream.add_output_handler(handler, SCStreamOutputType::Audio);
 
-            stream.start_capture()
+            stream
+                .start_capture()
                 .context("Failed to start system audio capture")?;
 
             self.stream = Some(stream);
             self.is_running.store(true, Ordering::Relaxed);
 
-            eprintln!("[INFO] System audio capture started ({}Hz → {}Hz)", sck_sample_rate, self.sample_rate);
+            eprintln!(
+                "[INFO] System audio capture started ({}Hz → {}Hz)",
+                sck_sample_rate, self.sample_rate
+            );
 
             Ok(())
         }
@@ -311,7 +335,8 @@ mod system_audio {
             eprintln!("[INFO] Stopping system audio capture...");
 
             if let Some(stream) = self.stream.take() {
-                stream.stop_capture()
+                stream
+                    .stop_capture()
                     .context("Failed to stop system audio capture")?;
             }
 
@@ -332,21 +357,19 @@ mod system_audio {
 #[cfg(not(target_os = "macos"))]
 mod system_audio {
     use super::*;
-    use ringbuf::HeapRb;
 
     /// System audio capture stub for non-macOS platforms
     pub struct SystemAudioCapture {
-        _producer: Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>,
+        _producer: RingBufferProducer,
     }
 
     impl SystemAudioCapture {
-        pub fn new(
-            _sample_rate: u32,
-            producer: Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>,
-        ) -> Result<Self> {
+        pub fn new(_sample_rate: u32, producer: RingBufferProducer) -> Result<Self> {
             eprintln!("[WARN] System audio capture only supported on macOS");
             eprintln!("[WARN] Currently outputting silence on Channel 0 (System)");
-            Ok(Self { _producer: producer })
+            Ok(Self {
+                _producer: producer,
+            })
         }
 
         pub fn start(&mut self) -> Result<()> {
@@ -369,11 +392,7 @@ mod system_audio {
 /// For production use, consider using a proper resampling library like `rubato`.
 ///
 /// Per PLAN.md: "Convert incoming streams to 16kHz / Mono (Deepgram requirement)"
-fn resample_to_16khz_mono(
-    input: &[i16],
-    input_sample_rate: u32,
-    input_channels: u16,
-) -> Vec<i16> {
+fn resample_to_16khz_mono(input: &[i16], input_sample_rate: u32, input_channels: u16) -> Vec<i16> {
     if input.is_empty() {
         return Vec::new();
     }
@@ -465,7 +484,9 @@ fn list_audio_devices() -> Result<()> {
     println!("==============================");
 
     // List input devices
-    let devices = host.input_devices().context("Failed to enumerate input devices")?;
+    let devices = host
+        .input_devices()
+        .context("Failed to enumerate input devices")?;
 
     for (idx, device) in devices.enumerate() {
         let name = device.name().unwrap_or_else(|_| "Unknown".to_string());
@@ -546,7 +567,10 @@ fn run_audio_capture(args: Args) -> Result<()> {
         config.sample_rate().0,
         config.sample_format()
     );
-    eprintln!("[INFO] Target output: {} channels, {} Hz, i16 PCM", OUTPUT_CHANNELS, args.sample_rate);
+    eprintln!(
+        "[INFO] Target output: {} channels, {} Hz, i16 PCM",
+        OUTPUT_CHANNELS, args.sample_rate
+    );
 
     let input_sample_rate = config.sample_rate().0;
     let input_channels = config.channels();
@@ -572,7 +596,8 @@ fn run_audio_capture(args: Args) -> Result<()> {
     ctrlc_handler(running.clone());
 
     // Initialize and start system audio capture
-    let mut system_audio = system_audio::SystemAudioCapture::new(args.sample_rate, system_producer)?;
+    let mut system_audio =
+        system_audio::SystemAudioCapture::new(args.sample_rate, system_producer)?;
     if let Err(e) = system_audio.start() {
         eprintln!("[WARN] Failed to start system audio capture: {}", e);
         eprintln!("[WARN] Continuing with microphone only (Channel 0 will be silence)");
@@ -646,7 +671,8 @@ fn run_audio_capture(args: Args) -> Result<()> {
         format => {
             anyhow::bail!("Unsupported sample format: {:?}", format);
         }
-    }.context("Failed to build input stream")?;
+    }
+    .context("Failed to build input stream")?;
 
     stream.play().context("Failed to start audio stream")?;
     eprintln!("[INFO] Audio capture started. Press Ctrl+C to stop.");
@@ -706,16 +732,15 @@ fn process_audio_data<T, F>(
     data: &[T],
     input_sample_rate: u32,
     input_channels: u16,
-    producer: &Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>,
-    system_consumer: &Arc<std::sync::Mutex<ringbuf::Consumer<i16, Arc<HeapRb<i16>>>>>,
+    producer: &RingBufferProducer,
+    system_consumer: &RingBufferConsumer,
     convert: F,
-)
-where
+) where
     T: Copy,
     F: Fn(&T) -> i16,
 {
     // Convert samples to i16
-    let samples_i16: Vec<i16> = data.iter().map(|s| convert(s)).collect();
+    let samples_i16: Vec<i16> = data.iter().map(convert).collect();
 
     // Resample microphone to target rate (mono)
     let mic_resampled = resample_to_16khz_mono(&samples_i16, input_sample_rate, input_channels);
