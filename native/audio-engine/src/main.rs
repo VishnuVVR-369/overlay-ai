@@ -39,6 +39,16 @@ const RING_BUFFER_SIZE: usize = TARGET_SAMPLE_RATE as usize * OUTPUT_CHANNELS as
 const SYSTEM_AUDIO_BUFFER_SIZE: usize = TARGET_SAMPLE_RATE as usize * 2;
 
 // ============================================================================
+// Type Aliases
+// ============================================================================
+
+/// Type alias for ring buffer producer wrapped in Arc<Mutex<...>>
+type RingBufferProducer = Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>;
+
+/// Type alias for ring buffer consumer wrapped in Arc<Mutex<...>>
+type RingBufferConsumer = Arc<std::sync::Mutex<ringbuf::Consumer<i16, Arc<HeapRb<i16>>>>>;
+
+// ============================================================================
 // CLI Arguments
 // ============================================================================
 
@@ -85,7 +95,6 @@ struct Args {
 #[cfg(target_os = "macos")]
 mod system_audio {
     use super::*;
-    use ringbuf::HeapRb;
     use screencapturekit::cm::CMTime;
     use screencapturekit::prelude::*;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -97,7 +106,7 @@ mod system_audio {
         /// Sample rate for audio capture
         sample_rate: u32,
         /// Ring buffer producer for captured audio
-        producer: Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>,
+        producer: RingBufferProducer,
         /// Flag indicating if capture is active
         is_running: Arc<AtomicBool>,
     }
@@ -105,7 +114,7 @@ mod system_audio {
     /// Handler for ScreenCaptureKit stream output
     struct SystemAudioHandler {
         /// Producer to push audio samples to
-        producer: Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>,
+        producer: RingBufferProducer,
         /// Source sample rate from ScreenCaptureKit
         source_sample_rate: u32,
         /// Target sample rate (16kHz)
@@ -232,7 +241,7 @@ mod system_audio {
         /// - Screen Recording permission granted in System Preferences
         pub fn new(
             sample_rate: u32,
-            producer: Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>,
+            producer: RingBufferProducer,
         ) -> Result<Self> {
             eprintln!("[INFO] Initializing system audio capture via ScreenCaptureKit");
             eprintln!("[INFO] Note: Screen Recording permission required");
@@ -351,17 +360,16 @@ mod system_audio {
 #[cfg(not(target_os = "macos"))]
 mod system_audio {
     use super::*;
-    use ringbuf::HeapRb;
 
     /// System audio capture stub for non-macOS platforms
     pub struct SystemAudioCapture {
-        _producer: Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>,
+        _producer: RingBufferProducer,
     }
 
     impl SystemAudioCapture {
         pub fn new(
             _sample_rate: u32,
-            producer: Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>,
+            producer: RingBufferProducer,
         ) -> Result<Self> {
             eprintln!("[WARN] System audio capture only supported on macOS");
             eprintln!("[WARN] Currently outputting silence on Channel 0 (System)");
@@ -730,8 +738,8 @@ fn process_audio_data<T, F>(
     data: &[T],
     input_sample_rate: u32,
     input_channels: u16,
-    producer: &Arc<std::sync::Mutex<ringbuf::Producer<i16, Arc<HeapRb<i16>>>>>,
-    system_consumer: &Arc<std::sync::Mutex<ringbuf::Consumer<i16, Arc<HeapRb<i16>>>>>,
+    producer: &RingBufferProducer,
+    system_consumer: &RingBufferConsumer,
     convert: F,
 ) where
     T: Copy,
