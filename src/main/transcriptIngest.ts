@@ -19,7 +19,6 @@ import {
   Speaker,
   createTranscriptSegment,
 } from '../lib/transcript';
-import { countWords } from '../lib/wordCount';
 
 // Re-export TranscriptSegment for convenience
 export type { TranscriptSegment, Speaker } from '../lib/transcript';

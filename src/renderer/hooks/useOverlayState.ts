@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { LiveModeStatus, AnswerData, AppStatus } from '../../lib/ipc';
+import type { LiveModeStatus, AnswerData } from '../../lib/ipc';
 import type { TranscriptSegment, Speaker } from '../../lib/transcript';
 import {
   getStatus,

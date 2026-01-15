@@ -1,11 +1,12 @@
 /**
- * LiveTranscript Component - Cyber-Minimalist HUD Design
+ * LiveTranscript Component - Space-Efficient Terminal Log Design
  *
- * Real-time transcript display with HUD-style speaker indicators
- * and sleek scrolling behavior.
+ * A compact, flowing transcript display that maximizes content density
+ * while maintaining the cyber-minimalist HUD aesthetic. Speaker changes
+ * are indicated inline, and consecutive messages flow together naturally.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import type { TranscriptSegment, Speaker } from '../../lib/transcript';
 
 // ============================================================================
@@ -21,18 +22,24 @@ export interface LiveTranscriptProps {
   showTimestamps?: boolean;
 }
 
+interface GroupedSegment {
+  speaker: Speaker;
+  texts: Array<{ text: string; timestamp: number; isInterim?: boolean }>;
+  startTimestamp: number;
+}
+
 // ============================================================================
 // Speaker Configuration
 // ============================================================================
 
-const SPEAKER_CONFIG: Record<Speaker, { label: string; lineClass: string }> = {
+const SPEAKER_CONFIG: Record<Speaker, { label: string; colorClass: string }> = {
   interviewer: {
-    label: 'INTERVIEWER',
-    lineClass: 'hud-transcript-line--interviewer',
+    label: 'INT',
+    colorClass: 'transcript-speaker--interviewer',
   },
   me: {
     label: 'YOU',
-    lineClass: 'hud-transcript-line--you',
+    colorClass: 'transcript-speaker--you',
   },
 };
 
@@ -45,54 +52,132 @@ function formatTimestamp(timestamp: number): string {
   return date.toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
   });
 }
 
 function filterRecentSegments(
   segments: TranscriptSegment[],
-  windowMs: number = 30000
+  windowMs: number = 60000 // Increased to 60s for more context
 ): TranscriptSegment[] {
   const now = Date.now();
   const cutoff = now - windowMs;
   return segments.filter((seg) => seg.timestamp >= cutoff);
 }
 
+/**
+ * Groups consecutive segments from the same speaker together
+ * for a more compact display
+ */
+function groupSegmentsBySpeaker(
+  segments: TranscriptSegment[],
+  interimText?: string,
+  interimSpeaker?: Speaker
+): GroupedSegment[] {
+  const groups: GroupedSegment[] = [];
+
+  for (const segment of segments) {
+    const lastGroup = groups[groups.length - 1];
+
+    if (lastGroup && lastGroup.speaker === segment.speaker) {
+      // Same speaker - add to existing group
+      lastGroup.texts.push({
+        text: segment.text,
+        timestamp: segment.timestamp,
+      });
+    } else {
+      // Different speaker - create new group
+      groups.push({
+        speaker: segment.speaker,
+        texts: [{ text: segment.text, timestamp: segment.timestamp }],
+        startTimestamp: segment.timestamp,
+      });
+    }
+  }
+
+  // Add interim text
+  if (interimText && interimSpeaker) {
+    const lastGroup = groups[groups.length - 1];
+
+    if (lastGroup && lastGroup.speaker === interimSpeaker) {
+      lastGroup.texts.push({
+        text: interimText,
+        timestamp: Date.now(),
+        isInterim: true,
+      });
+    } else {
+      groups.push({
+        speaker: interimSpeaker,
+        texts: [{ text: interimText, timestamp: Date.now(), isInterim: true }],
+        startTimestamp: Date.now(),
+      });
+    }
+  }
+
+  return groups;
+}
+
 // ============================================================================
 // Sub-Components
 // ============================================================================
 
-interface TranscriptLineProps {
-  segment: TranscriptSegment;
-  showTimestamp: boolean;
-  isInterim?: boolean;
+interface SpeakerTagProps {
+  speaker: Speaker;
+  timestamp?: number;
+  showTimestamp?: boolean;
 }
 
-function TranscriptLine({
-  segment,
+function SpeakerTag({
+  speaker,
+  timestamp,
   showTimestamp,
-  isInterim = false,
-}: TranscriptLineProps): React.ReactElement {
-  const config = SPEAKER_CONFIG[segment.speaker];
+}: SpeakerTagProps): React.ReactElement {
+  const config = SPEAKER_CONFIG[speaker];
 
   return (
-    <div
-      className={`hud-transcript-line ${config.lineClass} ${
-        isInterim ? 'hud-transcript-line--interim' : ''
-      }`}
-    >
-      <div className="hud-speaker-label">
-        {config.label}
-        {showTimestamp && (
-          <span className="ml-2 opacity-50 font-normal">
-            {formatTimestamp(segment.timestamp)}
+    <span className={`transcript-tag ${config.colorClass}`}>
+      <span className="transcript-tag__chevron">›</span>
+      <span className="transcript-tag__label">{config.label}</span>
+      {showTimestamp && timestamp && (
+        <span className="transcript-tag__time">{formatTimestamp(timestamp)}</span>
+      )}
+    </span>
+  );
+}
+
+interface TranscriptGroupProps {
+  group: GroupedSegment;
+  showTimestamp: boolean;
+  isFirst: boolean;
+}
+
+function TranscriptGroup({
+  group,
+  showTimestamp,
+  isFirst,
+}: TranscriptGroupProps): React.ReactElement {
+  const config = SPEAKER_CONFIG[group.speaker];
+
+  return (
+    <div className={`transcript-group ${isFirst ? 'transcript-group--first' : ''}`}>
+      <SpeakerTag
+        speaker={group.speaker}
+        timestamp={group.startTimestamp}
+        showTimestamp={showTimestamp}
+      />
+      <div className={`transcript-content ${config.colorClass}`}>
+        {group.texts.map((item, idx) => (
+          <span
+            key={`${item.timestamp}-${idx}`}
+            className={`transcript-text ${item.isInterim ? 'transcript-text--interim' : ''}`}
+          >
+            {item.text}
+            {idx < group.texts.length - 1 && ' '}
           </span>
-        )}
-        {isInterim && (
-          <span className="ml-2 opacity-50 italic font-normal">typing...</span>
+        ))}
+        {group.texts.some((t) => t.isInterim) && (
+          <span className="transcript-cursor" />
         )}
       </div>
-      <p className="hud-transcript-text">{segment.text}</p>
     </div>
   );
 }
@@ -103,11 +188,11 @@ function TranscriptLine({
 
 function EmptyState(): React.ReactElement {
   return (
-    <div className="hud-transcript-empty">
-      <div className="hud-transcript-empty-icon">
+    <div className="transcript-empty">
+      <div className="transcript-empty__icon">
         <svg
-          width="20"
-          height="20"
+          width="16"
+          height="16"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -120,9 +205,8 @@ function EmptyState(): React.ReactElement {
           <line x1="12" x2="12" y1="19" y2="22" />
         </svg>
       </div>
-      <p className="text-xs text-[var(--hud-text-tertiary)] font-mono">
-        AWAITING TRANSCRIPT...
-      </p>
+      <span className="transcript-empty__text">AWAITING INPUT</span>
+      <span className="transcript-empty__hint">Audio transcript will appear here</span>
     </div>
   );
 }
@@ -135,7 +219,7 @@ export function LiveTranscript({
   segments,
   interimText,
   interimSpeaker,
-  maxHeight = '200px',
+  maxHeight = '240px',
   autoScroll = true,
   showTimestamps = false,
 }: LiveTranscriptProps): React.ReactElement {
@@ -148,53 +232,56 @@ export function LiveTranscript({
     }
   }, [segments, interimText, autoScroll]);
 
-  // Filter to recent segments (last 30 seconds per PLAN.md)
-  const recentSegments = filterRecentSegments(segments);
+  // Filter to recent segments (60 seconds for more context)
+  const recentSegments = useMemo(
+    () => filterRecentSegments(segments),
+    [segments]
+  );
 
-  // Create interim segment for display
-  const interimSegment: TranscriptSegment | null =
-    interimText && interimSpeaker
-      ? {
-          timestamp: Date.now(),
-          speaker: interimSpeaker,
-          text: interimText,
-          wordCount: interimText.split(/\s+/).length,
-        }
-      : null;
+  // Group segments by speaker for compact display
+  const groupedSegments = useMemo(
+    () => groupSegmentsBySpeaker(recentSegments, interimText, interimSpeaker),
+    [recentSegments, interimText, interimSpeaker]
+  );
 
-  if (recentSegments.length === 0 && !interimSegment) {
+  if (groupedSegments.length === 0) {
     return <EmptyState />;
   }
 
   return (
-    <div
-      ref={scrollRef}
-      className="overflow-y-auto hud-scrollbar"
-      style={{ maxHeight }}
-    >
-      {/* Final transcript segments */}
-      {recentSegments.map((segment, index) => (
-        <TranscriptLine
-          key={`${segment.timestamp}-${index}`}
-          segment={segment}
-          showTimestamp={showTimestamps}
-        />
-      ))}
-
-      {/* Interim (non-final) text */}
-      {interimSegment && (
-        <TranscriptLine
-          segment={interimSegment}
-          showTimestamp={false}
-          isInterim={true}
-        />
-      )}
+    <div className="transcript-container">
+      <div className="transcript-header">
+        <span className="transcript-header__title">
+          <span className="transcript-header__dot" />
+          LIVE TRANSCRIPT
+        </span>
+        <span className="transcript-header__count">
+          {recentSegments.length} segments
+        </span>
+      </div>
+      <div
+        ref={scrollRef}
+        className="transcript-scroll hud-scrollbar"
+        style={{ maxHeight }}
+      >
+        <div className="transcript-log">
+          {groupedSegments.map((group, index) => (
+            <TranscriptGroup
+              key={`${group.speaker}-${group.startTimestamp}`}
+              group={group}
+              showTimestamp={showTimestamps}
+              isFirst={index === 0}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="transcript-fade" />
     </div>
   );
 }
 
 // ============================================================================
-// Compact Variant
+// Compact Variant (Single Line Display)
 // ============================================================================
 
 export function CompactTranscript({
@@ -211,34 +298,31 @@ export function CompactTranscript({
 
   if (!displayText || !displaySpeaker) {
     return (
-      <p className="text-xs text-[var(--hud-text-tertiary)] font-mono">
-        AWAITING TRANSCRIPT...
-      </p>
+      <div className="transcript-compact transcript-compact--empty">
+        <span className="transcript-compact__waiting">
+          <span className="transcript-compact__dot" />
+          Waiting for audio...
+        </span>
+      </div>
     );
   }
 
   const config = SPEAKER_CONFIG[displaySpeaker];
   const isInterim = !!interimText;
 
-  const speakerColorClass =
-    displaySpeaker === 'interviewer'
-      ? 'text-[var(--hud-speaker-interviewer)]'
-      : 'text-[var(--hud-speaker-you)]';
-
   return (
-    <div className="flex items-start gap-3">
-      <span
-        className={`text-[10px] font-mono font-semibold shrink-0 ${speakerColorClass}`}
-      >
-        {'>'} {config.label}:
+    <div className="transcript-compact">
+      <span className={`transcript-compact__speaker ${config.colorClass}`}>
+        {config.label}:
       </span>
-      <p
-        className={`text-sm text-[var(--hud-text-primary)] ${
-          isInterim ? 'italic opacity-50' : ''
+      <span
+        className={`transcript-compact__text ${
+          isInterim ? 'transcript-compact__text--interim' : ''
         }`}
       >
-        {displayText}
-      </p>
+        {displayText.length > 80 ? `${displayText.slice(-80)}...` : displayText}
+      </span>
+      {isInterim && <span className="transcript-cursor transcript-cursor--sm" />}
     </div>
   );
 }

@@ -55,14 +55,6 @@ function sendToRenderer<K extends keyof IPCEvents>(
 }
 
 /**
- * Update and broadcast live mode status
- */
-function updateLiveModeStatus(status: LiveModeStatus): void {
-  setLiveModeStatus(status);
-  sendToRenderer<'liveModeChanged'>(IPC_CHANNELS.LIVE_MODE_CHANGED, status);
-}
-
-/**
  * Update and broadcast answer data
  */
 function updateAnswerData(data: AnswerData): void {
