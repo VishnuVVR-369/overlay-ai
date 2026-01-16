@@ -66,8 +66,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -97,7 +97,9 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          Move-Item resources/bin/audio-engine.exe resources/bin/audio-engine-win.exe
+          if (Test-Path "resources/bin/audio-engine.exe") {
+            Move-Item resources/bin/audio-engine.exe resources/bin/audio-engine-win.exe -Force
+          }
 
       - name: Build TypeScript & Vite
         run: npm run build
@@ -119,6 +121,8 @@ jobs:
     name: Create Release
     needs: package
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -131,28 +135,19 @@ jobs:
           merge-multiple: true
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           draft: false
           generate_release_notes: true
-          tag_name: main-${{ github.sha }}
+          tag_name: v${{ github.run_number }}-${{ github.sha }}
           name: Build from main @ ${{ github.sha }}
           body: |
             ## Automated Build from main branch
-            
             This is an automated release created from commit ${{ github.sha }}.
-            
             **Commit:** ${{ github.sha }}
             **Branch:** ${{ github.ref_name }}
-            **Author:** ${{ github.actor }}
-            
-            ### Downloads
-            - **macOS:** `.dmg` file for Apple Silicon (ARM64)
-            - **Windows:** `.exe` installer
-            
-            ### Notes
-            - Artifacts are built and published automatically on every push to main.
           files: |
             artifacts/**/*
+          token: ${{ secrets.GITHUB_TOKEN }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
