@@ -22,18 +22,19 @@ impl DebugLogger {
     }
 
     /// Check if we should log based on call count and interval
+    /// This method increments the counter for the given key each time it's called.
     pub fn should_log(&self, key: &str, initial_count: usize, interval: usize) -> bool {
         if !self.enabled {
             return false;
         }
 
-        let counters = self.counters.lock().unwrap();
+        let mut counters = self.counters.lock().unwrap();
         let counter = counters
-            .get(key)
-            .map(|c| c.load(Ordering::Relaxed))
-            .unwrap_or(0);
+            .entry(key.to_string())
+            .or_insert_with(|| AtomicUsize::new(0));
+        let count = counter.fetch_add(1, Ordering::Relaxed);
 
-        counter < initial_count || counter.is_multiple_of(interval)
+        count < initial_count || count.is_multiple_of(interval)
     }
 
     /// Increment counter for a given key
@@ -77,9 +78,8 @@ mod tests {
     fn test_debug_logger_initial_count() {
         let logger = DebugLogger::new(true);
 
-        // First few calls should log
-        for i in 0..5 {
-            logger.increment("test");
+        // First few calls should log (should_log increments automatically)
+        for _ in 0..5 {
             assert!(logger.should_log("test", 5, 100));
         }
     }
@@ -88,20 +88,40 @@ mod tests {
     fn test_debug_logger_interval() {
         let logger = DebugLogger::new(true);
 
-        // Increment to 100 (should log)
-        for _ in 0..100 {
-            logger.increment("test");
+        // First 5 calls should log (counts 0-4 before increment)
+        for i in 0..5 {
+            assert!(
+                logger.should_log("test", 5, 100),
+                "Should log at call {}",
+                i + 1
+            );
         }
+
+        // Next calls up to 100 should not log (counts 5-99 before increment)
+        for i in 5..100 {
+            assert!(
+                !logger.should_log("test", 5, 100),
+                "Should not log at call {}",
+                i + 1
+            );
+        }
+
+        // Call 101: checks count 100 (before increment), which is a multiple of 100, should log
         assert!(logger.should_log("test", 5, 100));
 
-        // Increment to 101 (should not log)
-        logger.increment("test");
+        // Next calls up to 200 should not log (counts 101-199 before increment)
+        for i in 0..98 {
+            assert!(
+                !logger.should_log("test", 5, 100),
+                "Should not log at call {}",
+                102 + i
+            );
+        }
+
+        // Call 200: checks count 199 (before increment), should not log
         assert!(!logger.should_log("test", 5, 100));
 
-        // Increment to 200 (should log again)
-        for _ in 0..99 {
-            logger.increment("test");
-        }
+        // Call 201: checks count 200 (before increment), which is a multiple of 100, should log
         assert!(logger.should_log("test", 5, 100));
     }
 

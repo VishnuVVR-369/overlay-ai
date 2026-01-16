@@ -147,7 +147,7 @@ impl SystemAudioHandler {
                 buffer_list_size_needed,
                 ptr::null(),
                 ptr::null(),
-                0, // kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment = 1
+                0, // no flags (we do NOT request kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment = 1; 8-byte alignment from the allocator is sufficient for our use here)
                 &mut block_buffer,
             );
 

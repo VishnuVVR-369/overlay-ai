@@ -263,7 +263,7 @@ fn process_audio_data<T, F>(
 }
 
 /// Create output writer (stdout or file)
-fn create_output_writer(output_file: &Option<String>) -> Result<BufWriter<Box<dyn Write>>> {
+fn create_output_writer(output_file: &Option<String>) -> Result<BufWriter<Box<dyn Write + Send>>> {
     if let Some(ref path) = output_file {
         eprintln!("[INFO] Writing output to file: {}", path);
         Ok(BufWriter::new(Box::new(
@@ -278,7 +278,7 @@ fn create_output_writer(output_file: &Option<String>) -> Result<BufWriter<Box<dy
 /// Main output loop that reads from ring buffer and writes to output
 fn run_output_loop(
     consumer: RingBufferConsumer,
-    output: &mut BufWriter<Box<dyn Write>>,
+    output: &mut BufWriter<Box<dyn Write + Send>>,
     running: &Arc<AtomicBool>,
 ) -> Result<()> {
     let mut read_buffer = vec![0i16; OUTPUT_BUFFER_SIZE];

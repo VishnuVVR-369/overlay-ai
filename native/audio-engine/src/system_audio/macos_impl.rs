@@ -106,7 +106,7 @@ impl SystemAudioCapture {
         config.set_height(scaled_height);
         config.set_minimum_frame_interval(&frame_interval);
         config.set_captures_audio(true);
-        config.set_excludes_current_process_audio(true); // Exclude our own audio to avoid feedback
+        config.set_excludes_current_process_audio(true); // Exclude audio from this process (the audio engine) so its own output isn't re-captured
         config.set_sample_rate(sck_sample_rate);
         config.set_channel_count(2); // Stereo
         config.set_shows_cursor(false); // Don't need cursor for audio capture
