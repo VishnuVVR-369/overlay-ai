@@ -13,6 +13,7 @@ tokio = { version = "1.0", features = ["full"] }
 
 # Error handling
 anyhow = "1.0"
+thiserror = "1.0"
 
 # Raw PCM encoding
 byteorder = "1.4"
