@@ -220,7 +220,7 @@ mod system_audio {
             };
 
             // Log periodically
-            if callback_count < 5 || callback_count % 100 == 0 {
+            if callback_count < 5 || callback_count.is_multiple_of(100) {
                 eprintln!(
                     "[DEBUG] System audio #{}: extracted {} f32 samples, pushed {} i16 samples",
                     callback_count,
@@ -397,7 +397,7 @@ mod system_audio {
 
             for i in 0..buffer_list.number_buffers as usize {
                 // Access buffers array (variable length)
-                let buffer_ptr = (buffer_list.buffers.as_ptr() as *const AudioBuffer).add(i);
+                let buffer_ptr = buffer_list.buffers.as_ptr().add(i);
                 let buffer = &*buffer_ptr;
 
                 if !buffer.data.is_null() && buffer.data_byte_size > 0 {
@@ -529,8 +529,8 @@ mod system_audio {
 
             // Use scaled-down display dimensions (1/4 size to reduce overhead)
             // ScreenCaptureKit may reject 1x1 or very small dimensions
-            let scaled_width = (display_width / 4).max(64) as u32;
-            let scaled_height = (display_height / 4).max(64) as u32;
+            let scaled_width = (display_width / 4).max(64);
+            let scaled_height = (display_height / 4).max(64);
 
             eprintln!(
                 "[DEBUG] Video config: {}x{} @ 10fps (scaled from {}x{})",
@@ -1038,7 +1038,7 @@ fn process_audio_data<T, F>(
     };
 
     // Log mixing details for first few calls and periodically
-    if call_count < 5 || call_count % 500 == 0 {
+    if call_count < 5 || call_count.is_multiple_of(500) {
         eprintln!(
             "[DEBUG] Mixer #{}: mic={} samples, system={}/{} samples (read/available)",
             call_count,
