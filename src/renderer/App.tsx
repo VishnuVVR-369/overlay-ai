@@ -1,8 +1,8 @@
 /**
- * App Component - Cyber-Minimalist HUD Design
+ * App Component - Glassmorphic Design System
  *
- * Main overlay interface with professional HUD aesthetics.
- * Inspired by Linear, Raycast, and Vercel design systems.
+ * Main overlay interface with modern frosted glass aesthetics.
+ * Features translucent panels, subtle gradients, and elegant depth.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -10,6 +10,7 @@ import { StatusBadge } from './components/StatusIndicator';
 import { LiveTranscript } from './components/LiveTranscript';
 import { AnswerCard } from './components/AnswerCard';
 import { SettingsModal } from './components/SettingsModal';
+import { HelpModal } from './components/HelpModal';
 import { useOverlayState } from './hooks/useOverlayState';
 
 // ============================================================================
@@ -18,12 +19,12 @@ import { useOverlayState } from './hooks/useOverlayState';
 
 const LogoIcon = () => (
   <svg
-    width="16"
-    height="16"
+    width="14"
+    height="14"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    strokeWidth="2"
+    strokeWidth="2.5"
     strokeLinecap="round"
     strokeLinejoin="round"
   >
@@ -35,28 +36,45 @@ const LogoIcon = () => (
 
 const SettingsIcon = () => (
   <svg
-    width="18"
-    height="18"
+    width="15"
+    height="15"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    strokeWidth="1.5"
+    strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
   >
-    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
     <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
+
+const HelpIcon = () => (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <path d="M12 17h.01" />
   </svg>
 );
 
 const CloseIcon = () => (
   <svg
-    width="18"
-    height="18"
+    width="15"
+    height="15"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    strokeWidth="1.5"
+    strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
   >
@@ -83,8 +101,8 @@ function ConfigWarning({
   }
 
   return (
-    <div className="hud-warning">
-      <div className="hud-warning-icon">!</div>
+    <div className="glass-warning">
+      <div className="glass-warning-icon">!</div>
       <div>
         <h4>Configuration Required</h4>
         <ul>
@@ -99,55 +117,17 @@ function ConfigWarning({
 }
 
 // ============================================================================
-// Keyboard Shortcuts Help
-// ============================================================================
-
-function ShortcutsHelp(): React.ReactElement {
-  return (
-    <div className="hud-shortcuts">
-      <div className="hud-shortcut">
-        <kbd>Cmd+Shift+L</kbd>
-        <span>Live</span>
-      </div>
-      <div className="hud-shortcut">
-        <kbd>Cmd+Shift+X</kbd>
-        <span>Answer</span>
-      </div>
-      <div className="hud-shortcut">
-        <kbd>Cmd+Shift+Z</kbd>
-        <span>Clear</span>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
 // Loading State
 // ============================================================================
 
 function LoadingOverlay(): React.ReactElement {
   return (
-    <div className="hud-container flex items-center justify-center">
-      <div className="hud-loading">
-        <div className="hud-loading-spinner" />
-        <p className="hud-loading-text font-mono">INITIALIZING...</p>
+    <div className="glass-container flex items-center justify-center">
+      <div className="glass-loading">
+        <div className="glass-loading-spinner" />
+        <p className="glass-loading-text font-mono">INITIALIZING...</p>
       </div>
     </div>
-  );
-}
-
-// ============================================================================
-// HUD Frame Corners
-// ============================================================================
-
-function HudCorners(): React.ReactElement {
-  return (
-    <>
-      <div className="hud-corner hud-corner--tl" />
-      <div className="hud-corner hud-corner--tr" />
-      <div className="hud-corner hud-corner--bl" />
-      <div className="hud-corner hud-corner--br" />
-    </>
   );
 }
 
@@ -158,6 +138,7 @@ function HudCorners(): React.ReactElement {
 function App(): React.ReactElement {
   const { state, isLoading, actions } = useOverlayState();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const handleOpenSettings = useCallback(() => {
     setIsSettingsOpen(true);
@@ -171,53 +152,64 @@ function App(): React.ReactElement {
     actions.refreshStatus();
   }, [actions]);
 
+  const handleOpenHelp = useCallback(() => {
+    setIsHelpOpen(true);
+  }, []);
+
+  const handleCloseHelp = useCallback(() => {
+    setIsHelpOpen(false);
+  }, []);
+
   // Show loading state while initializing
   if (isLoading) {
     return <LoadingOverlay />;
   }
 
   return (
-    <div className="hud-container hud-scanlines">
-      {/* HUD Frame Corners */}
-      <HudCorners />
-
+    <div className="glass-container">
       {/* Header - Draggable region */}
       <header
-        className="hud-header draggable"
+        className="glass-header draggable"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <div className="hud-logo">
-          <div className="hud-logo-mark">
+        {/* Left side - Logo and Status */}
+        <div className="glass-header-left">
+          <div className="glass-logo-mark">
             <LogoIcon />
           </div>
-          <span className="hud-logo-text">OVERLAY AI</span>
+          <span className="glass-logo-text">Overlay AI</span>
           <StatusBadge state={state.liveMode.state} error={state.liveMode.error} />
         </div>
 
+        {/* Right side - Actions */}
         <div
-          className="flex items-center gap-4 non-draggable"
+          className="glass-header-right non-draggable"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          <ShortcutsHelp />
-
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleOpenSettings}
-              className="hud-btn--icon"
-              title="Settings"
-              aria-label="Open settings"
-            >
-              <SettingsIcon />
-            </button>
-            <button
-              onClick={() => window.close()}
-              className="hud-btn--icon"
-              title="Close"
-              aria-label="Close window"
-            >
-              <CloseIcon />
-            </button>
-          </div>
+          <button
+            onClick={handleOpenHelp}
+            className="glass-header-btn"
+            title="Help & Instructions"
+            aria-label="Open help"
+          >
+            <HelpIcon />
+          </button>
+          <button
+            onClick={handleOpenSettings}
+            className="glass-header-btn"
+            title="Settings"
+            aria-label="Open settings"
+          >
+            <SettingsIcon />
+          </button>
+          <button
+            onClick={() => window.close()}
+            className="glass-header-btn"
+            title="Close"
+            aria-label="Close window"
+          >
+            <CloseIcon />
+          </button>
         </div>
       </header>
 
@@ -227,32 +219,25 @@ function App(): React.ReactElement {
         isGroqConfigured={state.isGroqConfigured}
       />
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col gap-3 p-3 overflow-hidden">
-        {/* Live Transcript Panel */}
-        <section className="hud-panel">
-          <div className="hud-panel-header">
-            <h2>Live Transcript</h2>
-          </div>
-          <div className="hud-panel-content">
-            <LiveTranscript
-              segments={state.segments}
-              interimText={state.interimText}
-              interimSpeaker={state.interimSpeaker || undefined}
-              maxHeight="140px"
-              showTimestamps={false}
-            />
-          </div>
+      {/* Main Content - Scrollable area */}
+      <main className="glass-main glass-scrollbar">
+        {/* Live Transcript Panel - Collapsible */}
+        <section className="glass-transcript-section">
+          <LiveTranscript
+            segments={state.segments}
+            interimText={state.interimText}
+            interimSpeaker={state.interimSpeaker || undefined}
+            showTimestamps={false}
+          />
         </section>
 
-        {/* Answer Section */}
-        <section className="flex-1 min-h-0">
+        {/* Answer Section - Flexible */}
+        <section className="glass-answer-section">
           <AnswerCard
             state={state.answerState}
             text={state.answerText}
             error={state.answerError || undefined}
             modelId={state.answerModelId || undefined}
-            maxHeight="280px"
           />
         </section>
       </main>
@@ -261,9 +246,9 @@ function App(): React.ReactElement {
       {state.lastError &&
         state.liveMode.state !== 'error' &&
         state.answerState !== 'error' && (
-          <div className="hud-toast">
-            <div className="hud-toast-icon">!</div>
-            <p className="hud-toast-text">{state.lastError}</p>
+          <div className="glass-toast">
+            <div className="glass-toast-icon">!</div>
+            <p className="glass-toast-text">{state.lastError}</p>
           </div>
         )}
 
@@ -272,6 +257,12 @@ function App(): React.ReactElement {
         isOpen={isSettingsOpen}
         onClose={handleCloseSettings}
         onSave={handleSettingsSaved}
+      />
+
+      {/* Help Modal */}
+      <HelpModal
+        isOpen={isHelpOpen}
+        onClose={handleCloseHelp}
       />
     </div>
   );

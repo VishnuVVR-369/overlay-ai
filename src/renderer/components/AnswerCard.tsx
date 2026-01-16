@@ -1,8 +1,8 @@
 /**
- * AnswerCard Component - Cyber-Minimalist HUD Design
+ * AnswerCard Component - Glassmorphic Design System
  *
- * Displays LLM-generated answers with sleek markdown rendering
- * and HUD-style visual elements.
+ * Displays LLM-generated answers with elegant markdown rendering
+ * and frosted glass visual elements.
  */
 
 import React from 'react';
@@ -43,8 +43,8 @@ const CommandIcon = () => (
 
 const SparkleIcon = () => (
   <svg
-    width="24"
-    height="24"
+    width="28"
+    height="28"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -82,17 +82,16 @@ const AlertIcon = () => (
 // ============================================================================
 
 function ModelBadge({ modelId }: { modelId: string }): React.ReactElement {
-  // Extract short model name
   const shortName =
     modelId.split('/').pop()?.split('-').slice(0, 2).join('-') || modelId;
 
-  return <span className="hud-model-badge">{shortName}</span>;
+  return <span className="glass-model-badge">{shortName}</span>;
 }
 
 function GeneratingIndicator(): React.ReactElement {
   return (
-    <div className="hud-generating">
-      <span className="hud-generating-dot" />
+    <div className="glass-generating">
+      <span className="glass-generating-dot" />
       <span>GENERATING</span>
     </div>
   );
@@ -100,13 +99,13 @@ function GeneratingIndicator(): React.ReactElement {
 
 function LoadingState(): React.ReactElement {
   return (
-    <div className="flex flex-col items-center justify-center py-8">
-      <div className="hud-loading-dots mb-4">
+    <div className="flex flex-col items-center justify-center py-10">
+      <div className="glass-loading-dots mb-4">
         <span />
         <span />
         <span />
       </div>
-      <p className="text-xs text-[var(--hud-text-tertiary)] font-mono">
+      <p className="text-xs text-[var(--glass-text-muted)] font-mono">
         GENERATING RESPONSE...
       </p>
     </div>
@@ -115,8 +114,8 @@ function LoadingState(): React.ReactElement {
 
 function ErrorState({ message }: { message: string }): React.ReactElement {
   return (
-    <div className="hud-answer-error">
-      <div className="hud-answer-error-icon">
+    <div className="glass-answer-error">
+      <div className="glass-answer-error-icon">
         <AlertIcon />
       </div>
       <div>
@@ -129,15 +128,15 @@ function ErrorState({ message }: { message: string }): React.ReactElement {
 
 function IdleState(): React.ReactElement {
   return (
-    <div className="hud-answer-idle">
-      <div className="hud-answer-idle-icon">
+    <div className="glass-answer-idle">
+      <div className="glass-answer-idle-icon">
         <SparkleIcon />
       </div>
       <h3>Ready to assist</h3>
       <p>
-        Press <kbd className="hud-kbd">Cmd+Shift+X</kbd> to generate an answer
+        Press <kbd className="glass-kbd">Cmd+Shift+X</kbd> to generate an answer
       </p>
-      <p className="mt-2 text-[10px] text-[var(--hud-text-tertiary)]">
+      <p className="mt-3 text-[10px] text-[var(--glass-text-subtle)]">
         Based on the last 20 minutes of conversation
       </p>
     </div>
@@ -201,16 +200,16 @@ export function AnswerCard({
   error,
   modelId,
   showModel = true,
-  maxHeight = '400px',
+  maxHeight = '200px',
 }: AnswerCardProps): React.ReactElement {
   const showContent = state === 'generating' || state === 'complete';
 
   return (
-    <div className="hud-answer hud-animate-in">
+    <div className="glass-answer glass-animate-in">
       {/* Header */}
-      <div className="hud-answer-header">
-        <div className="hud-answer-title">
-          <span className="hud-answer-title-icon">
+      <div className="glass-answer-header">
+        <div className="glass-answer-title">
+          <span className="glass-answer-title-icon">
             <CommandIcon />
           </span>
           <span>RESPONSE</span>
@@ -226,27 +225,19 @@ export function AnswerCard({
 
       {/* Content */}
       <div
-        className="hud-answer-content hud-scrollbar"
+        className="glass-answer-content glass-scrollbar"
         style={{ maxHeight }}
       >
-        {/* Idle state */}
         {state === 'idle' && <IdleState />}
-
-        {/* Error state */}
         {state === 'error' && error && <ErrorState message={error} />}
-
-        {/* Loading state (generating with no text yet) */}
         {state === 'generating' && !text && <LoadingState />}
 
-        {/* Content (generating or complete) */}
         {showContent && text && (
-          <div className="hud-prose">
+          <div className="glass-prose">
             <ReactMarkdown components={markdownComponents}>
               {text}
             </ReactMarkdown>
-
-            {/* Streaming cursor */}
-            {state === 'generating' && <span className="hud-cursor" />}
+            {state === 'generating' && <span className="glass-cursor" />}
           </div>
         )}
       </div>
@@ -264,16 +255,16 @@ export function CompactAnswer({
 }: Pick<AnswerCardProps, 'state' | 'text'>): React.ReactElement {
   if (state === 'idle' || !text) {
     return (
-      <p className="text-xs text-[var(--hud-text-tertiary)] font-mono">
+      <p className="text-xs text-[var(--glass-text-muted)] font-mono">
         NO RESPONSE YET
       </p>
     );
   }
 
   return (
-    <div className="hud-prose">
+    <div className="glass-prose">
       <ReactMarkdown components={markdownComponents}>{text}</ReactMarkdown>
-      {state === 'generating' && <span className="hud-cursor" />}
+      {state === 'generating' && <span className="glass-cursor" />}
     </div>
   );
 }

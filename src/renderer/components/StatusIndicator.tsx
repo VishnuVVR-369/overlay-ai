@@ -1,8 +1,8 @@
 /**
- * StatusIndicator Component - Cyber-Minimalist HUD Design
+ * StatusIndicator Component - Glassmorphic Design System
  *
- * A sleek status indicator inspired by professional dev tools
- * with subtle HUD aesthetics for the overlay interface.
+ * A clean status indicator with frosted glass aesthetics
+ * for the overlay interface.
  */
 
 import React from 'react';
@@ -31,19 +31,19 @@ interface StatusConfig {
 const STATUS_CONFIG: Record<LiveModeState, StatusConfig> = {
   disconnected: {
     label: 'OFFLINE',
-    stateClass: 'hud-status--idle',
+    stateClass: 'glass-status--disconnected',
   },
   connecting: {
     label: 'CONNECTING',
-    stateClass: 'hud-status--connecting',
+    stateClass: 'glass-status--connecting',
   },
   connected: {
     label: 'LISTENING',
-    stateClass: 'hud-status--active',
+    stateClass: 'glass-status--connected',
   },
   error: {
     label: 'ERROR',
-    stateClass: 'hud-status--error',
+    stateClass: 'glass-status--error',
   },
 };
 
@@ -60,10 +60,10 @@ export function StatusIndicator({
   const displayLabel = state === 'error' && error ? 'ERROR' : config.label;
 
   return (
-    <div className={`hud-status ${config.stateClass}`}>
-      <span className="hud-status-dot" aria-hidden="true" />
+    <div className={`glass-status ${config.stateClass}`}>
+      <span className="glass-status-dot" aria-hidden="true" />
       {showLabel && (
-        <span className="hud-status-label">{displayLabel}</span>
+        <span className="glass-status-label">{displayLabel}</span>
       )}
     </div>
   );
@@ -102,10 +102,10 @@ export function InlineStatus({
   const config = STATUS_CONFIG[state];
 
   const colorClass = {
-    disconnected: 'text-[var(--hud-status-idle)]',
-    connecting: 'text-[var(--hud-status-warning)]',
-    connected: 'text-[var(--hud-status-active)]',
-    error: 'text-[var(--hud-status-error)]',
+    disconnected: 'text-[var(--glass-neutral)]',
+    connecting: 'text-[var(--glass-warning)]',
+    connected: 'text-[var(--glass-success)]',
+    error: 'text-[var(--glass-error)]',
   }[state];
 
   return (
