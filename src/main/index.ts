@@ -46,8 +46,8 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 function createWindow() {
   // Create the browser window with transparent, frameless settings for overlay
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 500,
+    height: 500,
     transparent: true,
     frame: false,
     movable: true, // Allow window to be dragged

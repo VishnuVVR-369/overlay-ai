@@ -1,9 +1,8 @@
 /**
- * LiveTranscript Component - Space-Efficient Terminal Log Design
+ * LiveTranscript Component - Glassmorphic Design System
  *
- * A compact, flowing transcript display that maximizes content density
- * while maintaining the cyber-minimalist HUD aesthetic. Speaker changes
- * are indicated inline, and consecutive messages flow together naturally.
+ * A clean, compact transcript display with frosted glass aesthetics.
+ * Speaker changes are indicated inline with elegant visual hierarchy.
  */
 
 import React, { useEffect, useRef, useMemo } from 'react';
@@ -35,11 +34,11 @@ interface GroupedSegment {
 const SPEAKER_CONFIG: Record<Speaker, { label: string; colorClass: string }> = {
   interviewer: {
     label: 'INT',
-    colorClass: 'transcript-speaker--interviewer',
+    colorClass: 'glass-transcript-tag--interviewer',
   },
   me: {
     label: 'YOU',
-    colorClass: 'transcript-speaker--you',
+    colorClass: 'glass-transcript-tag--you',
   },
 };
 
@@ -47,17 +46,9 @@ const SPEAKER_CONFIG: Record<Speaker, { label: string; colorClass: string }> = {
 // Helper Functions
 // ============================================================================
 
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 function filterRecentSegments(
   segments: TranscriptSegment[],
-  windowMs: number = 60000 // Increased to 60s for more context
+  windowMs: number = 60000
 ): TranscriptSegment[] {
   const now = Date.now();
   const cutoff = now - windowMs;
@@ -66,7 +57,6 @@ function filterRecentSegments(
 
 /**
  * Groups consecutive segments from the same speaker together
- * for a more compact display
  */
 function groupSegmentsBySpeaker(
   segments: TranscriptSegment[],
@@ -79,13 +69,11 @@ function groupSegmentsBySpeaker(
     const lastGroup = groups[groups.length - 1];
 
     if (lastGroup && lastGroup.speaker === segment.speaker) {
-      // Same speaker - add to existing group
       lastGroup.texts.push({
         text: segment.text,
         timestamp: segment.timestamp,
       });
     } else {
-      // Different speaker - create new group
       groups.push({
         speaker: segment.speaker,
         texts: [{ text: segment.text, timestamp: segment.timestamp }],
@@ -94,7 +82,6 @@ function groupSegmentsBySpeaker(
     }
   }
 
-  // Add interim text
   if (interimText && interimSpeaker) {
     const lastGroup = groups[groups.length - 1];
 
@@ -120,62 +107,27 @@ function groupSegmentsBySpeaker(
 // Sub-Components
 // ============================================================================
 
-interface SpeakerTagProps {
-  speaker: Speaker;
-  timestamp?: number;
-  showTimestamp?: boolean;
-}
-
-function SpeakerTag({
-  speaker,
-  timestamp,
-  showTimestamp,
-}: SpeakerTagProps): React.ReactElement {
-  const config = SPEAKER_CONFIG[speaker];
-
-  return (
-    <span className={`transcript-tag ${config.colorClass}`}>
-      <span className="transcript-tag__chevron">›</span>
-      <span className="transcript-tag__label">{config.label}</span>
-      {showTimestamp && timestamp && (
-        <span className="transcript-tag__time">{formatTimestamp(timestamp)}</span>
-      )}
-    </span>
-  );
-}
-
 interface TranscriptGroupProps {
   group: GroupedSegment;
-  showTimestamp: boolean;
-  isFirst: boolean;
 }
 
 function TranscriptGroup({
   group,
-  showTimestamp,
-  isFirst,
 }: TranscriptGroupProps): React.ReactElement {
-  const config = SPEAKER_CONFIG[group.speaker];
-
   return (
-    <div className={`transcript-group ${isFirst ? 'transcript-group--first' : ''}`}>
-      <SpeakerTag
-        speaker={group.speaker}
-        timestamp={group.startTimestamp}
-        showTimestamp={showTimestamp}
-      />
-      <div className={`transcript-content ${config.colorClass}`}>
+    <div className="glass-transcript-group">
+      <div className="glass-transcript-content">
         {group.texts.map((item, idx) => (
           <span
             key={`${item.timestamp}-${idx}`}
-            className={`transcript-text ${item.isInterim ? 'transcript-text--interim' : ''}`}
+            className={item.isInterim ? 'glass-transcript-text--interim' : ''}
           >
             {item.text}
             {idx < group.texts.length - 1 && ' '}
           </span>
         ))}
         {group.texts.some((t) => t.isInterim) && (
-          <span className="transcript-cursor" />
+          <span className="glass-cursor" />
         )}
       </div>
     </div>
@@ -188,8 +140,8 @@ function TranscriptGroup({
 
 function EmptyState(): React.ReactElement {
   return (
-    <div className="transcript-empty">
-      <div className="transcript-empty__icon">
+    <div className="glass-transcript-empty">
+      <div className="glass-transcript-empty-icon">
         <svg
           width="16"
           height="16"
@@ -205,8 +157,8 @@ function EmptyState(): React.ReactElement {
           <line x1="12" x2="12" y1="19" y2="22" />
         </svg>
       </div>
-      <span className="transcript-empty__text">AWAITING INPUT</span>
-      <span className="transcript-empty__hint">Audio transcript will appear here</span>
+      <span className="glass-transcript-empty-text">AWAITING INPUT</span>
+      <span className="glass-transcript-empty-hint">Audio transcript will appear here</span>
     </div>
   );
 }
@@ -221,24 +173,20 @@ export function LiveTranscript({
   interimSpeaker,
   maxHeight = '240px',
   autoScroll = true,
-  showTimestamps = false,
 }: LiveTranscriptProps): React.ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new content arrives
   useEffect(() => {
     if (autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [segments, interimText, autoScroll]);
 
-  // Filter to recent segments (60 seconds for more context)
   const recentSegments = useMemo(
     () => filterRecentSegments(segments),
     [segments]
   );
 
-  // Group segments by speaker for compact display
   const groupedSegments = useMemo(
     () => groupSegmentsBySpeaker(recentSegments, interimText, interimSpeaker),
     [recentSegments, interimText, interimSpeaker]
@@ -249,33 +197,31 @@ export function LiveTranscript({
   }
 
   return (
-    <div className="transcript-container">
-      <div className="transcript-header">
-        <span className="transcript-header__title">
-          <span className="transcript-header__dot" />
+    <div className="glass-transcript">
+      <div className="glass-transcript-header">
+        <span className="glass-transcript-title">
+          <span className="glass-transcript-dot" />
           LIVE TRANSCRIPT
         </span>
-        <span className="transcript-header__count">
+        <span className="glass-transcript-count">
           {recentSegments.length} segments
         </span>
       </div>
       <div
         ref={scrollRef}
-        className="transcript-scroll hud-scrollbar"
+        className="glass-transcript-scroll glass-scrollbar"
         style={{ maxHeight }}
       >
-        <div className="transcript-log">
-          {groupedSegments.map((group, index) => (
+        <div className="glass-transcript-log">
+          {groupedSegments.map((group) => (
             <TranscriptGroup
               key={`${group.speaker}-${group.startTimestamp}`}
               group={group}
-              showTimestamp={showTimestamps}
-              isFirst={index === 0}
             />
           ))}
         </div>
       </div>
-      <div className="transcript-fade" />
+      <div className="glass-transcript-fade" />
     </div>
   );
 }
@@ -298,9 +244,9 @@ export function CompactTranscript({
 
   if (!displayText || !displaySpeaker) {
     return (
-      <div className="transcript-compact transcript-compact--empty">
-        <span className="transcript-compact__waiting">
-          <span className="transcript-compact__dot" />
+      <div className="flex items-center justify-center py-4 px-3 bg-[var(--glass-bg-primary)] border border-[var(--glass-border-subtle)] rounded-lg">
+        <span className="flex items-center gap-2 text-[var(--glass-text-muted)] text-xs">
+          <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50" />
           Waiting for audio...
         </span>
       </div>
@@ -311,18 +257,18 @@ export function CompactTranscript({
   const isInterim = !!interimText;
 
   return (
-    <div className="transcript-compact">
-      <span className={`transcript-compact__speaker ${config.colorClass}`}>
+    <div className="flex items-center gap-2 py-2 px-3 bg-[var(--glass-bg-primary)] border border-[var(--glass-border-subtle)] rounded-lg overflow-hidden">
+      <span className={`font-mono text-[10px] font-bold ${config.colorClass.replace('glass-transcript-tag--', 'text-[var(--glass-speaker-')})}`}>
         {config.label}:
       </span>
       <span
-        className={`transcript-compact__text ${
-          isInterim ? 'transcript-compact__text--interim' : ''
+        className={`text-[var(--glass-text-primary)] text-xs whitespace-nowrap overflow-hidden text-ellipsis flex-1 ${
+          isInterim ? 'opacity-50 italic' : ''
         }`}
       >
         {displayText.length > 80 ? `${displayText.slice(-80)}...` : displayText}
       </span>
-      {isInterim && <span className="transcript-cursor transcript-cursor--sm" />}
+      {isInterim && <span className="glass-cursor glass-cursor--sm" />}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 /**
- * SettingsModal Component - Cyber-Minimalist HUD Design
+ * SettingsModal Component - Glassmorphic Design System
  *
- * Modal dialog for configuring API keys with sleek HUD styling.
+ * Modal dialog for configuring API keys with elegant frosted glass styling.
  * Keys are stored securely using electron-store.
  */
 
@@ -105,7 +105,6 @@ export function SettingsModal({
   const [showDeepgramKey, setShowDeepgramKey] = useState(false);
   const [showGroqKey, setShowGroqKey] = useState(false);
 
-  // Load current settings when modal opens
   useEffect(() => {
     if (isOpen) {
       setIsLoading(true);
@@ -144,7 +143,6 @@ export function SettingsModal({
     onClose();
   };
 
-  // Handle escape key to close modal
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && isOpen) {
@@ -160,17 +158,17 @@ export function SettingsModal({
   }
 
   return (
-    <div className="hud-modal-backdrop" onClick={handleCancel}>
+    <div className="glass-modal-backdrop" onClick={handleCancel}>
       <div
-        className="hud-modal hud-animate-in"
+        className="glass-modal glass-animate-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="hud-modal-header">
-          <h2 className="hud-modal-title">Configuration</h2>
+        <div className="glass-modal-header">
+          <h2 className="glass-modal-title">Configuration</h2>
           <button
             onClick={handleCancel}
-            className="hud-modal-close"
+            className="glass-modal-close"
             aria-label="Close settings"
           >
             <CloseIcon />
@@ -178,23 +176,23 @@ export function SettingsModal({
         </div>
 
         {/* Body */}
-        <div className="hud-modal-body">
+        <div className="glass-modal-body">
           {isLoading ? (
-            <div className="hud-loading">
-              <div className="hud-loading-spinner" />
-              <p className="hud-loading-text">Loading settings...</p>
+            <div className="glass-loading">
+              <div className="glass-loading-spinner" />
+              <p className="glass-loading-text">Loading settings...</p>
             </div>
           ) : (
             <>
               {/* Deepgram API Key */}
-              <div className="hud-input-group">
-                <label className="hud-label">
+              <div className="glass-input-group">
+                <label className="glass-label">
                   <span className="flex items-center gap-2">
                     <KeyIcon />
                     Deepgram API Key
                   </span>
                 </label>
-                <p className="hud-input-hint">
+                <p className="glass-input-hint">
                   Used for real-time speech transcription.{' '}
                   <a
                     href="https://console.deepgram.com/"
@@ -204,18 +202,18 @@ export function SettingsModal({
                     Get one here
                   </a>
                 </p>
-                <div className="hud-input-wrapper">
+                <div className="glass-input-wrapper">
                   <input
                     type={showDeepgramKey ? 'text' : 'password'}
                     value={deepgramKey}
                     onChange={(e) => setDeepgramKey(e.target.value)}
                     placeholder="Enter your Deepgram API key"
-                    className="hud-input"
+                    className="glass-input"
                   />
                   <button
                     type="button"
                     onClick={() => setShowDeepgramKey(!showDeepgramKey)}
-                    className="hud-input-toggle"
+                    className="glass-input-toggle"
                     aria-label={
                       showDeepgramKey ? 'Hide API key' : 'Show API key'
                     }
@@ -226,14 +224,14 @@ export function SettingsModal({
               </div>
 
               {/* Groq API Key */}
-              <div className="hud-input-group">
-                <label className="hud-label">
+              <div className="glass-input-group">
+                <label className="glass-label">
                   <span className="flex items-center gap-2">
                     <KeyIcon />
                     Groq API Key
                   </span>
                 </label>
-                <p className="hud-input-hint">
+                <p className="glass-input-hint">
                   Used for AI-powered answer generation.{' '}
                   <a
                     href="https://console.groq.com/"
@@ -243,18 +241,18 @@ export function SettingsModal({
                     Get one here
                   </a>
                 </p>
-                <div className="hud-input-wrapper">
+                <div className="glass-input-wrapper">
                   <input
                     type={showGroqKey ? 'text' : 'password'}
                     value={groqKey}
                     onChange={(e) => setGroqKey(e.target.value)}
                     placeholder="Enter your Groq API key"
-                    className="hud-input"
+                    className="glass-input"
                   />
                   <button
                     type="button"
                     onClick={() => setShowGroqKey(!showGroqKey)}
-                    className="hud-input-toggle"
+                    className="glass-input-toggle"
                     aria-label={showGroqKey ? 'Hide API key' : 'Show API key'}
                   >
                     {showGroqKey ? <EyeOffIcon /> : <EyeIcon />}
@@ -262,7 +260,7 @@ export function SettingsModal({
                 </div>
               </div>
 
-              <p className="text-[11px] text-[var(--hud-text-tertiary)] italic mt-4">
+              <p className="text-[11px] text-[var(--glass-text-subtle)] italic mt-4">
                 API keys are stored securely on your device and take precedence
                 over environment variables.
               </p>
@@ -271,14 +269,14 @@ export function SettingsModal({
         </div>
 
         {/* Footer */}
-        <div className="hud-modal-footer">
-          <button onClick={handleCancel} className="hud-btn hud-btn--ghost">
+        <div className="glass-modal-footer">
+          <button onClick={handleCancel} className="glass-btn glass-btn--ghost">
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving || isLoading}
-            className="hud-btn hud-btn--primary"
+            className="glass-btn glass-btn--primary"
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>
