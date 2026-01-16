@@ -46,14 +46,6 @@ const SPEAKER_CONFIG: Record<Speaker, { label: string; colorClass: string }> = {
 // Helper Functions
 // ============================================================================
 
-function formatTimestamp(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 function filterRecentSegments(
   segments: TranscriptSegment[],
   windowMs: number = 60000
@@ -114,30 +106,6 @@ function groupSegmentsBySpeaker(
 // ============================================================================
 // Sub-Components
 // ============================================================================
-
-interface SpeakerTagProps {
-  speaker: Speaker;
-  timestamp?: number;
-  showTimestamp?: boolean;
-}
-
-function SpeakerTag({
-  speaker,
-  timestamp,
-  showTimestamp,
-}: SpeakerTagProps): React.ReactElement {
-  const config = SPEAKER_CONFIG[speaker];
-
-  return (
-    <span className={`glass-transcript-tag ${config.colorClass}`}>
-      <span className="glass-transcript-tag-chevron">›</span>
-      <span>{config.label}</span>
-      {showTimestamp && timestamp && (
-        <span className="opacity-50 ml-1 font-normal">{formatTimestamp(timestamp)}</span>
-      )}
-    </span>
-  );
-}
 
 interface TranscriptGroupProps {
   group: GroupedSegment;
@@ -205,7 +173,6 @@ export function LiveTranscript({
   interimSpeaker,
   maxHeight = '240px',
   autoScroll = true,
-  showTimestamps = false,
 }: LiveTranscriptProps): React.ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null);
 

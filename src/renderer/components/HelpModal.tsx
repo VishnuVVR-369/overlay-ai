@@ -489,7 +489,7 @@ export function HelpModal({
                     <strong style={{ color: 'var(--glass-text-primary)' }}>
                       AI Answers:
                     </strong>{' '}
-                    Answers are generated using Groq's fast LLM models, optimized for
+                    Answers are generated using Groq&apos;s fast LLM models, optimized for
                     coding questions and system design problems.
                   </li>
                   <li
