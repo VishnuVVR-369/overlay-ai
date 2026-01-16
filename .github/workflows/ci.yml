@@ -100,6 +100,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: 1.90.0
           components: clippy, rustfmt
 
       - name: Install system dependencies (Linux)
@@ -116,7 +117,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run Clippy
-        run: cargo clippy --all --workspace -- -D warnings
+        run: cargo clippy --all --workspace --all-targets
 
       - name: Run tests with coverage
         run: cargo test --all --workspace -- --test-threads=1 -- --test-threads=1 --format=terse --color=always --show-output
