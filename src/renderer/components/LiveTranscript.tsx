@@ -141,22 +141,13 @@ function SpeakerTag({
 
 interface TranscriptGroupProps {
   group: GroupedSegment;
-  showTimestamp: boolean;
-  isFirst: boolean;
 }
 
 function TranscriptGroup({
   group,
-  showTimestamp,
-  isFirst,
 }: TranscriptGroupProps): React.ReactElement {
   return (
-    <div className={`glass-transcript-group ${isFirst ? '' : ''}`}>
-      <SpeakerTag
-        speaker={group.speaker}
-        timestamp={group.startTimestamp}
-        showTimestamp={showTimestamp}
-      />
+    <div className="glass-transcript-group">
       <div className="glass-transcript-content">
         {group.texts.map((item, idx) => (
           <span
@@ -255,12 +246,10 @@ export function LiveTranscript({
         style={{ maxHeight }}
       >
         <div className="glass-transcript-log">
-          {groupedSegments.map((group, index) => (
+          {groupedSegments.map((group) => (
             <TranscriptGroup
               key={`${group.speaker}-${group.startTimestamp}`}
               group={group}
-              showTimestamp={showTimestamps}
-              isFirst={index === 0}
             />
           ))}
         </div>
