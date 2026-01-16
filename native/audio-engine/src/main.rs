@@ -129,82 +129,309 @@ mod system_audio {
             sample: CMSampleBuffer,
             output_type: SCStreamOutputType,
         ) {
+            // Track all callbacks for debugging
+            let callback_count = self
+                .buffer_count
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
             // Only process audio buffers
             if output_type != SCStreamOutputType::Audio {
                 return;
             }
 
-            // Get audio buffer list from sample
-            let audio_buffer_list = match sample.get_audio_buffer_list() {
-                Some(list) => list,
-                None => return,
-            };
+            // Log first few audio callbacks
+            if callback_count < 5 {
+                let num_samples = sample.get_num_samples();
+                let total_size = sample.get_total_sample_size();
+                let is_ready = sample.is_data_ready();
+                eprintln!(
+                    "[DEBUG] Audio callback #{}: num_samples={}, total_size={}, is_ready={}",
+                    callback_count, num_samples, total_size, is_ready
+                );
+            }
 
-            // Process each audio buffer
-            for buffer in audio_buffer_list.iter() {
-                let data = buffer.data();
-                if data.is_empty() {
-                    continue;
+            // Ensure data is ready for access
+            if !sample.is_data_ready() {
+                if let Err(e) = sample.make_data_ready() {
+                    if callback_count < 10 {
+                        eprintln!("[DEBUG] make_data_ready failed: {}", e);
+                    }
+                    return;
                 }
+            }
 
-                // ScreenCaptureKit typically outputs Float32 audio
-                // Convert to i16 samples
-                let float_samples: &[f32] = unsafe {
-                    std::slice::from_raw_parts(
-                        data.as_ptr() as *const f32,
-                        data.len() / std::mem::size_of::<f32>(),
-                    )
-                };
+            // Try to get audio data using multiple methods
+            let audio_data = self.extract_audio_data(&sample, callback_count);
 
-                // Convert f32 to i16
-                let i16_samples: Vec<i16> = float_samples
-                    .iter()
-                    .map(|&s| {
-                        let scaled = s * i16::MAX as f32;
-                        scaled.clamp(i16::MIN as f32, i16::MAX as f32) as i16
-                    })
-                    .collect();
+            if audio_data.is_empty() {
+                if callback_count < 10 {
+                    eprintln!(
+                        "[DEBUG] Audio callback #{}: No audio data extracted",
+                        callback_count
+                    );
+                }
+                return;
+            }
 
-                // Mix to mono if stereo (ScreenCaptureKit may output stereo)
-                let mono_samples = if buffer.number_channels > 1 {
-                    let channels = buffer.number_channels as usize;
-                    let frame_count = i16_samples.len() / channels;
-                    let mut mono = Vec::with_capacity(frame_count);
-                    for i in 0..frame_count {
-                        let mut sum: i32 = 0;
-                        for ch in 0..channels {
+            // Convert f32 to i16 (ScreenCaptureKit outputs Float32)
+            let i16_samples: Vec<i16> = audio_data
+                .iter()
+                .map(|&s| {
+                    let scaled = s * i16::MAX as f32;
+                    scaled.clamp(i16::MIN as f32, i16::MAX as f32) as i16
+                })
+                .collect();
+
+            // Mix to mono (assuming stereo input from ScreenCaptureKit)
+            let channels = 2usize; // ScreenCaptureKit typically outputs stereo
+            let mono_samples = if i16_samples.len() >= channels {
+                let frame_count = i16_samples.len() / channels;
+                let mut mono = Vec::with_capacity(frame_count);
+                for i in 0..frame_count {
+                    let mut sum: i32 = 0;
+                    for ch in 0..channels {
+                        if i * channels + ch < i16_samples.len() {
                             sum += i16_samples[i * channels + ch] as i32;
                         }
-                        mono.push((sum / channels as i32) as i16);
                     }
-                    mono
-                } else {
-                    i16_samples
-                };
-
-                // Resample to target rate if needed
-                let resampled = if self.source_sample_rate != self.target_sample_rate {
-                    resample_linear(
-                        &mono_samples,
-                        self.source_sample_rate,
-                        self.target_sample_rate,
-                    )
-                } else {
-                    mono_samples
-                };
-
-                // Push to ring buffer
-                if let Ok(mut prod) = self.producer.lock() {
-                    let _ = prod.push_slice(&resampled);
+                    mono.push((sum / channels as i32) as i16);
                 }
+                mono
+            } else {
+                i16_samples
+            };
 
-                // Log occasionally
-                let count = self
-                    .buffer_count
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                if count.is_multiple_of(100) && count > 0 {
-                    eprintln!("[DEBUG] System audio: {} buffers processed", count);
+            // Resample to target rate if needed
+            let resampled = if self.source_sample_rate != self.target_sample_rate {
+                resample_linear(
+                    &mono_samples,
+                    self.source_sample_rate,
+                    self.target_sample_rate,
+                )
+            } else {
+                mono_samples
+            };
+
+            // Push to ring buffer
+            let pushed = if let Ok(mut prod) = self.producer.lock() {
+                prod.push_slice(&resampled)
+            } else {
+                0
+            };
+
+            // Log periodically
+            if callback_count < 5 || callback_count % 100 == 0 {
+                eprintln!(
+                    "[DEBUG] System audio #{}: extracted {} f32 samples, pushed {} i16 samples",
+                    callback_count,
+                    audio_data.len(),
+                    pushed
+                );
+            }
+        }
+    }
+
+    impl SystemAudioHandler {
+        /// Extract audio data from CMSampleBuffer using multiple methods
+        fn extract_audio_data(&self, sample: &CMSampleBuffer, callback_count: usize) -> Vec<f32> {
+            // Method 1: Try get_audio_buffer_list() (wrapper method)
+            if let Some(audio_buffer_list) = sample.get_audio_buffer_list() {
+                let mut all_samples = Vec::new();
+                for buffer in audio_buffer_list.iter() {
+                    let data = buffer.data();
+                    if !data.is_empty() {
+                        // Convert bytes to f32 samples
+                        let float_samples: &[f32] = unsafe {
+                            std::slice::from_raw_parts(
+                                data.as_ptr() as *const f32,
+                                data.len() / std::mem::size_of::<f32>(),
+                            )
+                        };
+                        all_samples.extend_from_slice(float_samples);
+                    }
                 }
+                if !all_samples.is_empty() {
+                    if callback_count < 3 {
+                        eprintln!(
+                            "[DEBUG] Method 1 (audio_buffer_list): got {} samples",
+                            all_samples.len()
+                        );
+                    }
+                    return all_samples;
+                }
+            }
+
+            // Method 2: Direct FFI call to CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer
+            if let Some(samples) = extract_audio_via_ffi(sample.as_ptr(), callback_count) {
+                return samples;
+            }
+
+            // Method 3: Log diagnostic info if no method worked
+            let num_samples = sample.get_num_samples();
+            let total_size = sample.get_total_sample_size();
+            if callback_count < 5 && num_samples > 0 {
+                eprintln!(
+                    "[DEBUG] Audio info: num_samples={}, total_size={} bytes (no extraction method worked)",
+                    num_samples, total_size
+                );
+            }
+
+            Vec::new()
+        }
+    }
+
+    /// FFI bindings for direct Core Media / Core Audio access
+    mod ffi_audio {
+        use std::ffi::c_void;
+
+        /// AudioBuffer structure from Core Audio
+        #[repr(C)]
+        pub struct AudioBuffer {
+            pub number_channels: u32,
+            pub data_byte_size: u32,
+            pub data: *mut c_void,
+        }
+
+        /// AudioBufferList structure from Core Audio
+        #[repr(C)]
+        pub struct AudioBufferList {
+            pub number_buffers: u32,
+            pub buffers: [AudioBuffer; 1], // Variable length array
+        }
+
+        // Core Media FFI declarations
+        #[link(name = "CoreMedia", kind = "framework")]
+        extern "C" {
+            pub fn CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+                sbuf: *const c_void,
+                buffer_list_size_needed_out: *mut usize,
+                buffer_list_out: *mut AudioBufferList,
+                buffer_list_size: usize,
+                block_buffer_structure_allocator: *const c_void,
+                block_buffer_block_allocator: *const c_void,
+                flags: u32,
+                block_buffer_out: *mut *mut c_void,
+            ) -> i32;
+        }
+
+        #[link(name = "CoreFoundation", kind = "framework")]
+        extern "C" {
+            pub fn CFRelease(cf: *const c_void);
+        }
+    }
+
+    /// Extract audio data using direct FFI call
+    fn extract_audio_via_ffi(
+        sample_buffer_ptr: *mut std::ffi::c_void,
+        callback_count: usize,
+    ) -> Option<Vec<f32>> {
+        use ffi_audio::*;
+        use std::ptr;
+
+        if sample_buffer_ptr.is_null() {
+            return None;
+        }
+
+        unsafe {
+            // First call to get required buffer size
+            let mut buffer_list_size_needed: usize = 0;
+            let status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+                sample_buffer_ptr,
+                &mut buffer_list_size_needed,
+                ptr::null_mut(),
+                0,
+                ptr::null(),
+                ptr::null(),
+                0,
+                ptr::null_mut(),
+            );
+
+            if status != 0 || buffer_list_size_needed == 0 {
+                if callback_count < 5 {
+                    eprintln!(
+                        "[DEBUG] FFI: size query failed, status={}, size={}",
+                        status, buffer_list_size_needed
+                    );
+                }
+                return None;
+            }
+
+            // Allocate buffer for AudioBufferList
+            let layout = std::alloc::Layout::from_size_align(buffer_list_size_needed, 8).ok()?;
+            let buffer_list_ptr = std::alloc::alloc(layout) as *mut AudioBufferList;
+            if buffer_list_ptr.is_null() {
+                return None;
+            }
+
+            // Second call to get actual audio data
+            let mut block_buffer: *mut std::ffi::c_void = ptr::null_mut();
+            let status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+                sample_buffer_ptr,
+                ptr::null_mut(),
+                buffer_list_ptr,
+                buffer_list_size_needed,
+                ptr::null(),
+                ptr::null(),
+                0, // kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment = 1
+                &mut block_buffer,
+            );
+
+            if status != 0 {
+                std::alloc::dealloc(buffer_list_ptr as *mut u8, layout);
+                if callback_count < 5 {
+                    eprintln!("[DEBUG] FFI: get audio failed, status={}", status);
+                }
+                return None;
+            }
+
+            // Extract audio samples from AudioBufferList
+            let buffer_list = &*buffer_list_ptr;
+            let mut all_samples = Vec::new();
+
+            if callback_count < 3 {
+                eprintln!(
+                    "[DEBUG] FFI: got {} audio buffers",
+                    buffer_list.number_buffers
+                );
+            }
+
+            for i in 0..buffer_list.number_buffers as usize {
+                // Access buffers array (variable length)
+                let buffer_ptr = (buffer_list.buffers.as_ptr() as *const AudioBuffer).add(i);
+                let buffer = &*buffer_ptr;
+
+                if !buffer.data.is_null() && buffer.data_byte_size > 0 {
+                    // ScreenCaptureKit outputs Float32 audio
+                    let num_floats = buffer.data_byte_size as usize / std::mem::size_of::<f32>();
+                    let float_samples =
+                        std::slice::from_raw_parts(buffer.data as *const f32, num_floats);
+                    all_samples.extend_from_slice(float_samples);
+
+                    if callback_count < 3 {
+                        eprintln!(
+                            "[DEBUG] FFI buffer {}: {} channels, {} bytes = {} f32 samples",
+                            i, buffer.number_channels, buffer.data_byte_size, num_floats
+                        );
+                    }
+                }
+            }
+
+            // Clean up
+            if !block_buffer.is_null() {
+                CFRelease(block_buffer);
+            }
+            std::alloc::dealloc(buffer_list_ptr as *mut u8, layout);
+
+            if all_samples.is_empty() {
+                None
+            } else {
+                if callback_count < 3 {
+                    eprintln!(
+                        "[DEBUG] FFI: extracted {} total f32 samples",
+                        all_samples.len()
+                    );
+                }
+                Some(all_samples)
             }
         }
     }
@@ -272,9 +499,16 @@ mod system_audio {
                 .next()
                 .context("No displays found for audio capture")?;
 
+            // Get display dimensions for valid video configuration
+            // ScreenCaptureKit requires valid video dimensions even for audio-only capture
+            let display_width = display.width();
+            let display_height = display.height();
+
             eprintln!(
-                "[INFO] Capturing system audio from display: {:?}",
-                display.display_id()
+                "[INFO] Capturing system audio from display: {:?} ({}x{})",
+                display.display_id(),
+                display_width,
+                display_height
             );
 
             // Create content filter for display capture (audio only needs a display context)
@@ -284,20 +518,33 @@ mod system_audio {
                 .build();
 
             // Configure for audio-only capture
-            // We use minimal video settings since we only need audio
+            // IMPORTANT: ScreenCaptureKit requires valid video dimensions even for audio
             let sck_sample_rate = 48000i32; // ScreenCaptureKit commonly uses 48kHz
 
-            // Create a CMTime for 1 FPS (minimum video framerate)
-            let one_fps = CMTime::new(1, 1); // 1 frame per second
+            // Create a CMTime for minimum frame interval (1/10 second = 10 FPS max)
+            // Using a reasonable frame interval to avoid potential issues with 1 FPS
+            let frame_interval = CMTime::new(1, 10); // 10 FPS (0.1 second per frame)
 
             let mut config = SCStreamConfiguration::default();
-            config.set_width(1); // Minimal video (required for stream)
-            config.set_height(1);
-            config.set_minimum_frame_interval(&one_fps); // 1 FPS (minimum video)
+
+            // Use scaled-down display dimensions (1/4 size to reduce overhead)
+            // ScreenCaptureKit may reject 1x1 or very small dimensions
+            let scaled_width = (display_width / 4).max(64) as u32;
+            let scaled_height = (display_height / 4).max(64) as u32;
+
+            eprintln!(
+                "[DEBUG] Video config: {}x{} @ 10fps (scaled from {}x{})",
+                scaled_width, scaled_height, display_width, display_height
+            );
+
+            config.set_width(scaled_width);
+            config.set_height(scaled_height);
+            config.set_minimum_frame_interval(&frame_interval);
             config.set_captures_audio(true);
-            config.set_excludes_current_process_audio(false); // Include system audio
+            config.set_excludes_current_process_audio(true); // Exclude our own audio to avoid feedback
             config.set_sample_rate(sck_sample_rate);
             config.set_channel_count(2); // Stereo
+            config.set_shows_cursor(false); // Don't need cursor for audio capture
 
             // Create the audio handler
             let handler = SystemAudioHandler {
@@ -308,18 +555,38 @@ mod system_audio {
             };
 
             // Create and start the stream
+            eprintln!("[DEBUG] Creating SCStream...");
             let mut stream = SCStream::new(&filter, &config);
+
+            eprintln!("[DEBUG] Adding audio output handler...");
             stream.add_output_handler(handler, SCStreamOutputType::Audio);
 
-            stream
-                .start_capture()
-                .context("Failed to start system audio capture")?;
+            eprintln!("[DEBUG] Starting capture...");
+            match stream.start_capture() {
+                Ok(()) => {
+                    eprintln!("[INFO] System audio capture started successfully");
+                }
+                Err(e) => {
+                    // Provide detailed error context
+                    eprintln!("[ERROR] SCStream::start_capture() failed: {:?}", e);
+                    eprintln!("[DEBUG] This usually means:");
+                    eprintln!("[DEBUG]   1. Screen Recording permission not granted");
+                    eprintln!("[DEBUG]   2. Invalid stream configuration");
+                    eprintln!("[DEBUG]   3. Display/content not available");
+                    return Err(anyhow::anyhow!(
+                        "Failed to start system audio capture: {:?}. \
+                        Please grant Screen Recording permission in System Preferences → \
+                        Privacy & Security → Screen Recording",
+                        e
+                    ));
+                }
+            }
 
             self.stream = Some(stream);
             self.is_running.store(true, Ordering::Relaxed);
 
             eprintln!(
-                "[INFO] System audio capture started ({}Hz → {}Hz)",
+                "[INFO] System audio capture active ({}Hz → {}Hz)",
                 sck_sample_rate, self.sample_rate
             );
 
@@ -599,8 +866,11 @@ fn run_audio_capture(args: Args) -> Result<()> {
     let mut system_audio =
         system_audio::SystemAudioCapture::new(args.sample_rate, system_producer)?;
     if let Err(e) = system_audio.start() {
-        eprintln!("[WARN] Failed to start system audio capture: {}", e);
+        // Use {:#} to show full error chain from anyhow
+        eprintln!("[WARN] Failed to start system audio capture: {:#}", e);
         eprintln!("[WARN] Continuing with microphone only (Channel 0 will be silence)");
+        eprintln!("[HINT] Make sure Screen Recording permission is granted in:");
+        eprintln!("[HINT]   System Preferences → Privacy & Security → Screen Recording");
     }
 
     // Build the input stream based on sample format
@@ -726,6 +996,10 @@ fn run_audio_capture(args: Args) -> Result<()> {
     Ok(())
 }
 
+/// Counter for process_audio_data calls (for debug logging)
+static PROCESS_AUDIO_COUNTER: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
 /// Process audio data from the input stream (microphone)
 /// Mixes with system audio from the system_consumer ring buffer
 fn process_audio_data<T, F>(
@@ -739,6 +1013,8 @@ fn process_audio_data<T, F>(
     T: Copy,
     F: Fn(&T) -> i16,
 {
+    let call_count = PROCESS_AUDIO_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
     // Convert samples to i16
     let samples_i16: Vec<i16> = data.iter().map(convert).collect();
 
@@ -746,7 +1022,8 @@ fn process_audio_data<T, F>(
     let mic_resampled = resample_to_16khz_mono(&samples_i16, input_sample_rate, input_channels);
 
     // Get system audio samples from ring buffer (same count as mic samples)
-    let system_samples = if let Ok(mut cons) = system_consumer.lock() {
+    let (system_samples, system_read) = if let Ok(mut cons) = system_consumer.lock() {
+        let available = cons.len();
         let mut buf = vec![0i16; mic_resampled.len()];
         let read = cons.pop_slice(&mut buf);
         if read < buf.len() {
@@ -754,11 +1031,22 @@ fn process_audio_data<T, F>(
             buf.truncate(read);
             buf.resize(mic_resampled.len(), 0);
         }
-        buf
+        (buf, (read, available))
     } else {
         // If we can't lock, use silence
-        vec![0i16; mic_resampled.len()]
+        (vec![0i16; mic_resampled.len()], (0, 0))
     };
+
+    // Log mixing details for first few calls and periodically
+    if call_count < 5 || call_count % 500 == 0 {
+        eprintln!(
+            "[DEBUG] Mixer #{}: mic={} samples, system={}/{} samples (read/available)",
+            call_count,
+            mic_resampled.len(),
+            system_read.0,
+            system_read.1
+        );
+    }
 
     // Mix to stereo (Channel 0 = System, Channel 1 = Mic)
     let stereo = mix_to_stereo(&system_samples, &mic_resampled);
