@@ -15,7 +15,12 @@ import {
   type AppSettings,
 } from '../lib/ipc';
 import type { TranscriptSegment, Speaker } from '../lib/transcript';
-import { appRouter, setLiveModeStatus, setAnswerData, setInterimTranscript } from './trpc/router';
+import {
+  appRouter,
+  setLiveModeStatus,
+  setAnswerData,
+  setInterimTranscript,
+} from './trpc/router';
 import { getDefaultContextBuffer } from './contextBuffer';
 import { getDefaultGroqProvider, LLMError, resetGroqProvider } from './llm';
 import {
@@ -28,6 +33,8 @@ import {
   saveSettings,
   isDeepgramConfiguredFromSettings,
   isGroqConfiguredFromSettings,
+  toggleMinimizeMode,
+  isMinimizedMode as isMinimizedModeFromStore,
 } from './settingsStore';
 
 // ============================================================================
@@ -72,7 +79,10 @@ function sendError(message: string, code?: string): void {
  * Send streaming answer chunk to renderer
  */
 function sendAnswerChunk(chunk: string, isComplete: boolean): void {
-  sendToRenderer<'answerChunk'>(IPC_CHANNELS.ANSWER_CHUNK, { chunk, isComplete });
+  sendToRenderer<'answerChunk'>(IPC_CHANNELS.ANSWER_CHUNK, {
+    chunk,
+    isComplete,
+  });
 }
 
 // ============================================================================
@@ -93,13 +103,19 @@ function initializeLiveModeManager(): void {
 
   // Forward transcript segments to renderer
   liveModeManager.on('segment', (segment: TranscriptSegment) => {
-    sendToRenderer<'transcriptSegment'>(IPC_CHANNELS.TRANSCRIPT_SEGMENT, segment);
+    sendToRenderer<'transcriptSegment'>(
+      IPC_CHANNELS.TRANSCRIPT_SEGMENT,
+      segment
+    );
   });
 
   // Forward interim transcripts to renderer
   liveModeManager.on('interim', (text: string, speaker: Speaker) => {
     setInterimTranscript({ text, speaker });
-    sendToRenderer<'interimTranscript'>(IPC_CHANNELS.INTERIM_TRANSCRIPT, { text, speaker });
+    sendToRenderer<'interimTranscript'>(IPC_CHANNELS.INTERIM_TRANSCRIPT, {
+      text,
+      speaker,
+    });
   });
 
   // Forward errors to renderer
@@ -192,13 +208,20 @@ async function triggerAnswer(modelId?: string): Promise<AnswerData> {
   console.log(`[IPC] Context length: ${context.length} chars`);
 
   // Update state to generating
-  updateAnswerData({ state: 'generating', text: '', modelId: effectiveModelId });
+  updateAnswerData({
+    state: 'generating',
+    text: '',
+    modelId: effectiveModelId,
+  });
 
   try {
     const chunks: string[] = [];
 
     // Stream response from LLM
-    for await (const chunk of provider.streamResponse(context, effectiveModelId)) {
+    for await (const chunk of provider.streamResponse(
+      context,
+      effectiveModelId
+    )) {
       chunks.push(chunk);
       // Send each chunk to renderer for real-time display
       sendAnswerChunk(chunk, false);
@@ -268,6 +291,51 @@ function closeWindow(): { success: boolean } {
 }
 
 // ============================================================================
+// Minimize Mode
+// ============================================================================
+
+/**
+ * Dimensions for minimized mode
+ */
+const MINIMIZED_DIMENSIONS = {
+  width: 280,
+  height: 120,
+};
+
+const NORMAL_DIMENSIONS = {
+  width: 500,
+  height: 500,
+};
+
+/**
+ * Apply minimized or normal window size
+ */
+function applyMinimizeMode(isMinimized: boolean): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  const dimensions = isMinimized ? MINIMIZED_DIMENSIONS : NORMAL_DIMENSIONS;
+
+  mainWindow.setSize(dimensions.width, dimensions.height);
+  mainWindow.center();
+}
+
+/**
+ * Toggle minimize mode
+ */
+async function toggleMinimizeModeWrapper(): Promise<{ isMinimized: boolean }> {
+  const isMinimized = toggleMinimizeMode();
+  applyMinimizeMode(isMinimized);
+
+  sendToRenderer<'minimizeModeChanged'>(IPC_CHANNELS.MINIMIZE_MODE_CHANGED, {
+    isMinimized,
+  });
+
+  return { isMinimized };
+}
+
+// ============================================================================
 // IPC Registration
 // ============================================================================
 
@@ -293,9 +361,12 @@ export function initializeIPC(window: BrowserWindow): void {
     return stopLiveMode();
   });
 
-  ipcMain.handle(IPC_CHANNELS.TRIGGER_ANSWER, async (_event, { modelId }: { modelId?: string }) => {
-    return triggerAnswer(modelId);
-  });
+  ipcMain.handle(
+    IPC_CHANNELS.TRIGGER_ANSWER,
+    async (_event, { modelId }: { modelId?: string }) => {
+      return triggerAnswer(modelId);
+    }
+  );
 
   ipcMain.handle(IPC_CHANNELS.CLEAR_OVERLAY, () => {
     return clearOverlay();
@@ -327,11 +398,18 @@ export function initializeIPC(window: BrowserWindow): void {
     return getSettings();
   });
 
-  ipcMain.handle(IPC_CHANNELS.SAVE_SETTINGS, (_event, settings: Partial<AppSettings>) => {
-    saveSettings(settings);
-    // Reset Groq provider to pick up new API key
-    resetGroqProvider();
-    return { success: true };
+  ipcMain.handle(
+    IPC_CHANNELS.SAVE_SETTINGS,
+    (_event, settings: Partial<AppSettings>) => {
+      saveSettings(settings);
+      // Reset Groq provider to pick up new API key
+      resetGroqProvider();
+      return { success: true };
+    }
+  );
+
+  ipcMain.handle(IPC_CHANNELS.TOGGLE_MINIMIZE_MODE, async () => {
+    return toggleMinimizeModeWrapper();
   });
 
   console.log('[IPC] Handlers initialized');
@@ -355,10 +433,21 @@ export function cleanupIPC(): void {
   ipcMain.removeHandler(IPC_CHANNELS.CLOSE_WINDOW);
   ipcMain.removeHandler(IPC_CHANNELS.GET_SETTINGS);
   ipcMain.removeHandler(IPC_CHANNELS.SAVE_SETTINGS);
+  ipcMain.removeHandler(IPC_CHANNELS.TOGGLE_MINIMIZE_MODE);
 
   mainWindow = null;
   console.log('[IPC] Handlers cleaned up');
 }
 
 // Export for use in main process
-export { startLiveMode, stopLiveMode, toggleLiveMode, triggerAnswer, clearOverlay, closeWindow };
+export {
+  startLiveMode,
+  stopLiveMode,
+  toggleLiveMode,
+  triggerAnswer,
+  clearOverlay,
+  closeWindow,
+  toggleMinimizeModeWrapper as toggleMinimizeMode,
+  applyMinimizeMode,
+  isMinimizedModeFromStore as isMinimized,
+};

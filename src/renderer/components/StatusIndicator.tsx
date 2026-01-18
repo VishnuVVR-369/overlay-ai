@@ -62,9 +62,7 @@ export function StatusIndicator({
   return (
     <div className={`glass-status ${config.stateClass}`}>
       <span className="glass-status-dot" aria-hidden="true" />
-      {showLabel && (
-        <span className="glass-status-label">{displayLabel}</span>
-      )}
+      {showLabel && <span className="glass-status-label">{displayLabel}</span>}
     </div>
   );
 }
@@ -109,7 +107,9 @@ export function InlineStatus({
   }[state];
 
   return (
-    <span className={`inline-flex items-center gap-1.5 font-mono text-[10px] ${colorClass}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 font-mono text-[10px] ${colorClass}`}
+    >
       <span className="relative flex h-1.5 w-1.5">
         {(state === 'connected' || state === 'connecting') && (
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-50" />

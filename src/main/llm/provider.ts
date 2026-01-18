@@ -120,4 +120,5 @@ export const LLM_ERROR_CODES = {
   STREAM_ERROR: 'STREAM_ERROR',
 } as const;
 
-export type LLMErrorCode = (typeof LLM_ERROR_CODES)[keyof typeof LLM_ERROR_CODES];
+export type LLMErrorCode =
+  (typeof LLM_ERROR_CODES)[keyof typeof LLM_ERROR_CODES];

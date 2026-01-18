@@ -19,6 +19,7 @@ import {
   stopLiveMode as ipcStopLiveMode,
   triggerAnswer as ipcTriggerAnswer,
   clearOverlay as ipcClearOverlay,
+  toggleMinimizeMode as ipcToggleMinimizeMode,
 } from '../ipcClient';
 
 // ============================================================================
@@ -45,6 +46,8 @@ export interface OverlayState {
   /** Whether API keys are configured */
   isDeepgramConfigured: boolean;
   isGroqConfigured: boolean;
+  /** Minimize mode state */
+  isMinimized: boolean;
   /** Last error message */
   lastError: string | null;
 }
@@ -62,6 +65,8 @@ export interface OverlayActions {
   clearOverlay: () => Promise<void>;
   /** Refresh status from main process */
   refreshStatus: () => Promise<void>;
+  /** Toggle minimize mode */
+  toggleMinimizeMode: () => Promise<void>;
 }
 
 export interface UseOverlayStateReturn {
@@ -85,6 +90,7 @@ const INITIAL_STATE: OverlayState = {
   answerModelId: null,
   isDeepgramConfigured: false,
   isGroqConfigured: false,
+  isMinimized: false,
   lastError: null,
 };
 
@@ -140,31 +146,37 @@ export function useOverlayState(): UseOverlayStateReturn {
     }));
   }, []);
 
-  const updateInterimTranscript = useCallback((text: string, speaker: Speaker) => {
-    setState((prev) => ({
-      ...prev,
-      interimText: text,
-      interimSpeaker: speaker,
-    }));
-  }, []);
+  const updateInterimTranscript = useCallback(
+    (text: string, speaker: Speaker) => {
+      setState((prev) => ({
+        ...prev,
+        interimText: text,
+        interimSpeaker: speaker,
+      }));
+    },
+    []
+  );
 
-  const handleAnswerChunk = useCallback((chunk: string, isComplete: boolean) => {
-    if (isComplete) {
-      // Final chunk - answer is complete
-      setState((prev) => ({
-        ...prev,
-        answerState: 'complete',
-        answerText: answerTextRef.current,
-      }));
-    } else {
-      // Accumulate chunks
-      answerTextRef.current += chunk;
-      setState((prev) => ({
-        ...prev,
-        answerText: answerTextRef.current,
-      }));
-    }
-  }, []);
+  const handleAnswerChunk = useCallback(
+    (chunk: string, isComplete: boolean) => {
+      if (isComplete) {
+        // Final chunk - answer is complete
+        setState((prev) => ({
+          ...prev,
+          answerState: 'complete',
+          answerText: answerTextRef.current,
+        }));
+      } else {
+        // Accumulate chunks
+        answerTextRef.current += chunk;
+        setState((prev) => ({
+          ...prev,
+          answerText: answerTextRef.current,
+        }));
+      }
+    },
+    []
+  );
 
   const updateAnswerState = useCallback((data: AnswerData) => {
     setState((prev) => ({
@@ -188,6 +200,16 @@ export function useOverlayState(): UseOverlayStateReturn {
     }));
   }, []);
 
+  const handleMinimizeModeChanged = useCallback(
+    ({ isMinimized }: { isMinimized: boolean }) => {
+      setState((prev) => ({
+        ...prev,
+        isMinimized,
+      }));
+    },
+    []
+  );
+
   // ============================================================================
   // Actions
   // ============================================================================
@@ -197,7 +219,9 @@ export function useOverlayState(): UseOverlayStateReturn {
       const status = await ipcStartLiveMode();
       updateLiveMode(status);
     } catch (error) {
-      handleError(error instanceof Error ? error.message : 'Failed to start live mode');
+      handleError(
+        error instanceof Error ? error.message : 'Failed to start live mode'
+      );
     }
   }, [updateLiveMode, handleError]);
 
@@ -206,7 +230,9 @@ export function useOverlayState(): UseOverlayStateReturn {
       const status = await ipcStopLiveMode();
       updateLiveMode(status);
     } catch (error) {
-      handleError(error instanceof Error ? error.message : 'Failed to stop live mode');
+      handleError(
+        error instanceof Error ? error.message : 'Failed to stop live mode'
+      );
     }
   }, [updateLiveMode, handleError]);
 
@@ -218,32 +244,37 @@ export function useOverlayState(): UseOverlayStateReturn {
     }
   }, [state.liveMode.state, startLiveMode, stopLiveMode]);
 
-  const triggerAnswer = useCallback(async (modelId?: string) => {
-    try {
-      // Reset answer text ref before starting
-      answerTextRef.current = '';
-      setState((prev) => ({
-        ...prev,
-        answerState: 'generating',
-        answerText: '',
-        answerError: null,
-      }));
+  const triggerAnswer = useCallback(
+    async (modelId?: string) => {
+      try {
+        // Reset answer text ref before starting
+        answerTextRef.current = '';
+        setState((prev) => ({
+          ...prev,
+          answerState: 'generating',
+          answerText: '',
+          answerError: null,
+        }));
 
-      const data = await ipcTriggerAnswer(modelId);
-      // Note: The streaming updates will come via IPC events
-      // This just sets the final state if streaming is done
-      if (data.state === 'complete' || data.state === 'error') {
-        updateAnswerState(data);
+        const data = await ipcTriggerAnswer(modelId);
+        // Note: The streaming updates will come via IPC events
+        // This just sets the final state if streaming is done
+        if (data.state === 'complete' || data.state === 'error') {
+          updateAnswerState(data);
+        }
+      } catch (error) {
+        handleError(
+          error instanceof Error ? error.message : 'Failed to trigger answer'
+        );
+        setState((prev) => ({
+          ...prev,
+          answerState: 'error',
+          answerError: error instanceof Error ? error.message : 'Unknown error',
+        }));
       }
-    } catch (error) {
-      handleError(error instanceof Error ? error.message : 'Failed to trigger answer');
-      setState((prev) => ({
-        ...prev,
-        answerState: 'error',
-        answerError: error instanceof Error ? error.message : 'Unknown error',
-      }));
-    }
-  }, [updateAnswerState, handleError]);
+    },
+    [updateAnswerState, handleError]
+  );
 
   const clearOverlay = useCallback(async () => {
     try {
@@ -260,7 +291,9 @@ export function useOverlayState(): UseOverlayStateReturn {
       }));
       answerTextRef.current = '';
     } catch (error) {
-      handleError(error instanceof Error ? error.message : 'Failed to clear overlay');
+      handleError(
+        error instanceof Error ? error.message : 'Failed to clear overlay'
+      );
     }
   }, [handleError]);
 
@@ -277,7 +310,25 @@ export function useOverlayState(): UseOverlayStateReturn {
         isGroqConfigured: status.isGroqConfigured,
       }));
     } catch (error) {
-      handleError(error instanceof Error ? error.message : 'Failed to get status');
+      handleError(
+        error instanceof Error ? error.message : 'Failed to get status'
+      );
+    }
+  }, [handleError]);
+
+  const toggleMinimizeModeAction = useCallback(async () => {
+    try {
+      const result = await ipcToggleMinimizeMode();
+      setState((prev) => ({
+        ...prev,
+        isMinimized: result.isMinimized,
+      }));
+    } catch (error) {
+      handleError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to toggle minimize mode'
+      );
     }
   }, [handleError]);
 
@@ -300,10 +351,13 @@ export function useOverlayState(): UseOverlayStateReturn {
     const unsubscribe = subscribeToEvents({
       liveModeChanged: updateLiveMode,
       transcriptSegment: addSegment,
-      interimTranscript: ({ text, speaker }) => updateInterimTranscript(text, speaker),
-      answerChunk: ({ chunk, isComplete }) => handleAnswerChunk(chunk, isComplete),
+      interimTranscript: ({ text, speaker }) =>
+        updateInterimTranscript(text, speaker),
+      answerChunk: ({ chunk, isComplete }) =>
+        handleAnswerChunk(chunk, isComplete),
       answerStateChanged: updateAnswerState,
       error: ({ message }) => handleError(message),
+      minimizeModeChanged: handleMinimizeModeChanged,
     });
 
     return unsubscribe;
@@ -314,6 +368,7 @@ export function useOverlayState(): UseOverlayStateReturn {
     handleAnswerChunk,
     updateAnswerState,
     handleError,
+    handleMinimizeModeChanged,
   ]);
 
   // ============================================================================
@@ -329,6 +384,7 @@ export function useOverlayState(): UseOverlayStateReturn {
       triggerAnswer,
       clearOverlay,
       refreshStatus,
+      toggleMinimizeMode: toggleMinimizeModeAction,
     },
     isLoading,
   };

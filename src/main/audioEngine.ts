@@ -116,7 +116,9 @@ export class AudioEngine extends EventEmitter {
 
     const binaryPath = getAudioEnginePath();
     console.log(`[AudioEngine] Starting: ${binaryPath}`);
-    console.log(`[AudioEngine] Args: --sample-rate ${this.sampleRate} --device ${this.device}`);
+    console.log(
+      `[AudioEngine] Args: --sample-rate ${this.sampleRate} --device ${this.device}`
+    );
 
     try {
       // Spawn the Rust binary per PLAN.md pseudocode
@@ -155,7 +157,9 @@ export class AudioEngine extends EventEmitter {
 
       // Handle process exit
       this.process.on('close', (code: number | null, signal: string | null) => {
-        console.log(`[AudioEngine] Process exited with code ${code}, signal ${signal}`);
+        console.log(
+          `[AudioEngine] Process exited with code ${code}, signal ${signal}`
+        );
         this.emit('exit', code, signal);
         this.cleanup();
       });

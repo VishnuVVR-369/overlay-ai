@@ -49,7 +49,9 @@ declare global {
  * Start live mode (audio capture + Deepgram)
  */
 export async function startLiveMode(): Promise<LiveModeStatus> {
-  return window.electronAPI.invoke<LiveModeStatus>(IPC_CHANNELS.START_LIVE_MODE);
+  return window.electronAPI.invoke<LiveModeStatus>(
+    IPC_CHANNELS.START_LIVE_MODE
+  );
 }
 
 /**
@@ -75,14 +77,18 @@ export async function toggleLiveMode(): Promise<LiveModeStatus> {
  * Trigger answer generation
  */
 export async function triggerAnswer(modelId?: string): Promise<AnswerData> {
-  return window.electronAPI.invoke<AnswerData>(IPC_CHANNELS.TRIGGER_ANSWER, { modelId });
+  return window.electronAPI.invoke<AnswerData>(IPC_CHANNELS.TRIGGER_ANSWER, {
+    modelId,
+  });
 }
 
 /**
  * Clear overlay (transcript and answer)
  */
 export async function clearOverlay(): Promise<{ success: boolean }> {
-  return window.electronAPI.invoke<{ success: boolean }>(IPC_CHANNELS.CLEAR_OVERLAY);
+  return window.electronAPI.invoke<{ success: boolean }>(
+    IPC_CHANNELS.CLEAR_OVERLAY
+  );
 }
 
 /**
@@ -96,7 +102,9 @@ export async function getStatus(): Promise<AppStatus> {
  * Close the window
  */
 export async function closeWindow(): Promise<{ success: boolean }> {
-  return window.electronAPI.invoke<{ success: boolean }>(IPC_CHANNELS.CLOSE_WINDOW);
+  return window.electronAPI.invoke<{ success: boolean }>(
+    IPC_CHANNELS.CLOSE_WINDOW
+  );
 }
 
 /**
@@ -109,9 +117,27 @@ export async function getSettings(): Promise<AppSettings> {
 /**
  * Save settings
  */
-export async function saveSettings(settings: Partial<AppSettings>): Promise<{ success: boolean }> {
-  return window.electronAPI.invoke<{ success: boolean }>(IPC_CHANNELS.SAVE_SETTINGS, settings);
+export async function saveSettings(
+  settings: Partial<AppSettings>
+): Promise<{ success: boolean }> {
+  return window.electronAPI.invoke<{ success: boolean }>(
+    IPC_CHANNELS.SAVE_SETTINGS,
+    settings
+  );
 }
+
+/**
+ * Toggle minimize mode
+ */
+export async function toggleMinimizeMode(): Promise<{ isMinimized: boolean }> {
+  return window.electronAPI.invoke<{ isMinimized: boolean }>(
+    IPC_CHANNELS.TOGGLE_MINIMIZE_MODE
+  );
+}
+
+// ============================================================================
+// tRPC Query Methods
+// ============================================================================
 
 // ============================================================================
 // tRPC Query Methods
@@ -120,14 +146,19 @@ export async function saveSettings(settings: Partial<AppSettings>): Promise<{ su
 /**
  * Get recent transcript via tRPC
  */
-export async function getRecentTranscript(windowMs = 30000): Promise<LiveTranscriptData> {
+export async function getRecentTranscript(
+  windowMs = 30000
+): Promise<LiveTranscriptData> {
   return trpc.getRecentTranscript.query({ windowMs });
 }
 
 /**
  * Get full context via tRPC
  */
-export async function getFullContext(): Promise<{ context: string; stats: ContextStats }> {
+export async function getFullContext(): Promise<{
+  context: string;
+  stats: ContextStats;
+}> {
   return trpc.getFullContext.query();
 }
 
@@ -140,49 +171,95 @@ type EventCallback<K extends keyof IPCEvents> = (data: IPCEvents[K]) => void;
 /**
  * Subscribe to live mode status changes
  */
-export function onLiveModeChanged(callback: EventCallback<'liveModeChanged'>): () => void {
-  window.electronAPI.on(IPC_CHANNELS.LIVE_MODE_CHANGED, callback as (...args: unknown[]) => void);
-  return () => window.electronAPI.removeAllListeners(IPC_CHANNELS.LIVE_MODE_CHANGED);
+export function onLiveModeChanged(
+  callback: EventCallback<'liveModeChanged'>
+): () => void {
+  window.electronAPI.on(
+    IPC_CHANNELS.LIVE_MODE_CHANGED,
+    callback as (...args: unknown[]) => void
+  );
+  return () =>
+    window.electronAPI.removeAllListeners(IPC_CHANNELS.LIVE_MODE_CHANGED);
 }
 
 /**
  * Subscribe to transcript segments
  */
-export function onTranscriptSegment(callback: EventCallback<'transcriptSegment'>): () => void {
-  window.electronAPI.on(IPC_CHANNELS.TRANSCRIPT_SEGMENT, callback as (...args: unknown[]) => void);
-  return () => window.electronAPI.removeAllListeners(IPC_CHANNELS.TRANSCRIPT_SEGMENT);
+export function onTranscriptSegment(
+  callback: EventCallback<'transcriptSegment'>
+): () => void {
+  window.electronAPI.on(
+    IPC_CHANNELS.TRANSCRIPT_SEGMENT,
+    callback as (...args: unknown[]) => void
+  );
+  return () =>
+    window.electronAPI.removeAllListeners(IPC_CHANNELS.TRANSCRIPT_SEGMENT);
 }
 
 /**
  * Subscribe to interim transcript updates
  */
-export function onInterimTranscript(callback: EventCallback<'interimTranscript'>): () => void {
-  window.electronAPI.on(IPC_CHANNELS.INTERIM_TRANSCRIPT, callback as (...args: unknown[]) => void);
-  return () => window.electronAPI.removeAllListeners(IPC_CHANNELS.INTERIM_TRANSCRIPT);
+export function onInterimTranscript(
+  callback: EventCallback<'interimTranscript'>
+): () => void {
+  window.electronAPI.on(
+    IPC_CHANNELS.INTERIM_TRANSCRIPT,
+    callback as (...args: unknown[]) => void
+  );
+  return () =>
+    window.electronAPI.removeAllListeners(IPC_CHANNELS.INTERIM_TRANSCRIPT);
 }
 
 /**
  * Subscribe to answer chunks (streaming)
  */
-export function onAnswerChunk(callback: EventCallback<'answerChunk'>): () => void {
-  window.electronAPI.on(IPC_CHANNELS.ANSWER_CHUNK, callback as (...args: unknown[]) => void);
+export function onAnswerChunk(
+  callback: EventCallback<'answerChunk'>
+): () => void {
+  window.electronAPI.on(
+    IPC_CHANNELS.ANSWER_CHUNK,
+    callback as (...args: unknown[]) => void
+  );
   return () => window.electronAPI.removeAllListeners(IPC_CHANNELS.ANSWER_CHUNK);
 }
 
 /**
  * Subscribe to answer state changes
  */
-export function onAnswerStateChanged(callback: EventCallback<'answerStateChanged'>): () => void {
-  window.electronAPI.on(IPC_CHANNELS.ANSWER_STATE_CHANGED, callback as (...args: unknown[]) => void);
-  return () => window.electronAPI.removeAllListeners(IPC_CHANNELS.ANSWER_STATE_CHANGED);
+export function onAnswerStateChanged(
+  callback: EventCallback<'answerStateChanged'>
+): () => void {
+  window.electronAPI.on(
+    IPC_CHANNELS.ANSWER_STATE_CHANGED,
+    callback as (...args: unknown[]) => void
+  );
+  return () =>
+    window.electronAPI.removeAllListeners(IPC_CHANNELS.ANSWER_STATE_CHANGED);
 }
 
 /**
  * Subscribe to errors
  */
 export function onError(callback: EventCallback<'error'>): () => void {
-  window.electronAPI.on(IPC_CHANNELS.ERROR, callback as (...args: unknown[]) => void);
+  window.electronAPI.on(
+    IPC_CHANNELS.ERROR,
+    callback as (...args: unknown[]) => void
+  );
   return () => window.electronAPI.removeAllListeners(IPC_CHANNELS.ERROR);
+}
+
+/**
+ * Subscribe to minimize mode changes
+ */
+export function onMinimizeModeChanged(
+  callback: EventCallback<'minimizeModeChanged'>
+): () => void {
+  window.electronAPI.on(
+    IPC_CHANNELS.MINIMIZE_MODE_CHANGED,
+    callback as (...args: unknown[]) => void
+  );
+  return () =>
+    window.electronAPI.removeAllListeners(IPC_CHANNELS.MINIMIZE_MODE_CHANGED);
 }
 
 // ============================================================================
@@ -196,6 +273,7 @@ export interface IPCSubscriptions {
   answerChunk?: EventCallback<'answerChunk'>;
   answerStateChanged?: EventCallback<'answerStateChanged'>;
   error?: EventCallback<'error'>;
+  minimizeModeChanged?: EventCallback<'minimizeModeChanged'>;
 }
 
 /**
@@ -222,6 +300,9 @@ export function subscribeToEvents(subscriptions: IPCSubscriptions): () => void {
   }
   if (subscriptions.error) {
     cleanups.push(onError(subscriptions.error));
+  }
+  if (subscriptions.minimizeModeChanged) {
+    cleanups.push(onMinimizeModeChanged(subscriptions.minimizeModeChanged));
   }
 
   return () => {

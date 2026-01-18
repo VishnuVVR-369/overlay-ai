@@ -19,7 +19,11 @@ import type { TranscriptSegment, Speaker } from './transcript';
  * Live mode connection states
  * Per PLAN.md Phase 9: disconnected → connecting → connected → error
  */
-export type LiveModeState = 'disconnected' | 'connecting' | 'connected' | 'error';
+export type LiveModeState =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'error';
 
 /**
  * Live mode status information
@@ -110,6 +114,7 @@ export interface ApiKeySettings {
  */
 export interface AppSettings extends ApiKeySettings {
   customSystemPrompt?: string;
+  isMinimized?: boolean;
 }
 
 // ============================================================================
@@ -153,6 +158,9 @@ export interface IPCInputs {
 
   /** Save settings */
   saveSettings: Partial<AppSettings>;
+
+  /** Toggle minimize mode */
+  toggleMinimizeMode: void;
 }
 
 /**
@@ -169,6 +177,7 @@ export interface IPCOutputs {
   closeWindow: { success: boolean };
   getSettings: AppSettings;
   saveSettings: { success: boolean };
+  toggleMinimizeMode: { isMinimized: boolean };
 }
 
 // ============================================================================
@@ -196,6 +205,9 @@ export interface IPCEvents {
 
   /** Error occurred */
   error: { message: string; code?: string };
+
+  /** Minimize mode changed */
+  minimizeModeChanged: { isMinimized: boolean };
 }
 
 // ============================================================================
@@ -216,6 +228,7 @@ export const IPC_CHANNELS = {
   CLOSE_WINDOW: 'overlay:close-window',
   GET_SETTINGS: 'overlay:get-settings',
   SAVE_SETTINGS: 'overlay:save-settings',
+  TOGGLE_MINIMIZE_MODE: 'overlay:toggle-minimize-mode',
 
   // Events (main → renderer)
   LIVE_MODE_CHANGED: 'overlay:live-mode-changed',
@@ -224,6 +237,7 @@ export const IPC_CHANNELS = {
   ANSWER_CHUNK: 'overlay:answer-chunk',
   ANSWER_STATE_CHANGED: 'overlay:answer-state-changed',
   ERROR: 'overlay:error',
+  MINIMIZE_MODE_CHANGED: 'overlay:minimize-mode-changed',
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

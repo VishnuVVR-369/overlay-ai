@@ -30,7 +30,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * Invoke a main process handler and get a response
    */
   invoke: <T>(channel: string, data?: unknown): Promise<T> => {
-    if (VALID_CHANNELS.includes(channel as typeof VALID_CHANNELS[number])) {
+    if (VALID_CHANNELS.includes(channel as (typeof VALID_CHANNELS)[number])) {
       return ipcRenderer.invoke(channel, data);
     }
     return Promise.reject(new Error(`Invalid channel: ${channel}`));
@@ -40,7 +40,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * Listen for events from main process
    */
   on: (channel: string, callback: (...args: unknown[]) => void): void => {
-    if (VALID_CHANNELS.includes(channel as typeof VALID_CHANNELS[number])) {
+    if (VALID_CHANNELS.includes(channel as (typeof VALID_CHANNELS)[number])) {
       ipcRenderer.on(channel, (_event, ...args) => callback(...args));
     }
   },
@@ -56,7 +56,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
    * Send a one-way message to main process
    */
   send: (channel: string, data?: unknown): void => {
-    if (VALID_CHANNELS.includes(channel as typeof VALID_CHANNELS[number])) {
+    if (VALID_CHANNELS.includes(channel as (typeof VALID_CHANNELS)[number])) {
       ipcRenderer.send(channel, data);
     }
   },
