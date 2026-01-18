@@ -14,7 +14,6 @@ import {
   type AnswerData,
   type AppStatus,
   type AppSettings,
-  type ApiKeySettings,
   type LiveTranscriptData,
   type ContextStats,
   type IPCEvents,
@@ -110,7 +109,7 @@ export async function getSettings(): Promise<AppSettings> {
 /**
  * Save settings
  */
-export async function saveSettings(settings: ApiKeySettings): Promise<{ success: boolean }> {
+export async function saveSettings(settings: Partial<AppSettings>): Promise<{ success: boolean }> {
   return window.electronAPI.invoke<{ success: boolean }>(IPC_CHANNELS.SAVE_SETTINGS, settings);
 }
 

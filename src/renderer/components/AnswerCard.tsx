@@ -3,10 +3,12 @@
  *
  * Displays LLM-generated answers with elegant markdown rendering
  * and frosted glass visual elements.
+ *
+ * Uses Streamdown for optimized streaming LLM response rendering.
  */
 
 import React from 'react';
-import ReactMarkdown from 'react-markdown';
+import { Streamdown } from 'streamdown';
 import type { AnswerState } from '../../lib/ipc';
 
 // ============================================================================
@@ -234,9 +236,13 @@ export function AnswerCard({
 
         {showContent && text && (
           <div className="glass-prose">
-            <ReactMarkdown components={markdownComponents}>
+            <Streamdown
+              mode="streaming"
+              parseIncompleteMarkdown
+              components={markdownComponents}
+            >
               {text}
-            </ReactMarkdown>
+            </Streamdown>
             {state === 'generating' && <span className="glass-cursor" />}
           </div>
         )}
@@ -263,7 +269,13 @@ export function CompactAnswer({
 
   return (
     <div className="glass-prose">
-      <ReactMarkdown components={markdownComponents}>{text}</ReactMarkdown>
+      <Streamdown
+        mode="streaming"
+        parseIncompleteMarkdown
+        components={markdownComponents}
+      >
+        {text}
+      </Streamdown>
       {state === 'generating' && <span className="glass-cursor" />}
     </div>
   );

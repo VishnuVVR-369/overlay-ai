@@ -15,7 +15,7 @@ import {
   LLMError,
   LLM_ERROR_CODES,
 } from './provider';
-import { SYSTEM_PROMPT, buildUserPrompt } from './systemPrompt';
+import { getSystemPrompt, buildUserPrompt } from './systemPrompt';
 
 // ============================================================================
 // Configuration
@@ -140,7 +140,7 @@ export class GroqProvider implements LLMProvider {
         messages: [
           {
             role: 'system',
-            content: SYSTEM_PROMPT,
+            content: getSystemPrompt(),
           },
           {
             role: 'user',

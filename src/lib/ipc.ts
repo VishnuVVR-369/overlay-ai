@@ -109,7 +109,7 @@ export interface ApiKeySettings {
  * Complete app settings
  */
 export interface AppSettings extends ApiKeySettings {
-  // Future settings can be added here
+  customSystemPrompt?: string;
 }
 
 // ============================================================================
@@ -152,7 +152,7 @@ export interface IPCInputs {
   getSettings: void;
 
   /** Save settings */
-  saveSettings: ApiKeySettings;
+  saveSettings: Partial<AppSettings>;
 }
 
 /**

@@ -21,6 +21,7 @@ asar: true
 
 # macOS specific
 mac:
+  icon: overlay-ai.icns
   target:
     - target: dmg
       arch:
@@ -45,6 +46,7 @@ dmg:
 
 # Windows placeholder
 win:
+  icon: overlay-ai.ico
   target:
     - target: nsis
       arch:

@@ -12,7 +12,6 @@ import {
   type LiveModeStatus,
   type AnswerData,
   type IPCEvents,
-  type ApiKeySettings,
   type AppSettings,
 } from '../lib/ipc';
 import type { TranscriptSegment, Speaker } from '../lib/transcript';
@@ -328,7 +327,7 @@ export function initializeIPC(window: BrowserWindow): void {
     return getSettings();
   });
 
-  ipcMain.handle(IPC_CHANNELS.SAVE_SETTINGS, (_event, settings: ApiKeySettings) => {
+  ipcMain.handle(IPC_CHANNELS.SAVE_SETTINGS, (_event, settings: Partial<AppSettings>) => {
     saveSettings(settings);
     // Reset Groq provider to pick up new API key
     resetGroqProvider();

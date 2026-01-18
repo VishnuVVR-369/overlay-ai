@@ -15,7 +15,7 @@ export interface ApiKeySettings {
 }
 
 export interface AppSettings extends ApiKeySettings {
-  // Future settings can be added here
+  customSystemPrompt?: string;
 }
 
 // ============================================================================
@@ -27,6 +27,7 @@ const store = new Store<AppSettings>({
   defaults: {
     deepgramApiKey: undefined,
     groqApiKey: undefined,
+    customSystemPrompt: undefined,
   },
   // Encrypt API keys for security
   encryptionKey: 'overlay-ai-encryption-key-v1',
@@ -43,6 +44,7 @@ export function getSettings(): AppSettings {
   return {
     deepgramApiKey: store.get('deepgramApiKey'),
     groqApiKey: store.get('groqApiKey'),
+    customSystemPrompt: store.get('customSystemPrompt'),
   };
 }
 
@@ -62,6 +64,13 @@ export function saveSettings(settings: Partial<AppSettings>): void {
       store.delete('groqApiKey');
     } else {
       store.set('groqApiKey', settings.groqApiKey);
+    }
+  }
+  if (settings.customSystemPrompt !== undefined) {
+    if (settings.customSystemPrompt === '') {
+      store.delete('customSystemPrompt');
+    } else {
+      store.set('customSystemPrompt', settings.customSystemPrompt);
     }
   }
 }
