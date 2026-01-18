@@ -15,8 +15,4 @@ export {
   type LiveTranscriptProps,
 } from './LiveTranscript';
 
-export {
-  AnswerCard,
-  CompactAnswer,
-  type AnswerCardProps,
-} from './AnswerCard';
+export { AnswerCard, CompactAnswer, type AnswerCardProps } from './AnswerCard';

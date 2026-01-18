@@ -12,8 +12,15 @@ import { EventEmitter } from 'events';
 import type { LiveModeStatus, LiveModeState } from '../lib/ipc';
 import type { TranscriptSegment, Speaker } from '../lib/transcript';
 import { AudioEngine, getDefaultAudioEngine } from './audioEngine';
-import { DeepgramClient, connectDeepgram, isDeepgramConfigured } from './deepgram';
-import { TranscriptIngest, getDefaultTranscriptIngest } from './transcriptIngest';
+import {
+  DeepgramClient,
+  connectDeepgram,
+  isDeepgramConfigured,
+} from './deepgram';
+import {
+  TranscriptIngest,
+  getDefaultTranscriptIngest,
+} from './transcriptIngest';
 import { getDefaultContextBuffer } from './contextBuffer';
 
 // ============================================================================
@@ -199,7 +206,9 @@ export class LiveModeManager extends EventEmitter {
       });
 
       this.audioEngine.on('exit', (code, signal) => {
-        console.log(`[LiveMode] Audio engine exited: code=${code}, signal=${signal}`);
+        console.log(
+          `[LiveMode] Audio engine exited: code=${code}, signal=${signal}`
+        );
         if (code !== 0 && code !== null && this._state === 'connected') {
           this.transition('error', `Audio engine exited with code ${code}`);
         }
@@ -211,7 +220,8 @@ export class LiveModeManager extends EventEmitter {
       this.transition('connected');
       return this.status;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       console.error('[LiveMode] Start failed:', errorMessage);
       this.cleanup();
       this.transition('error', errorMessage);

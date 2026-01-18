@@ -34,7 +34,8 @@ export const publicProcedure = t.procedure;
 // These will be set by the IPC module
 let liveModeStatus: LiveModeStatus = { state: 'disconnected' };
 let answerData: AnswerData = { state: 'idle', text: '' };
-let interimTranscript: { text: string; speaker: 'interviewer' | 'me' } | null = null;
+let interimTranscript: { text: string; speaker: 'interviewer' | 'me' } | null =
+  null;
 
 // State setters (called from ipc.ts)
 export function setLiveModeStatus(status: LiveModeStatus): void {
@@ -45,7 +46,9 @@ export function setAnswerData(data: AnswerData): void {
   answerData = data;
 }
 
-export function setInterimTranscript(data: { text: string; speaker: 'interviewer' | 'me' } | null): void {
+export function setInterimTranscript(
+  data: { text: string; speaker: 'interviewer' | 'me' } | null
+): void {
   interimTranscript = data;
 }
 
@@ -107,20 +110,22 @@ export const appRouter = router({
   /**
    * Get full context (for debugging or manual inspection)
    */
-  getFullContext: publicProcedure.query((): { context: string; stats: ContextStats } => {
-    const buffer = getDefaultContextBuffer();
-    const stats = buffer.getStats();
+  getFullContext: publicProcedure.query(
+    (): { context: string; stats: ContextStats } => {
+      const buffer = getDefaultContextBuffer();
+      const stats = buffer.getStats();
 
-    return {
-      context: buffer.getFullContext(),
-      stats: {
-        segmentCount: stats.segmentCount,
-        wordCount: stats.wordCount,
-        estimatedTokens: stats.estimatedTokens,
-        durationMs: stats.durationMs,
-      },
-    };
-  }),
+      return {
+        context: buffer.getFullContext(),
+        stats: {
+          segmentCount: stats.segmentCount,
+          wordCount: stats.wordCount,
+          estimatedTokens: stats.estimatedTokens,
+          durationMs: stats.durationMs,
+        },
+      };
+    }
+  ),
 
   /**
    * Start live mode

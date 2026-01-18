@@ -132,6 +132,78 @@ function LoadingOverlay(): React.ReactElement {
 }
 
 // ============================================================================
+// Minimized View Component
+// ============================================================================
+
+interface MinimizedViewProps {
+  liveModeState: string;
+  isGenerating: boolean;
+  onToggle: () => void;
+}
+
+function MinimizedView({
+  liveModeState,
+  isGenerating,
+  onToggle,
+}: MinimizedViewProps): React.ReactElement {
+  const statusColor =
+    liveModeState === 'connected'
+      ? 'var(--glass-success)'
+      : liveModeState === 'connecting'
+        ? 'var(--glass-warning)'
+        : liveModeState === 'error'
+          ? 'var(--glass-error)'
+          : 'var(--glass-neutral)';
+
+  const statusLabel =
+    liveModeState === 'connected'
+      ? 'LIVE'
+      : liveModeState === 'connecting'
+        ? 'CONNECTING'
+        : liveModeState === 'error'
+          ? 'ERROR'
+          : 'IDLE';
+
+  return (
+    <div className="minimized-container">
+      <div className="minimized-content">
+        <div className="minimized-status" style={{ color: statusColor }}>
+          <span className="minimized-status-dot" />
+          <span className="minimized-status-label">{statusLabel}</span>
+        </div>
+        {isGenerating && (
+          <div className="minimized-generating">
+            <span className="minimized-generating-dot" />
+            <span>GENERATING</span>
+          </div>
+        )}
+      </div>
+      <button
+        onClick={onToggle}
+        className="minimized-toggle"
+        title="Press Cmd+Shift+M to expand"
+        aria-label="Expand overlay"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="6" y1="18" x2="18" y2="18" />
+          <line x1="12" y1="16" x2="12" y2="9" />
+          <polyline points="9 12 12 8 15 12" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+// ============================================================================
 // Main App Component
 // ============================================================================
 
@@ -160,28 +232,44 @@ function App(): React.ReactElement {
     setIsHelpOpen(false);
   }, []);
 
+  const handleToggleMinimizeMode = useCallback(() => {
+    actions.toggleMinimizeMode();
+  }, [actions]);
+
   // Show loading state while initializing
   if (isLoading) {
     return <LoadingOverlay />;
   }
 
+  if (state.isMinimized) {
+    return (
+      <div className="glass-container minimized">
+        <MinimizedView
+          liveModeState={state.liveMode.state}
+          isGenerating={state.answerState === 'generating'}
+          onToggle={handleToggleMinimizeMode}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="glass-container">
-      {/* Header - Draggable region */}
       <header
         className="glass-header draggable"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        {/* Left side - Logo and Status */}
         <div className="glass-header-left">
           <div className="glass-logo-mark">
             <LogoIcon />
           </div>
           <span className="glass-logo-text">Overlay AI</span>
-          <StatusBadge state={state.liveMode.state} error={state.liveMode.error} />
+          <StatusBadge
+            state={state.liveMode.state}
+            error={state.liveMode.error}
+          />
         </div>
 
-        {/* Right side - Actions */}
         <div
           className="glass-header-right non-draggable"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -189,7 +277,7 @@ function App(): React.ReactElement {
           <button
             onClick={handleOpenHelp}
             className="glass-header-btn"
-            title="Help & Instructions"
+            title="Help and Instructions"
             aria-label="Open help"
           >
             <HelpIcon />
@@ -203,6 +291,27 @@ function App(): React.ReactElement {
             <SettingsIcon />
           </button>
           <button
+            onClick={handleToggleMinimizeMode}
+            className="glass-header-btn"
+            title="Minimize (Cmd+Shift+M)"
+            aria-label="Minimize overlay"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="12" />
+              <polyline points="9 10 12 13 15 10" />
+              <line x1="6" y1="18" x2="18" y2="18" />
+            </svg>
+          </button>
+          <button
             onClick={() => window.close()}
             className="glass-header-btn"
             title="Close"
@@ -213,15 +322,12 @@ function App(): React.ReactElement {
         </div>
       </header>
 
-      {/* Configuration Warning */}
       <ConfigWarning
         isDeepgramConfigured={state.isDeepgramConfigured}
         isGroqConfigured={state.isGroqConfigured}
       />
 
-      {/* Main Content - Scrollable area */}
       <main className="glass-main glass-scrollbar">
-        {/* Live Transcript Panel - Collapsible */}
         <section className="glass-transcript-section">
           <LiveTranscript
             segments={state.segments}
@@ -231,7 +337,6 @@ function App(): React.ReactElement {
           />
         </section>
 
-        {/* Answer Section - Flexible */}
         <section className="glass-answer-section">
           <AnswerCard
             state={state.answerState}
@@ -242,7 +347,6 @@ function App(): React.ReactElement {
         </section>
       </main>
 
-      {/* Error Toast */}
       {state.lastError &&
         state.liveMode.state !== 'error' &&
         state.answerState !== 'error' && (
@@ -252,18 +356,13 @@ function App(): React.ReactElement {
           </div>
         )}
 
-      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={handleCloseSettings}
         onSave={handleSettingsSaved}
       />
 
-      {/* Help Modal */}
-      <HelpModal
-        isOpen={isHelpOpen}
-        onClose={handleCloseHelp}
-      />
+      <HelpModal isOpen={isHelpOpen} onClose={handleCloseHelp} />
     </div>
   );
 }

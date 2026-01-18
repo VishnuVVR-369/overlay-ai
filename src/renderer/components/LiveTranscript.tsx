@@ -111,9 +111,7 @@ interface TranscriptGroupProps {
   group: GroupedSegment;
 }
 
-function TranscriptGroup({
-  group,
-}: TranscriptGroupProps): React.ReactElement {
+function TranscriptGroup({ group }: TranscriptGroupProps): React.ReactElement {
   return (
     <div className="glass-transcript-group">
       <div className="glass-transcript-content">
@@ -158,7 +156,9 @@ function EmptyState(): React.ReactElement {
         </svg>
       </div>
       <span className="glass-transcript-empty-text">AWAITING INPUT</span>
-      <span className="glass-transcript-empty-hint">Audio transcript will appear here</span>
+      <span className="glass-transcript-empty-hint">
+        Audio transcript will appear here
+      </span>
     </div>
   );
 }
@@ -258,7 +258,9 @@ export function CompactTranscript({
 
   return (
     <div className="flex items-center gap-2 py-2 px-3 bg-[var(--glass-bg-primary)] border border-[var(--glass-border-subtle)] rounded-lg overflow-hidden">
-      <span className={`font-mono text-[10px] font-bold ${config.colorClass.replace('glass-transcript-tag--', 'text-[var(--glass-speaker-')})}`}>
+      <span
+        className={`font-mono text-[10px] font-bold ${config.colorClass.replace('glass-transcript-tag--', 'text-[var(--glass-speaker-')})}`}
+      >
         {config.label}:
       </span>
       <span

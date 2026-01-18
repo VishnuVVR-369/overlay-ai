@@ -17,10 +17,7 @@
  * ```
  */
 
-import {
-  TranscriptSegment,
-  formatSegmentsForContext,
-} from '../lib/transcript';
+import { TranscriptSegment, formatSegmentsForContext } from '../lib/transcript';
 import { estimateTokens } from '../lib/wordCount';
 
 // ============================================================================

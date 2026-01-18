@@ -14,7 +14,11 @@ export interface ApiKeySettings {
   groqApiKey?: string;
 }
 
-export interface AppSettings extends ApiKeySettings {
+export interface MinimizeModeSettings {
+  isMinimized: boolean;
+}
+
+export interface AppSettings extends ApiKeySettings, MinimizeModeSettings {
   customSystemPrompt?: string;
 }
 
@@ -28,6 +32,7 @@ const store = new Store<AppSettings>({
     deepgramApiKey: undefined,
     groqApiKey: undefined,
     customSystemPrompt: undefined,
+    isMinimized: false,
   },
   // Encrypt API keys for security
   encryptionKey: 'overlay-ai-encryption-key-v1',
@@ -45,6 +50,7 @@ export function getSettings(): AppSettings {
     deepgramApiKey: store.get('deepgramApiKey'),
     groqApiKey: store.get('groqApiKey'),
     customSystemPrompt: store.get('customSystemPrompt'),
+    isMinimized: store.get('isMinimized'),
   };
 }
 
@@ -120,4 +126,21 @@ export function isGroqConfiguredFromSettings(): boolean {
  */
 export function clearSettings(): void {
   store.clear();
+}
+
+/**
+ * Toggle minimize mode
+ */
+export function toggleMinimizeMode(): boolean {
+  const current = store.get('isMinimized') || false;
+  const newValue = !current;
+  store.set('isMinimized', newValue);
+  return newValue;
+}
+
+/**
+ * Get minimize mode state
+ */
+export function isMinimizedMode(): boolean {
+  return store.get('isMinimized') || false;
 }

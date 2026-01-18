@@ -136,7 +136,10 @@ export interface DeepgramMetadata {
 /**
  * Union type for all Deepgram messages
  */
-export type DeepgramMessage = DeepgramTranscript | DeepgramMetadata | { type: string };
+export type DeepgramMessage =
+  | DeepgramTranscript
+  | DeepgramMetadata
+  | { type: string };
 
 // ============================================================================
 // Deepgram Events
@@ -192,7 +195,8 @@ export enum DeepgramConnectionState {
 export class DeepgramClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private config: DeepgramConfig;
-  private _state: DeepgramConnectionState = DeepgramConnectionState.DISCONNECTED;
+  private _state: DeepgramConnectionState =
+    DeepgramConnectionState.DISCONNECTED;
 
   constructor(config: Partial<DeepgramConfig> = {}) {
     super();

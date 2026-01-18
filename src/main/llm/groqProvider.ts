@@ -10,11 +10,7 @@ import { config } from 'dotenv';
 config();
 
 import Groq from 'groq-sdk';
-import {
-  LLMProvider,
-  LLMError,
-  LLM_ERROR_CODES,
-} from './provider';
+import { LLMProvider, LLMError, LLM_ERROR_CODES } from './provider';
 import { getSystemPrompt, buildUserPrompt } from './systemPrompt';
 
 // ============================================================================
@@ -184,11 +180,7 @@ export class GroqProvider implements LLMProvider {
           error
         );
       }
-      throw new LLMError(
-        'Unknown error',
-        LLM_ERROR_CODES.API_ERROR,
-        this.name
-      );
+      throw new LLMError('Unknown error', LLM_ERROR_CODES.API_ERROR, this.name);
     }
   }
 

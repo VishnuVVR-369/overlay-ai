@@ -89,7 +89,9 @@ export interface NativeWindowHandle {
  * @param window - The Electron BrowserWindow
  * @returns The native window handle info
  */
-export function getNativeWindowHandle(window: BrowserWindow): NativeWindowHandle {
+export function getNativeWindowHandle(
+  window: BrowserWindow
+): NativeWindowHandle {
   try {
     const buffer = window.getNativeWindowHandle();
     return {
@@ -251,7 +253,9 @@ export class StealthWindowManager {
     this.nativeHandle = getNativeWindowHandle(this.window);
 
     if (!this.nativeHandle.isValid) {
-      console.warn('[StealthWindow] Invalid native window handle, skipping native stealth');
+      console.warn(
+        '[StealthWindow] Invalid native window handle, skipping native stealth'
+      );
       return;
     }
 

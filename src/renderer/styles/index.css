@@ -1485,3 +1485,103 @@ body {
 .hud-header { @apply glass-header; }
 .hud-scrollbar { @apply glass-scrollbar; }
 .hud-animate-in { @apply glass-animate-in; }
+/* ============================================================================
+   MINIMIZED MODE
+   ============================================================================ */
+
+.glass-container.minimized {
+  width: 280px;
+  height: 120px;
+}
+
+.minimized-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-app-region: drag;
+  position: relative;
+}
+
+.minimized-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.minimized-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  background: var(--glass-bg-secondary);
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: var(--glass-radius-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all var(--glass-transition-fast);
+  -webkit-app-region: no-drag;
+  z-index: 10;
+}
+
+.minimized-toggle:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-accent);
+  transform: scale(1.05);
+}
+
+.minimized-toggle:active {
+  background: var(--glass-bg-active);
+  transform: scale(0.95);
+}
+
+.minimized-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--glass-bg-secondary);
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: var(--glass-radius-full);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.minimized-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.minimized-status-label {
+  text-transform: uppercase;
+}
+
+.minimized-generating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--glass-accent-subtle);
+  border-radius: var(--glass-radius-sm);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.minimized-generating-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--glass-accent-light);
+  animation: glass-pulse 1s ease-in-out infinite;
+}

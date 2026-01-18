@@ -70,7 +70,9 @@ export function formatSegmentForContext(segment: TranscriptSegment): string {
 /**
  * Format multiple segments for LLM context
  */
-export function formatSegmentsForContext(segments: TranscriptSegment[]): string {
+export function formatSegmentsForContext(
+  segments: TranscriptSegment[]
+): string {
   return segments.map(formatSegmentForContext).join('\n');
 }
 

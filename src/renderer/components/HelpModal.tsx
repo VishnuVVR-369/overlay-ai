@@ -141,7 +141,13 @@ export function HelpModal({
                 <KeyboardIcon />
                 Keyboard Shortcuts
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                }}
+              >
                 <div
                   style={{
                     padding: '14px',
@@ -188,7 +194,8 @@ export function HelpModal({
                       margin: 0,
                     }}
                   >
-                    Start or stop audio transcription. Connect/disconnect to Deepgram.
+                    Start or stop audio transcription. Connect/disconnect to
+                    Deepgram.
                   </p>
                 </div>
 
@@ -238,7 +245,8 @@ export function HelpModal({
                       margin: 0,
                     }}
                   >
-                    Generate an AI-powered answer based on the last 20 minutes of conversation.
+                    Generate an AI-powered answer based on the last 20 minutes
+                    of conversation.
                   </p>
                 </div>
 
@@ -288,7 +296,60 @@ export function HelpModal({
                       margin: 0,
                     }}
                   >
-                    Clear transcript and answer history. Context buffer is preserved.
+                    Clear transcript and answer history. Context buffer is
+                    preserved.
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    padding: '14px',
+                    background: 'var(--glass-bg-secondary)',
+                    border: '1px solid var(--glass-border-subtle)',
+                    borderRadius: 'var(--glass-radius-md)',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '6px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        color: 'var(--glass-text-primary)',
+                      }}
+                    >
+                      Minimize Mode
+                    </span>
+                    <kbd
+                      style={{
+                        padding: '4px 10px',
+                        background: 'var(--glass-bg-elevated)',
+                        border: '1px solid var(--glass-border-default)',
+                        borderRadius: 'var(--glass-radius-sm)',
+                        fontFamily: 'JetBrains Mono, monospace',
+                        fontSize: '11px',
+                        color: 'var(--glass-text-secondary)',
+                      }}
+                    >
+                      Cmd+Shift+M
+                    </kbd>
+                  </div>
+
+                  <p
+                    style={{
+                      fontSize: '12px',
+                      color: 'var(--glass-text-muted)',
+                      margin: 0,
+                    }}
+                  >
+                    Reduce overlay size to focus on interviewer. Click overlay
+                    or use shortcut to expand.
                   </p>
                 </div>
               </div>
@@ -339,8 +400,8 @@ export function HelpModal({
                     <strong style={{ color: 'var(--glass-text-primary)' }}>
                       Configure API Keys:
                     </strong>{' '}
-                    Click the settings icon to add your Deepgram and Groq API keys.
-                    You can get these from{' '}
+                    Click the settings icon to add your Deepgram and Groq API
+                    keys. You can get these from{' '}
                     <a
                       href="https://console.deepgram.com/"
                       target="_blank"
@@ -376,7 +437,8 @@ export function HelpModal({
                     <strong style={{ color: 'var(--glass-text-primary)' }}>
                       Start Live Mode:
                     </strong>{' '}
-                    Press <kbd
+                    Press{' '}
+                    <kbd
                       style={{
                         padding: '2px 6px',
                         background: 'var(--glass-bg-elevated)',
@@ -388,7 +450,8 @@ export function HelpModal({
                     >
                       ⌘⇧L
                     </kbd>{' '}
-                    to begin transcription. The status indicator shows connection state.
+                    to begin transcription. The status indicator shows
+                    connection state.
                   </li>
                   <li
                     style={{
@@ -400,7 +463,8 @@ export function HelpModal({
                     <strong style={{ color: 'var(--glass-text-primary)' }}>
                       Get Answers:
                     </strong>{' '}
-                    When you need help, press <kbd
+                    When you need help, press{' '}
+                    <kbd
                       style={{
                         padding: '2px 6px',
                         background: 'var(--glass-bg-elevated)',
@@ -412,7 +476,8 @@ export function HelpModal({
                     >
                       ⌘⇧X
                     </kbd>{' '}
-                    to generate an AI response based on the conversation context.
+                    to generate an AI response based on the conversation
+                    context.
                   </li>
                 </ol>
               </div>
@@ -463,8 +528,9 @@ export function HelpModal({
                     <strong style={{ color: 'var(--glass-text-primary)' }}>
                       Real-time Transcription:
                     </strong>{' '}
-                    Audio is captured and sent to Deepgram for live transcription. Both
-                    system audio and microphone input are processed.
+                    Audio is captured and sent to Deepgram for live
+                    transcription. Both system audio and microphone input are
+                    processed.
                   </li>
                   <li
                     style={{
@@ -476,8 +542,8 @@ export function HelpModal({
                     <strong style={{ color: 'var(--glass-text-primary)' }}>
                       Context Buffer:
                     </strong>{' '}
-                    The last 20 minutes of conversation are maintained in memory for
-                    context-aware answers.
+                    The last 20 minutes of conversation are maintained in memory
+                    for context-aware answers.
                   </li>
                   <li
                     style={{
@@ -489,8 +555,8 @@ export function HelpModal({
                     <strong style={{ color: 'var(--glass-text-primary)' }}>
                       AI Answers:
                     </strong>{' '}
-                    Answers are generated using Groq&apos;s fast LLM models, optimized for
-                    coding questions and system design problems.
+                    Answers are generated using Groq&apos;s fast LLM models,
+                    optimized for coding questions and system design problems.
                   </li>
                   <li
                     style={{
@@ -502,8 +568,8 @@ export function HelpModal({
                     <strong style={{ color: 'var(--glass-text-primary)' }}>
                       Stealth Mode:
                     </strong>{' '}
-                    The overlay window is hidden from screen capture software, keeping
-                    your workflow private.
+                    The overlay window is hidden from screen capture software,
+                    keeping your workflow private.
                   </li>
                 </ul>
               </div>
@@ -551,8 +617,8 @@ export function HelpModal({
                       lineHeight: '1.6',
                     }}
                   >
-                    The transcript shows the last 30 seconds of conversation for quick
-                    reference.
+                    The transcript shows the last 30 seconds of conversation for
+                    quick reference.
                   </li>
                   <li
                     style={{
@@ -561,7 +627,8 @@ export function HelpModal({
                       lineHeight: '1.6',
                     }}
                   >
-                    Green status indicator means Live Mode is active and listening.
+                    Green status indicator means Live Mode is active and
+                    listening.
                   </li>
                   <li
                     style={{
@@ -570,8 +637,8 @@ export function HelpModal({
                       lineHeight: '1.6',
                     }}
                   >
-                    Answers include code examples, explanations, and time complexity
-                    analysis for coding questions.
+                    Answers include code examples, explanations, and time
+                    complexity analysis for coding questions.
                   </li>
                   <li
                     style={{
@@ -580,7 +647,8 @@ export function HelpModal({
                       lineHeight: '1.6',
                     }}
                   >
-                    You can drag the overlay window to reposition it on your screen.
+                    You can drag the overlay window to reposition it on your
+                    screen.
                   </li>
                 </ul>
               </div>

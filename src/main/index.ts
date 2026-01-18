@@ -20,12 +20,23 @@ if (!app.isPackaged) {
   const envPath = path.join(__dirname, '../../../.env');
   const result = config({ path: envPath });
   console.log('[ENV] Loading .env from:', envPath);
-  console.log('[ENV] Result:', result.error ? `Error: ${result.error.message}` : 'Loaded successfully');
+  console.log(
+    '[ENV] Result:',
+    result.error ? `Error: ${result.error.message}` : 'Loaded successfully'
+  );
 }
 console.log('[ENV] DEEPGRAM_API_KEY set:', !!process.env.DEEPGRAM_API_KEY);
 console.log('[ENV] GROQ_API_KEY set:', !!process.env.GROQ_API_KEY);
 
-import { initializeIPC, cleanupIPC, toggleLiveMode, triggerAnswer, clearOverlay } from './ipc';
+import {
+  initializeIPC,
+  cleanupIPC,
+  toggleLiveMode,
+  triggerAnswer,
+  clearOverlay,
+  toggleMinimizeMode,
+  applyMinimizeMode,
+} from './ipc';
 import { StealthWindowManager, getNativeWindowHandle } from './macos';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -88,6 +99,9 @@ function createWindow() {
   // Initialize IPC handlers
   initializeIPC(mainWindow);
 
+  // Apply minimize mode if it was set in settings
+  applyMinimizeMode(false);
+
   // Load the Vite dev server in development, or the built renderer in production
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
@@ -142,7 +156,20 @@ function registerShortcuts() {
     clearOverlay();
   });
 
-  console.log('[Shortcuts] Registered: Cmd+Shift+L (Live), Cmd+Shift+X (Answer), Cmd+Shift+Z (Clear)');
+  // Cmd+Shift+M: Toggle Minimize Mode
+  globalShortcut.register('CommandOrControl+Shift+M', async () => {
+    console.log('[Shortcut] Toggle Minimize Mode');
+    try {
+      const result = await toggleMinimizeMode();
+      console.log('[Shortcut] Minimize mode:', result.isMinimized);
+    } catch (error) {
+      console.error('[Shortcut] Failed to toggle minimize mode:', error);
+    }
+  });
+
+  console.log(
+    '[Shortcuts] Registered: Cmd+Shift+L (Live), Cmd+Shift+X (Answer), Cmd+Shift+Z (Clear), Cmd+Shift+M (Minimize)'
+  );
 }
 
 /**
