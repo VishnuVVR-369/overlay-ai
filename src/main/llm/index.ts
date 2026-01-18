@@ -13,7 +13,7 @@ export {
 } from './provider';
 
 // System prompt
-export { SYSTEM_PROMPT, buildUserPrompt } from './systemPrompt';
+export { SYSTEM_PROMPT, DEFAULT_SYSTEM_PROMPT, getSystemPrompt, buildUserPrompt } from './systemPrompt';
 
 // Groq provider
 export {

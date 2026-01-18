@@ -9,6 +9,16 @@ import React, { useState, useEffect } from 'react';
 import { getSettings, saveSettings, getStatus } from '../ipcClient';
 
 // ============================================================================
+// Default System Prompt
+// ============================================================================
+
+const DEFAULT_SYSTEM_PROMPT = `You are a senior staff engineer assisting in a live interview. You have access to the last 20 minutes of conversation. The user just asked a specific question or the interviewer posed a problem.
+1. Identify the core question.
+2. If it is a Coding question: Provide Python code, time complexity, and brief explanation.
+3. If it is System Design: Outline high-level components and trade-offs.
+4. Ignore small talk in the transcript.`;
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -100,6 +110,7 @@ export function SettingsModal({
 }: SettingsModalProps): React.ReactElement | null {
   const [deepgramKey, setDeepgramKey] = useState('');
   const [groqKey, setGroqKey] = useState('');
+  const [customSystemPrompt, setCustomSystemPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeepgramKey, setShowDeepgramKey] = useState(false);
@@ -112,6 +123,7 @@ export function SettingsModal({
         .then((settings) => {
           setDeepgramKey(settings.deepgramApiKey || '');
           setGroqKey(settings.groqApiKey || '');
+          setCustomSystemPrompt(settings.customSystemPrompt || DEFAULT_SYSTEM_PROMPT);
         })
         .catch((error) => {
           console.error('Failed to load settings:', error);
@@ -128,6 +140,7 @@ export function SettingsModal({
       await saveSettings({
         deepgramApiKey: deepgramKey,
         groqApiKey: groqKey,
+        customSystemPrompt: customSystemPrompt,
       });
       await getStatus();
       onSave?.();
@@ -258,15 +271,47 @@ export function SettingsModal({
                     {showGroqKey ? <EyeOffIcon /> : <EyeIcon />}
                   </button>
                 </div>
-              </div>
+                  </div>
 
-              <p className="text-[11px] text-[var(--glass-text-subtle)] italic mt-4">
-                API keys are stored securely on your device and take precedence
-                over environment variables.
-              </p>
-            </>
-          )}
-        </div>
+                  {/* Custom System Prompt */}
+                  <div className="glass-input-group">
+                    <label className="glass-label">
+                      <span className="flex items-center gap-2">
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                        Custom System Prompt
+                      </span>
+                    </label>
+                    <p className="glass-input-hint">
+                      Customize how the AI assistant behaves. Leave empty to use the
+                      default interview assistant prompt.
+                    </p>
+                    <textarea
+                      value={customSystemPrompt}
+                      onChange={(e) => setCustomSystemPrompt(e.target.value)}
+                      placeholder="Enter your custom system prompt..."
+                      className="glass-textarea"
+                      rows={6}
+                    />
+                  </div>
+
+                <p className="text-[11px] text-[var(--glass-text-subtle)] italic mt-4">
+                  API keys are stored securely on your device and take precedence
+                  over environment variables.
+                </p>
+              </>
+            )}
+          </div>
 
         {/* Footer */}
         <div className="glass-modal-footer">
