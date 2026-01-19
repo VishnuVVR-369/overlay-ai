@@ -3,18 +3,18 @@
 //! This module contains all configuration constants used throughout the audio engine,
 //! including sample rates, buffer sizes, and logging intervals.
 
-/// Target sample rate for Deepgram (16kHz as per PLAN.md)
-pub const TARGET_SAMPLE_RATE: u32 = 16000;
+/// Target sample rate for Deepgram (24kHz for better accuracy with fast speech and accents)
+pub const TARGET_SAMPLE_RATE: u32 = 24000;
 
 /// Output channels: Stereo (Channel 0 = System, Channel 1 = Mic)
 pub const OUTPUT_CHANNELS: u16 = 2;
 
-/// Ring buffer size in samples (enough for ~1 second of stereo audio at 16kHz)
-/// Formula: sample_rate * channels * seconds = 16000 * 2 * 1 = 32000 samples
+/// Ring buffer size in samples (enough for ~1 second of stereo audio at 24kHz)
+/// Formula: sample_rate * channels * seconds = 24000 * 2 * 1 = 48000 samples
 pub const RING_BUFFER_SIZE: usize = TARGET_SAMPLE_RATE as usize * OUTPUT_CHANNELS as usize * 2;
 
 /// Ring buffer size for system audio (mono, before mixing)
-/// Formula: sample_rate * seconds = 16000 * 2 = 32000 samples
+/// Formula: sample_rate * seconds = 24000 * 2 = 48000 samples
 pub const SYSTEM_AUDIO_BUFFER_SIZE: usize = TARGET_SAMPLE_RATE as usize * 2;
 
 /// ScreenCaptureKit sample rate (commonly uses 48kHz)

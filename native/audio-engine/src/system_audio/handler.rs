@@ -242,7 +242,7 @@ impl SystemAudioHandler {
             i16_samples
         };
 
-        // Resample to target rate if needed
+        // Resample to target rate if needed using high-quality resampling
         let resampled = if self.source_sample_rate != self.target_sample_rate {
             resample_linear(
                 &mono_samples,

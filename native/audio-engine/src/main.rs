@@ -1,14 +1,14 @@
 //! Audio Engine - Rust sidecar for Overlay AI
 //!
 //! This binary captures microphone audio (and system audio on macOS via ScreenCaptureKit),
-//! resamples to 16kHz, mixes into stereo (Channel 0 = System, Channel 1 = Mic),
+//! resamples to 24kHz, mixes into stereo (Channel 0 = System, Channel 1 = Mic),
 //! and streams raw i16 PCM bytes to stdout for piping into Electron.
 //!
 //! Usage: ./audio-engine --device=default | (Electron reads stdout)
 //!
 //! The output format is:
 //! - Encoding: linear16 (i16 little-endian)
-//! - Sample rate: 16000 Hz
+//! - Sample rate: 24000 Hz
 //! - Channels: 2 (stereo) - Channel 0: System Audio (Interviewer), Channel 1: Mic (You)
 
 mod capture;
@@ -38,7 +38,7 @@ use device::list_audio_devices;
 #[command(name = "audio-engine")]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Target sample rate in Hz (default: 16000 for Deepgram)
+    /// Target sample rate in Hz (default: 24000 for Deepgram)
     #[arg(long, default_value_t = TARGET_SAMPLE_RATE)]
     sample_rate: u32,
 

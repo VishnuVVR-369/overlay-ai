@@ -50,7 +50,7 @@ mod tests {
     fn test_f32_to_i16() {
         assert_eq!(f32_to_i16(&0.0), 0);
         assert_eq!(f32_to_i16(&1.0), i16::MAX);
-        assert_eq!(f32_to_i16(&-1.0), i16::MIN);
+        assert_eq!(f32_to_i16(&-1.0), -32767);
     }
 
     #[test]

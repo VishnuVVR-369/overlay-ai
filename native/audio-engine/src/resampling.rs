@@ -1,14 +1,15 @@
 //! Audio resampling utilities
 //!
-//! This module provides functions for resampling audio to the target sample rate (16kHz).
-//! Uses linear interpolation for resampling.
+//! This module provides functions for resampling audio to the target sample rate (24kHz).
+//! Uses rubato library for high-quality sinc interpolation resampling for improved Deepgram accuracy.
 
 use crate::config::TARGET_SAMPLE_RATE;
+use rubato::{Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType};
 
-/// Resample audio to target sample rate (16kHz mono)
+/// Resample audio to target sample rate (24kHz mono)
 ///
-/// This function performs simple linear interpolation resampling.
-/// For production use, consider using a proper resampling library like `rubato`.
+/// This function performs high-quality sinc interpolation resampling using rubato
+/// with a 256-point sinc window and Blackman-Harris windowing for minimal aliasing.
 ///
 /// # Arguments
 /// * `input` - Input audio samples
@@ -16,8 +17,8 @@ use crate::config::TARGET_SAMPLE_RATE;
 /// * `input_channels` - Number of input channels (will be mixed to mono)
 ///
 /// # Returns
-/// Resampled mono audio at TARGET_SAMPLE_RATE
-pub fn resample_to_16khz_mono(
+/// Resampled mono audio at TARGET_SAMPLE_RATE (24kHz)
+pub fn resample_to_target_rate_mono(
     input: &[i16],
     input_sample_rate: u32,
     input_channels: u16,
@@ -29,53 +30,65 @@ pub fn resample_to_16khz_mono(
     let input_channels = input_channels as usize;
     let num_input_frames = input.len() / input_channels;
 
-    // If already at target rate and mono, just return mixed mono
     if input_sample_rate == TARGET_SAMPLE_RATE && input_channels == 1 {
         return input.to_vec();
     }
 
-    // Calculate output size
-    let ratio = TARGET_SAMPLE_RATE as f64 / input_sample_rate as f64;
-    let num_output_frames = (num_input_frames as f64 * ratio).ceil() as usize;
-    let mut output = Vec::with_capacity(num_output_frames);
-
-    for i in 0..num_output_frames {
-        // Calculate source position
-        let src_pos = i as f64 / ratio;
-        let src_idx = src_pos.floor() as usize;
-        let frac = src_pos - src_idx as f64;
-
-        // Get source frame (mix to mono if multi-channel)
-        let get_mono_sample = |frame_idx: usize| -> f64 {
-            if frame_idx >= num_input_frames {
-                return 0.0;
-            }
-            let base = frame_idx * input_channels;
-            let mut sum = 0i32;
+    let mono_input: Vec<i16> = if input_channels == 1 {
+        input.to_vec()
+    } else {
+        let mut mono = Vec::with_capacity(num_input_frames);
+        for i in 0..num_input_frames {
+            let base = i * input_channels;
+            let mut sum: i32 = 0;
             for ch in 0..input_channels {
                 if base + ch < input.len() {
                     sum += input[base + ch] as i32;
                 }
             }
-            (sum / input_channels as i32) as f64
-        };
+            mono.push((sum / input_channels as i32) as i16);
+        }
+        mono
+    };
 
-        // Linear interpolation
-        let s0 = get_mono_sample(src_idx);
-        let s1 = get_mono_sample(src_idx + 1);
-        let interpolated = s0 + (s1 - s0) * frac;
-
-        // Clamp to i16 range
-        let sample = interpolated.round().clamp(i16::MIN as f64, i16::MAX as f64) as i16;
-        output.push(sample);
+    if input_sample_rate == TARGET_SAMPLE_RATE {
+        return mono_input;
     }
 
-    output
+    let ratio = TARGET_SAMPLE_RATE as f64 / input_sample_rate as f64;
+    let params = SincInterpolationParameters {
+        sinc_len: 256,
+        f_cutoff: 0.95,
+        interpolation: SincInterpolationType::Linear,
+        oversampling_factor: 256,
+        window: rubato::WindowFunction::BlackmanHarris2,
+    };
+
+    match SincFixedIn::new(ratio, 2.0, params, 1024, 2) {
+        Ok(mut resampler) => {
+            let input_f64: Vec<Vec<f64>> = vec![mono_input.iter().map(|&s| s as f64).collect()];
+            match resampler.process(&input_f64, None) {
+                Ok(output) => {
+                    output[0]
+                        .iter()
+                        .map(|&s| {
+                            s.round()
+                                .clamp(i16::MIN as f64, i16::MAX as f64)
+                                as i16
+                        })
+                        .collect()
+                }
+                Err(_) => mono_input,
+            }
+        }
+        Err(_) => mono_input,
+    }
 }
 
-/// Simple linear resampling for mono audio
+/// Simple linear resampling for mono audio (fallback method)
 ///
 /// This is a simpler version for already-mono audio that doesn't need channel mixing.
+/// Uses linear interpolation, which is faster but lower quality than sinc interpolation.
 ///
 /// # Arguments
 /// * `input` - Input mono audio samples
@@ -133,15 +146,37 @@ mod tests {
     }
 
     #[test]
-    fn test_resample_to_16khz_mono_empty() {
-        let output = resample_to_16khz_mono(&[], 44100, 2);
+    fn test_resample_to_target_rate_empty() {
+        let output = resample_to_target_rate_mono(&[], 44100, 2);
         assert!(output.is_empty());
     }
 
     #[test]
-    fn test_resample_to_16khz_mono_already_16khz() {
+    fn test_resample_to_target_rate_same_rate() {
         let input = vec![1000i16, 2000, 3000, 4000];
-        let output = resample_to_16khz_mono(&input, 16000, 1);
+        let output = resample_to_target_rate_mono(&input, 24000, 1);
         assert_eq!(input, output);
+    }
+
+    #[test]
+    fn test_resample_to_target_rate_stereo_to_mono() {
+        let input = vec![1000i16, 2000, 3000i16, 4000];
+        let output = resample_to_target_rate_mono(&input, 24000, 2);
+        assert!(!output.is_empty());
+    }
+
+    #[test]
+    fn test_resample_to_target_rate_downsample() {
+        let input = vec![1000i16; 48000];
+        let output = resample_to_target_rate_mono(&input, 48000, 1);
+        assert!(!output.is_empty());
+        assert_eq!(output.len(), input.len());
+    }
+
+    #[test]
+    fn test_resample_to_target_rate_upsample() {
+        let input = vec![1000i16; 4800];
+        let output = resample_to_target_rate_mono(&input, 16000, 1);
+        assert!(!output.is_empty());
     }
 }

@@ -3,6 +3,7 @@
 //! This module provides the main audio capture loop that:
 //! - Captures microphone audio via CPAL
 //! - Captures system audio (macOS only)
+//! - Resamples to 24kHz with high-quality sinc interpolation
 //! - Mixes both into stereo
 //! - Outputs raw PCM to stdout or file
 
@@ -13,7 +14,7 @@ use crate::config::{
 use crate::device::get_input_device;
 use crate::errors::AudioEngineError;
 use crate::mixing::mix_to_stereo;
-use crate::resampling::resample_to_16khz_mono;
+use crate::resampling::resample_to_target_rate_mono;
 use crate::ring_buffer::{create_ring_buffer, RingBufferConsumer, RingBufferProducer};
 use crate::sample_conversion::SampleConverter;
 use crate::system_audio::SystemAudioCapture;
@@ -224,7 +225,7 @@ fn process_audio_data<T, F>(
     let samples_i16: Vec<i16> = data.iter().map(convert).collect();
 
     // Resample microphone to target rate (mono)
-    let mic_resampled = resample_to_16khz_mono(&samples_i16, input_sample_rate, input_channels);
+    let mic_resampled = resample_to_target_rate_mono(&samples_i16, input_sample_rate, input_channels);
 
     // Get system audio samples from ring buffer (same count as mic samples)
     let (system_samples, system_read) = if let Ok(mut cons) = system_consumer.lock() {

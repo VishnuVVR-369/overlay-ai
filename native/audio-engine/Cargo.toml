@@ -24,6 +24,9 @@ clap = { version = "4.0", features = ["derive"] }
 # Lock-free ring buffer for thread safety
 ringbuf = "0.3"
 
+# High-quality audio resampling
+rubato = "0.14"
+
 # Signal handling (Ctrl+C)
 ctrlc = "3.4"
 

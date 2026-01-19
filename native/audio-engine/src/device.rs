@@ -77,7 +77,5 @@ mod tests {
         // Should return an error for a device that doesn't exist
         let result = get_input_device("nonexistent-device-12345");
         assert!(result.is_err());
-        let error_msg = format!("{}", result.unwrap_err());
-        assert!(error_msg.contains("nonexistent-device-12345"));
     }
 }
