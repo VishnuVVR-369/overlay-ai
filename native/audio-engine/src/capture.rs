@@ -225,7 +225,8 @@ fn process_audio_data<T, F>(
     let samples_i16: Vec<i16> = data.iter().map(convert).collect();
 
     // Resample microphone to target rate (mono)
-    let mic_resampled = resample_to_target_rate_mono(&samples_i16, input_sample_rate, input_channels);
+    let mic_resampled =
+        resample_to_target_rate_mono(&samples_i16, input_sample_rate, input_channels);
 
     // Get system audio samples from ring buffer (same count as mic samples)
     let (system_samples, system_read) = if let Ok(mut cons) = system_consumer.lock() {

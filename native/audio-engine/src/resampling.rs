@@ -68,16 +68,10 @@ pub fn resample_to_target_rate_mono(
         Ok(mut resampler) => {
             let input_f64: Vec<Vec<f64>> = vec![mono_input.iter().map(|&s| s as f64).collect()];
             match resampler.process(&input_f64, None) {
-                Ok(output) => {
-                    output[0]
-                        .iter()
-                        .map(|&s| {
-                            s.round()
-                                .clamp(i16::MIN as f64, i16::MAX as f64)
-                                as i16
-                        })
-                        .collect()
-                }
+                Ok(output) => output[0]
+                    .iter()
+                    .map(|&s| s.round().clamp(i16::MIN as f64, i16::MAX as f64) as i16)
+                    .collect(),
                 Err(_) => mono_input,
             }
         }
