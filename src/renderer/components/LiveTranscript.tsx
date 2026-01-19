@@ -1,16 +1,6 @@
-/**
- * LiveTranscript Component - Glassmorphic Design System
- *
- * A clean, compact transcript display with frosted glass aesthetics.
- * Speaker changes are indicated inline with elegant visual hierarchy.
- */
-
 import React, { useEffect, useRef, useMemo } from 'react';
+import { MicrophoneIcon } from './Icons';
 import type { TranscriptSegment, Speaker } from '../../lib/transcript';
-
-// ============================================================================
-// Types
-// ============================================================================
 
 export interface LiveTranscriptProps {
   segments: TranscriptSegment[];
@@ -27,10 +17,6 @@ interface GroupedSegment {
   startTimestamp: number;
 }
 
-// ============================================================================
-// Speaker Configuration
-// ============================================================================
-
 const SPEAKER_CONFIG: Record<Speaker, { label: string; colorClass: string }> = {
   interviewer: {
     label: 'INT',
@@ -42,22 +28,16 @@ const SPEAKER_CONFIG: Record<Speaker, { label: string; colorClass: string }> = {
   },
 };
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
+const RECENT_WINDOW_MS = 60000; // 60 seconds
 
 function filterRecentSegments(
   segments: TranscriptSegment[],
-  windowMs: number = 60000
+  windowMs: number = RECENT_WINDOW_MS
 ): TranscriptSegment[] {
-  const now = Date.now();
-  const cutoff = now - windowMs;
+  const cutoff = Date.now() - windowMs;
   return segments.filter((seg) => seg.timestamp >= cutoff);
 }
 
-/**
- * Groups consecutive segments from the same speaker together
- */
 function groupSegmentsBySpeaker(
   segments: TranscriptSegment[],
   interimText?: string,
@@ -84,18 +64,19 @@ function groupSegmentsBySpeaker(
 
   if (interimText && interimSpeaker) {
     const lastGroup = groups[groups.length - 1];
+    const now = Date.now();
 
     if (lastGroup && lastGroup.speaker === interimSpeaker) {
       lastGroup.texts.push({
         text: interimText,
-        timestamp: Date.now(),
+        timestamp: now,
         isInterim: true,
       });
     } else {
       groups.push({
         speaker: interimSpeaker,
-        texts: [{ text: interimText, timestamp: Date.now(), isInterim: true }],
-        startTimestamp: Date.now(),
+        texts: [{ text: interimText, timestamp: now, isInterim: true }],
+        startTimestamp: now,
       });
     }
   }
@@ -103,15 +84,13 @@ function groupSegmentsBySpeaker(
   return groups;
 }
 
-// ============================================================================
-// Sub-Components
-// ============================================================================
-
 interface TranscriptGroupProps {
   group: GroupedSegment;
 }
 
 function TranscriptGroup({ group }: TranscriptGroupProps): React.ReactElement {
+  const hasInterim = group.texts.some((t) => t.isInterim);
+
   return (
     <div className="glass-transcript-group">
       <div className="glass-transcript-content">
@@ -124,36 +103,17 @@ function TranscriptGroup({ group }: TranscriptGroupProps): React.ReactElement {
             {idx < group.texts.length - 1 && ' '}
           </span>
         ))}
-        {group.texts.some((t) => t.isInterim) && (
-          <span className="glass-cursor" />
-        )}
+        {hasInterim && <span className="glass-cursor" />}
       </div>
     </div>
   );
 }
 
-// ============================================================================
-// Empty State
-// ============================================================================
-
 function EmptyState(): React.ReactElement {
   return (
     <div className="glass-transcript-empty">
       <div className="glass-transcript-empty-icon">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-          <line x1="12" x2="12" y1="19" y2="22" />
-        </svg>
+        <MicrophoneIcon size={16} strokeWidth={1.5} />
       </div>
       <span className="glass-transcript-empty-text">AWAITING INPUT</span>
       <span className="glass-transcript-empty-hint">
@@ -162,10 +122,6 @@ function EmptyState(): React.ReactElement {
     </div>
   );
 }
-
-// ============================================================================
-// Main Component
-// ============================================================================
 
 export function LiveTranscript({
   segments,
@@ -226,10 +182,6 @@ export function LiveTranscript({
   );
 }
 
-// ============================================================================
-// Compact Variant (Single Line Display)
-// ============================================================================
-
 export function CompactTranscript({
   segments,
   interimText,
@@ -255,6 +207,8 @@ export function CompactTranscript({
 
   const config = SPEAKER_CONFIG[displaySpeaker];
   const isInterim = !!interimText;
+  const truncatedText =
+    displayText.length > 80 ? `${displayText.slice(-80)}...` : displayText;
 
   return (
     <div className="flex items-center gap-2 py-2 px-3 bg-[var(--glass-bg-primary)] border border-[var(--glass-border-subtle)] rounded-lg overflow-hidden">
@@ -268,7 +222,7 @@ export function CompactTranscript({
           isInterim ? 'opacity-50 italic' : ''
         }`}
       >
-        {displayText.length > 80 ? `${displayText.slice(-80)}...` : displayText}
+        {truncatedText}
       </span>
       {isInterim && <span className="glass-cursor glass-cursor--sm" />}
     </div>

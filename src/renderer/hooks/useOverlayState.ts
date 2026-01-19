@@ -1,15 +1,4 @@
-/**
- * useOverlayState Hook - UI State Management
- *
- * Per PLAN.md Phase 8:
- * Add minimal state management for listening status, live transcript,
- * and streamed answer text (do not invent advanced architecture).
- *
- * This hook provides a simple React-based state management solution
- * using useState and useEffect to manage the overlay state.
- */
-
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { LiveModeStatus, AnswerData } from '../../lib/ipc';
 import type { TranscriptSegment, Speaker } from '../../lib/transcript';
 import {
@@ -22,50 +11,28 @@ import {
   toggleMinimizeMode as ipcToggleMinimizeMode,
 } from '../ipcClient';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export interface OverlayState {
-  /** Live mode connection status */
   liveMode: LiveModeStatus;
-  /** Transcript segments */
   segments: TranscriptSegment[];
-  /** Interim (non-final) transcript text */
   interimText: string;
-  /** Speaker of interim text */
   interimSpeaker: Speaker | null;
-  /** Answer generation state */
   answerState: AnswerData['state'];
-  /** Answer text (may be partial during streaming) */
   answerText: string;
-  /** Answer error message */
   answerError: string | null;
-  /** Model used for answer generation */
   answerModelId: string | null;
-  /** Whether API keys are configured */
   isDeepgramConfigured: boolean;
   isGroqConfigured: boolean;
-  /** Minimize mode state */
   isMinimized: boolean;
-  /** Last error message */
   lastError: string | null;
 }
 
 export interface OverlayActions {
-  /** Start live mode (audio capture + transcription) */
   startLiveMode: () => Promise<void>;
-  /** Stop live mode */
   stopLiveMode: () => Promise<void>;
-  /** Toggle live mode */
   toggleLiveMode: () => Promise<void>;
-  /** Trigger answer generation */
   triggerAnswer: (modelId?: string) => Promise<void>;
-  /** Clear all overlay state */
   clearOverlay: () => Promise<void>;
-  /** Refresh status from main process */
   refreshStatus: () => Promise<void>;
-  /** Toggle minimize mode */
   toggleMinimizeMode: () => Promise<void>;
 }
 
@@ -74,10 +41,6 @@ export interface UseOverlayStateReturn {
   actions: OverlayActions;
   isLoading: boolean;
 }
-
-// ============================================================================
-// Initial State
-// ============================================================================
 
 const INITIAL_STATE: OverlayState = {
   liveMode: { state: 'disconnected' },
@@ -94,39 +57,14 @@ const INITIAL_STATE: OverlayState = {
   lastError: null,
 };
 
-// ============================================================================
-// Hook Implementation
-// ============================================================================
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
 
-/**
- * useOverlayState - Manages all overlay UI state
- *
- * @example
- * ```tsx
- * function App() {
- *   const { state, actions, isLoading } = useOverlayState();
- *
- *   return (
- *     <div>
- *       <StatusIndicator state={state.liveMode.state} />
- *       <LiveTranscript segments={state.segments} />
- *       <AnswerCard state={state.answerState} text={state.answerText} />
- *       <button onClick={actions.toggleLiveMode}>Toggle Live</button>
- *     </div>
- *   );
- * }
- * ```
- */
 export function useOverlayState(): UseOverlayStateReturn {
   const [state, setState] = useState<OverlayState>(INITIAL_STATE);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Ref for accumulating streaming answer text
   const answerTextRef = useRef('');
-
-  // ============================================================================
-  // State Update Helpers
-  // ============================================================================
 
   const updateLiveMode = useCallback((status: LiveModeStatus) => {
     setState((prev) => ({
@@ -140,7 +78,6 @@ export function useOverlayState(): UseOverlayStateReturn {
     setState((prev) => ({
       ...prev,
       segments: [...prev.segments, segment],
-      // Clear interim text when we get a final segment
       interimText: '',
       interimSpeaker: null,
     }));
@@ -160,14 +97,12 @@ export function useOverlayState(): UseOverlayStateReturn {
   const handleAnswerChunk = useCallback(
     (chunk: string, isComplete: boolean) => {
       if (isComplete) {
-        // Final chunk - answer is complete
         setState((prev) => ({
           ...prev,
           answerState: 'complete',
           answerText: answerTextRef.current,
         }));
       } else {
-        // Accumulate chunks
         answerTextRef.current += chunk;
         setState((prev) => ({
           ...prev,
@@ -187,7 +122,6 @@ export function useOverlayState(): UseOverlayStateReturn {
       answerModelId: data.modelId || null,
     }));
 
-    // Reset answer text ref when starting new generation
     if (data.state === 'generating') {
       answerTextRef.current = '';
     }
@@ -210,18 +144,12 @@ export function useOverlayState(): UseOverlayStateReturn {
     []
   );
 
-  // ============================================================================
-  // Actions
-  // ============================================================================
-
   const startLiveMode = useCallback(async () => {
     try {
       const status = await ipcStartLiveMode();
       updateLiveMode(status);
     } catch (error) {
-      handleError(
-        error instanceof Error ? error.message : 'Failed to start live mode'
-      );
+      handleError(getErrorMessage(error, 'Failed to start live mode'));
     }
   }, [updateLiveMode, handleError]);
 
@@ -230,9 +158,7 @@ export function useOverlayState(): UseOverlayStateReturn {
       const status = await ipcStopLiveMode();
       updateLiveMode(status);
     } catch (error) {
-      handleError(
-        error instanceof Error ? error.message : 'Failed to stop live mode'
-      );
+      handleError(getErrorMessage(error, 'Failed to stop live mode'));
     }
   }, [updateLiveMode, handleError]);
 
@@ -247,7 +173,6 @@ export function useOverlayState(): UseOverlayStateReturn {
   const triggerAnswer = useCallback(
     async (modelId?: string) => {
       try {
-        // Reset answer text ref before starting
         answerTextRef.current = '';
         setState((prev) => ({
           ...prev,
@@ -257,19 +182,16 @@ export function useOverlayState(): UseOverlayStateReturn {
         }));
 
         const data = await ipcTriggerAnswer(modelId);
-        // Note: The streaming updates will come via IPC events
-        // This just sets the final state if streaming is done
         if (data.state === 'complete' || data.state === 'error') {
           updateAnswerState(data);
         }
       } catch (error) {
-        handleError(
-          error instanceof Error ? error.message : 'Failed to trigger answer'
-        );
+        const errorMessage = getErrorMessage(error, 'Unknown error');
+        handleError(getErrorMessage(error, 'Failed to trigger answer'));
         setState((prev) => ({
           ...prev,
           answerState: 'error',
-          answerError: error instanceof Error ? error.message : 'Unknown error',
+          answerError: errorMessage,
         }));
       }
     },
@@ -291,9 +213,7 @@ export function useOverlayState(): UseOverlayStateReturn {
       }));
       answerTextRef.current = '';
     } catch (error) {
-      handleError(
-        error instanceof Error ? error.message : 'Failed to clear overlay'
-      );
+      handleError(getErrorMessage(error, 'Failed to clear overlay'));
     }
   }, [handleError]);
 
@@ -310,9 +230,7 @@ export function useOverlayState(): UseOverlayStateReturn {
         isGroqConfigured: status.isGroqConfigured,
       }));
     } catch (error) {
-      handleError(
-        error instanceof Error ? error.message : 'Failed to get status'
-      );
+      handleError(getErrorMessage(error, 'Failed to get status'));
     }
   }, [handleError]);
 
@@ -324,19 +242,10 @@ export function useOverlayState(): UseOverlayStateReturn {
         isMinimized: result.isMinimized,
       }));
     } catch (error) {
-      handleError(
-        error instanceof Error
-          ? error.message
-          : 'Failed to toggle minimize mode'
-      );
+      handleError(getErrorMessage(error, 'Failed to toggle minimize mode'));
     }
   }, [handleError]);
 
-  // ============================================================================
-  // Effects
-  // ============================================================================
-
-  // Initial status load
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
@@ -346,7 +255,6 @@ export function useOverlayState(): UseOverlayStateReturn {
     init();
   }, [refreshStatus]);
 
-  // Subscribe to IPC events
   useEffect(() => {
     const unsubscribe = subscribeToEvents({
       liveModeChanged: updateLiveMode,
@@ -371,13 +279,8 @@ export function useOverlayState(): UseOverlayStateReturn {
     handleMinimizeModeChanged,
   ]);
 
-  // ============================================================================
-  // Return
-  // ============================================================================
-
-  return {
-    state,
-    actions: {
+  const actions = useMemo<OverlayActions>(
+    () => ({
       startLiveMode,
       stopLiveMode,
       toggleLiveMode,
@@ -385,7 +288,21 @@ export function useOverlayState(): UseOverlayStateReturn {
       clearOverlay,
       refreshStatus,
       toggleMinimizeMode: toggleMinimizeModeAction,
-    },
+    }),
+    [
+      startLiveMode,
+      stopLiveMode,
+      toggleLiveMode,
+      triggerAnswer,
+      clearOverlay,
+      refreshStatus,
+      toggleMinimizeModeAction,
+    ]
+  );
+
+  return {
+    state,
+    actions,
     isLoading,
   };
 }

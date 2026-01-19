@@ -1,30 +1,13 @@
-/**
- * Deepgram WebSocket Client - Real-time speech-to-text streaming
- *
- * Per PLAN.md:
- * - Connect to Deepgram WebSocket API
- * - Stream raw PCM audio for transcription
- * - Use multichannel mode for speaker diarization
- */
 import { config } from 'dotenv';
 config();
 
 import { EventEmitter } from 'events';
 import WebSocket from 'ws';
+import {
+  getDeepgramApiKeyFromSettings,
+  isDeepgramConfiguredFromSettings,
+} from './settingsStore';
 
-// ============================================================================
-// Deepgram Configuration (per PLAN.md)
-// ============================================================================
-
-/**
- * Deepgram streaming configuration
- * Per PLAN.md Section 3.2:
- * - model: 'nova-2-general'
- * - multichannel: true (Channel 0 is interviewer, Channel 1 is you)
- * - smart_format: true
- * - encoding: 'linear16'
- * - sample_rate: 16000
- */
 export interface DeepgramConfig {
   model: string;
   multichannel: boolean;
@@ -40,29 +23,11 @@ export const DEFAULT_DEEPGRAM_CONFIG: DeepgramConfig = {
   smart_format: true,
   encoding: 'linear16',
   sample_rate: 16000,
-  channels: 2, // Stereo: Channel 0 = System/Interviewer, Channel 1 = Mic/You
+  channels: 2,
 };
 
-// ============================================================================
-// API Key Handling (from settings or environment)
-// ============================================================================
-
-import {
-  getDeepgramApiKeyFromSettings,
-  isDeepgramConfiguredFromSettings,
-} from './settingsStore';
-
-/**
- * Get Deepgram API key from settings or environment variable
- *
- * Per PLAN.md: Add DEEPGRAM_API_KEY as a required environment variable
- * Extended: Settings take precedence over environment variables
- *
- * @throws Error if DEEPGRAM_API_KEY is not set
- */
 export function getDeepgramApiKey(): string {
   const apiKey = getDeepgramApiKeyFromSettings();
-
   if (!apiKey) {
     throw new Error(
       'DEEPGRAM_API_KEY is not configured. ' +
@@ -70,24 +35,13 @@ export function getDeepgramApiKey(): string {
         'Get one at https://console.deepgram.com/'
     );
   }
-
   return apiKey;
 }
 
-/**
- * Check if Deepgram API key is configured (without throwing)
- */
 export function isDeepgramConfigured(): boolean {
   return isDeepgramConfiguredFromSettings();
 }
 
-// ============================================================================
-// Deepgram Transcript Types
-// ============================================================================
-
-/**
- * Word-level timing information from Deepgram
- */
 export interface DeepgramWord {
   word: string;
   start: number;
@@ -96,9 +50,6 @@ export interface DeepgramWord {
   punctuated_word?: string;
 }
 
-/**
- * Channel-specific transcript from Deepgram
- */
 export interface DeepgramChannel {
   alternatives: Array<{
     transcript: string;
@@ -107,9 +58,6 @@ export interface DeepgramChannel {
   }>;
 }
 
-/**
- * Deepgram transcript message
- */
 export interface DeepgramTranscript {
   type: 'Results';
   channel_index: number[];
@@ -120,9 +68,6 @@ export interface DeepgramTranscript {
   channel: DeepgramChannel;
 }
 
-/**
- * Deepgram metadata message
- */
 export interface DeepgramMetadata {
   type: 'Metadata';
   transaction_key: string;
@@ -133,34 +78,18 @@ export interface DeepgramMetadata {
   channels: number;
 }
 
-/**
- * Union type for all Deepgram messages
- */
 export type DeepgramMessage =
   | DeepgramTranscript
   | DeepgramMetadata
   | { type: string };
 
-// ============================================================================
-// Deepgram Events
-// ============================================================================
-
 export interface DeepgramClientEvents {
-  /** Connection opened */
   open: () => void;
-  /** Connection closed */
   close: (code: number, reason: string) => void;
-  /** Connection error */
   error: (error: Error) => void;
-  /** Transcript received */
   transcript: (transcript: DeepgramTranscript) => void;
-  /** Metadata received */
   metadata: (metadata: DeepgramMetadata) => void;
 }
-
-// ============================================================================
-// Connection State
-// ============================================================================
 
 export enum DeepgramConnectionState {
   DISCONNECTED = 'disconnected',
@@ -169,29 +98,6 @@ export enum DeepgramConnectionState {
   ERROR = 'error',
 }
 
-// ============================================================================
-// Deepgram Client
-// ============================================================================
-
-/**
- * Deepgram WebSocket client for real-time transcription
- *
- * Usage per PLAN.md:
- * ```typescript
- * const deepgram = new DeepgramClient();
- * await deepgram.connect();
- *
- * audioProcess.stdout.on('data', (chunk) => {
- *     if (deepgram.isOpen()) {
- *         deepgram.send(chunk);
- *     }
- * });
- *
- * deepgram.on('transcript', (transcript) => {
- *     // Handle transcript
- * });
- * ```
- */
 export class DeepgramClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private config: DeepgramConfig;
@@ -203,23 +109,14 @@ export class DeepgramClient extends EventEmitter {
     this.config = { ...DEFAULT_DEEPGRAM_CONFIG, ...config };
   }
 
-  /**
-   * Get current connection state
-   */
   get state(): DeepgramConnectionState {
     return this._state;
   }
 
-  /**
-   * Check if WebSocket is open and ready to receive audio
-   */
   isOpen(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
   }
 
-  /**
-   * Build the Deepgram WebSocket URL with query parameters
-   */
   private buildUrl(): string {
     const params = new URLSearchParams({
       model: this.config.model,
@@ -229,17 +126,12 @@ export class DeepgramClient extends EventEmitter {
       sample_rate: this.config.sample_rate.toString(),
       channels: this.config.channels.toString(),
     });
-
     return `wss://api.deepgram.com/v1/listen?${params.toString()}`;
   }
 
-  /**
-   * Connect to Deepgram WebSocket API
-   */
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       if (this.ws) {
-        console.warn('[Deepgram] Already connected or connecting');
         resolve();
         return;
       }
@@ -247,17 +139,12 @@ export class DeepgramClient extends EventEmitter {
       const apiKey = getDeepgramApiKey();
       const url = this.buildUrl();
 
-      console.log('[Deepgram] Connecting to:', url);
       this._state = DeepgramConnectionState.CONNECTING;
-
       this.ws = new WebSocket(url, {
-        headers: {
-          Authorization: `Token ${apiKey}`,
-        },
+        headers: { Authorization: `Token ${apiKey}` },
       });
 
       this.ws.on('open', () => {
-        console.log('[Deepgram] Connected');
         this._state = DeepgramConnectionState.CONNECTED;
         this.emit('open');
         resolve();
@@ -268,15 +155,12 @@ export class DeepgramClient extends EventEmitter {
       });
 
       this.ws.on('close', (code: number, reason: Buffer) => {
-        const reasonStr = reason.toString();
-        console.log(`[Deepgram] Disconnected: ${code} - ${reasonStr}`);
         this._state = DeepgramConnectionState.DISCONNECTED;
-        this.emit('close', code, reasonStr);
+        this.emit('close', code, reason.toString());
         this.ws = null;
       });
 
       this.ws.on('error', (error: Error) => {
-        console.error('[Deepgram] WebSocket error:', error.message);
         this._state = DeepgramConnectionState.ERROR;
         this.emit('error', error);
         reject(error);
@@ -284,15 +168,8 @@ export class DeepgramClient extends EventEmitter {
     });
   }
 
-  /**
-   * Send audio data to Deepgram
-   *
-   * Per PLAN.md: Only send when readyState === WebSocket.OPEN
-   */
   send(audioData: Buffer): boolean {
-    if (!this.isOpen()) {
-      return false;
-    }
+    if (!this.isOpen()) return false;
 
     try {
       this.ws!.send(audioData);
@@ -303,17 +180,9 @@ export class DeepgramClient extends EventEmitter {
     }
   }
 
-  /**
-   * Close the Deepgram connection
-   */
   disconnect(): void {
-    if (!this.ws) {
-      return;
-    }
+    if (!this.ws) return;
 
-    console.log('[Deepgram] Disconnecting...');
-
-    // Send close message to signal end of audio
     try {
       this.ws.send(JSON.stringify({ type: 'CloseStream' }));
     } catch {
@@ -325,9 +194,6 @@ export class DeepgramClient extends EventEmitter {
     this._state = DeepgramConnectionState.DISCONNECTED;
   }
 
-  /**
-   * Handle incoming WebSocket messages
-   */
   private handleMessage(data: WebSocket.Data): void {
     try {
       const message: DeepgramMessage = JSON.parse(data.toString());
@@ -339,9 +205,6 @@ export class DeepgramClient extends EventEmitter {
         case 'Metadata':
           this.emit('metadata', message as DeepgramMetadata);
           break;
-        default:
-          // Unknown message type - log for debugging
-          console.log('[Deepgram] Unknown message type:', message.type);
       }
     } catch (error) {
       console.error('[Deepgram] Failed to parse message:', error);
@@ -349,13 +212,6 @@ export class DeepgramClient extends EventEmitter {
   }
 }
 
-/**
- * Create and connect a Deepgram client
- *
- * Convenience function per PLAN.md:
- * "Create `src/main/deepgram.ts` exposing `connectDeepgram()` returning
- * a WebSocket instance and connection state callbacks"
- */
 export async function connectDeepgram(
   config: Partial<DeepgramConfig> = {}
 ): Promise<DeepgramClient> {

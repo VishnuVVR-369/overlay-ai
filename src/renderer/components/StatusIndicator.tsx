@@ -1,16 +1,5 @@
-/**
- * StatusIndicator Component - Glassmorphic Design System
- *
- * A clean status indicator with frosted glass aesthetics
- * for the overlay interface.
- */
-
 import React from 'react';
 import type { LiveModeState } from '../../lib/ipc';
-
-// ============================================================================
-// Types
-// ============================================================================
 
 export interface StatusIndicatorProps {
   state: LiveModeState;
@@ -18,10 +7,6 @@ export interface StatusIndicatorProps {
   showLabel?: boolean;
   size?: 'sm' | 'md' | 'lg';
 }
-
-// ============================================================================
-// Status Configuration
-// ============================================================================
 
 interface StatusConfig {
   label: string;
@@ -47,10 +32,6 @@ const STATUS_CONFIG: Record<LiveModeState, StatusConfig> = {
   },
 };
 
-// ============================================================================
-// Main Component
-// ============================================================================
-
 export function StatusIndicator({
   state,
   error,
@@ -67,32 +48,18 @@ export function StatusIndicator({
   );
 }
 
-// ============================================================================
-// Variants
-// ============================================================================
-
-/**
- * Compact status dot only
- */
 export function StatusDot({
   state,
 }: Pick<StatusIndicatorProps, 'state'>): React.ReactElement {
   return <StatusIndicator state={state} showLabel={false} />;
 }
 
-/**
- * Status badge - the main variant used in the header
- */
 export function StatusBadge({
   state,
   error,
 }: Pick<StatusIndicatorProps, 'state' | 'error'>): React.ReactElement {
   return <StatusIndicator state={state} error={error} showLabel={true} />;
 }
-
-// ============================================================================
-// Inline Status (for compact displays)
-// ============================================================================
 
 export function InlineStatus({
   state,

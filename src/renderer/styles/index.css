@@ -55,7 +55,6 @@
   --glass-border-subtle: rgba(255, 255, 255, 0.08);
   --glass-border-default: rgba(255, 255, 255, 0.12);
   --glass-border-strong: rgba(255, 255, 255, 0.18);
-  --glass-border-accent: rgba(99, 102, 241, 0.4);
 
   /* Border Radius */
   --glass-radius-sm: 8px;
@@ -1465,27 +1464,6 @@ body {
 }
 
 /* ============================================================================
-   UTILITY CLASSES
-   ============================================================================ */
-.glass-glow {
-  box-shadow: var(--glass-shadow-glow);
-}
-
-.glass-text-accent {
-  color: var(--glass-accent-light);
-}
-
-.glass-border-accent {
-  border-color: var(--glass-border-accent);
-}
-
-/* Legacy class aliases for compatibility */
-.hud-container { @apply glass-container; }
-.hud-panel { @apply glass-panel; }
-.hud-header { @apply glass-header; }
-.hud-scrollbar { @apply glass-scrollbar; }
-.hud-animate-in { @apply glass-animate-in; }
-/* ============================================================================
    MINIMIZED MODE
    ============================================================================ */
 
@@ -1584,4 +1562,106 @@ body {
   border-radius: 50%;
   background: var(--glass-accent-light);
   animation: glass-pulse 1s ease-in-out infinite;
+}
+
+/* ============================================================================
+   HELP MODAL STYLES
+   ============================================================================ */
+
+.glass-help-section {
+  margin-bottom: 28px;
+}
+
+.glass-help-section:last-child {
+  margin-bottom: 0;
+}
+
+.glass-help-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--glass-text-secondary);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.glass-help-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.glass-help-item {
+  padding: 14px;
+  background: var(--glass-bg-secondary);
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: var(--glass-radius-md);
+}
+
+.glass-help-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.glass-help-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--glass-text-primary);
+}
+
+.glass-help-item-desc {
+  font-size: 12px;
+  color: var(--glass-text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.glass-help-card {
+  padding: 18px;
+  background: var(--glass-bg-secondary);
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: var(--glass-radius-md);
+}
+
+.glass-help-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.glass-help-list--ordered {
+  gap: 12px;
+}
+
+.glass-help-list-item {
+  font-size: 13px;
+  color: var(--glass-text-secondary);
+  line-height: 1.6;
+}
+
+.glass-help-list-title {
+  color: var(--glass-text-primary);
+}
+
+.glass-link {
+  color: var(--glass-accent-light);
+  text-decoration: none;
+  transition: color var(--glass-transition-fast);
+}
+
+.glass-link:hover {
+  color: var(--glass-accent);
+  text-decoration: underline;
+}
+
+.glass-kbd--sm {
+  padding: 2px 6px;
+  font-size: 11px;
 }
