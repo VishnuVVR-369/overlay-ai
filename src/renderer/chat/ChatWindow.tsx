@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { Streamdown } from 'streamdown';
 import { type ChatState } from '../../lib/chat';
 import {
   getChatHistory,
@@ -70,6 +71,43 @@ const TranscriptIncludedIcon = () => (
     <path d="M2 2l7.586 7.586" />
   </svg>
 );
+
+const markdownComponents = {
+  code: ({
+    className,
+    children,
+    ...props
+  }: React.HTMLAttributes<HTMLElement> & { className?: string }) => {
+    const isInline = !className;
+    if (isInline) {
+      return <code {...props}>{children}</code>;
+    }
+    return (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    );
+  },
+  pre: ({ children }: { children?: React.ReactNode }) => <pre>{children}</pre>,
+  h1: ({ children }: { children?: React.ReactNode }) => <h1>{children}</h1>,
+  h2: ({ children }: { children?: React.ReactNode }) => <h2>{children}</h2>,
+  h3: ({ children }: { children?: React.ReactNode }) => <h3>{children}</h3>,
+  ul: ({ children }: { children?: React.ReactNode }) => <ul>{children}</ul>,
+  ol: ({ children }: { children?: React.ReactNode }) => <ol>{children}</ol>,
+  li: ({ children }: { children?: React.ReactNode }) => <li>{children}</li>,
+  p: ({ children }: { children?: React.ReactNode }) => <p>{children}</p>,
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong>{children}</strong>
+  ),
+  blockquote: ({ children }: { children?: React.ReactNode }) => (
+    <blockquote>{children}</blockquote>
+  ),
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  ),
+};
 
 export function ChatWindow(): React.ReactElement {
   const [state, setState] = useState<ChatState>({
@@ -197,7 +235,19 @@ export function ChatWindow(): React.ReactElement {
           <>
             {state.messages.map((msg) => (
               <div key={msg.id} className={`chat-message ${msg.role}`}>
-                <div className="chat-message-bubble">{msg.content}</div>
+                {msg.role === 'user' ? (
+                  <div className="chat-message-bubble">{msg.content}</div>
+                ) : (
+                  <div className="chat-message-bubble chat-message-bubble--markdown">
+                    <Streamdown
+                      mode="streaming"
+                      parseIncompleteMarkdown
+                      components={markdownComponents}
+                    >
+                      {msg.content}
+                    </Streamdown>
+                  </div>
+                )}
                 <div className="chat-message-meta">
                   {formatTime(msg.timestamp)}
                   {msg.includeTranscript && (
@@ -213,7 +263,9 @@ export function ChatWindow(): React.ReactElement {
             ))}
             {state.isGenerating && (
               <div className="chat-message assistant generating">
-                <div className="chat-message-bubble">Thinking...</div>
+                <div className="chat-message-bubble chat-message-bubble--markdown">
+                  <span className="chat-generating-indicator">Thinking...</span>
+                </div>
               </div>
             )}
             <div ref={messagesEndRef} />

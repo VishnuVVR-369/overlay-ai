@@ -161,33 +161,115 @@
   border-bottom-left-radius: 4px;
 }
 
-.chat-message-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--glass-text-subtle);
-  padding: 0 2px;
+.chat-message-bubble--markdown {
+  line-height: 1.6;
 }
 
-.chat-message.user .chat-message-meta {
-  justify-content: flex-end;
+.chat-message-bubble--markdown h1,
+.chat-message-bubble--markdown h2,
+.chat-message-bubble--markdown h3 {
+  margin-top: 12px;
+  margin-bottom: 8px;
+  font-weight: 600;
 }
 
-.chat-transcript-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.chat-message-bubble--markdown h1 {
+  font-size: 16px;
+}
+
+.chat-message-bubble--markdown h2 {
+  font-size: 15px;
+}
+
+.chat-message-bubble--markdown h3 {
+  font-size: 14px;
+}
+
+.chat-message-bubble--markdown p {
+  margin: 8px 0;
+}
+
+.chat-message-bubble--markdown p:first-child {
+  margin-top: 0;
+}
+
+.chat-message-bubble--markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-message-bubble--markdown ul,
+.chat-message-bubble--markdown ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.chat-message-bubble--markdown li {
+  margin: 4px 0;
+}
+
+.chat-message-bubble--markdown code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.3);
   padding: 2px 6px;
-  background: var(--glass-bg-elevated);
   border-radius: 4px;
-  font-size: 10px;
-  color: var(--glass-text-muted);
 }
 
-.chat-transcript-badge svg {
-  width: 10px;
-  height: 10px;
+.chat-message-bubble--markdown pre {
+  margin: 12px 0;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.chat-message-bubble--markdown pre code {
+  background: none;
+  padding: 0;
+}
+
+.chat-message-bubble--markdown blockquote {
+  margin: 8px 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--glass-accent);
+  color: var(--glass-text-secondary);
+  font-style: italic;
+}
+
+.chat-message-bubble--markdown a {
+  color: var(--glass-accent-light);
+  text-decoration: underline;
+}
+
+.chat-message-bubble--markdown a:hover {
+  color: var(--glass-accent);
+}
+
+.chat-generating-indicator {
+  color: var(--glass-text-muted);
+  font-style: italic;
+}
+
+/* Loading State */
+.chat-message.generating .chat-message-bubble::after {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  background: var(--glass-accent-light);
+  border-radius: 50%;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 /* Error Message */
@@ -203,6 +285,16 @@
 }
 
 /* Loading State */
+.chat-message.generating .chat-message-bubble::after {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 8px;
+  background: var(--glass-accent-light);
+  border-radius: 50%;
+  animation: pulse 1s infinite;
+}
 .chat-message.generating .chat-message-bubble::after {
   content: '';
   display: inline-block;
@@ -354,28 +446,4 @@
 .chat-send-btn svg {
   width: 16px;
   height: 16px;
-}
-
-/* ============================================================================
-   CODE BLOCKS IN MESSAGES
-   ============================================================================ */
-.chat-message-bubble code {
-  background: rgba(0, 0, 0, 0.3);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-}
-
-.chat-message-bubble pre {
-  background: rgba(0, 0, 0, 0.3);
-  padding: 12px;
-  border-radius: var(--glass-radius-sm);
-  overflow-x: auto;
-  margin: 8px 0;
-}
-
-.chat-message-bubble pre code {
-  background: none;
-  padding: 0;
 }
