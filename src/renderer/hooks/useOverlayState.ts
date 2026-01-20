@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { LiveModeStatus, AnswerData } from '../../lib/ipc';
+import type { LiveModeStatus, AnswerData, SessionStats } from '../../lib/ipc';
 import type { TranscriptSegment, Speaker } from '../../lib/transcript';
 import {
   getStatus,
@@ -24,6 +24,7 @@ export interface OverlayState {
   isGroqConfigured: boolean;
   isMinimized: boolean;
   lastError: string | null;
+  sessionStats: SessionStats;
 }
 
 export interface OverlayActions {
@@ -55,6 +56,12 @@ const INITIAL_STATE: OverlayState = {
   isGroqConfigured: false,
   isMinimized: false,
   lastError: null,
+  sessionStats: {
+    sessionStartedAt: null,
+    totalWordsTranscribed: 0,
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+  },
 };
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -144,6 +151,13 @@ export function useOverlayState(): UseOverlayStateReturn {
     []
   );
 
+  const handleSessionStatsUpdated = useCallback((stats: SessionStats) => {
+    setState((prev) => ({
+      ...prev,
+      sessionStats: stats,
+    }));
+  }, []);
+
   const startLiveMode = useCallback(async () => {
     try {
       const status = await ipcStartLiveMode();
@@ -210,6 +224,12 @@ export function useOverlayState(): UseOverlayStateReturn {
         answerText: '',
         answerError: null,
         lastError: null,
+        sessionStats: {
+          sessionStartedAt: null,
+          totalWordsTranscribed: 0,
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+        },
       }));
       answerTextRef.current = '';
     } catch (error) {
@@ -266,6 +286,7 @@ export function useOverlayState(): UseOverlayStateReturn {
       answerStateChanged: updateAnswerState,
       error: ({ message }) => handleError(message),
       minimizeModeChanged: handleMinimizeModeChanged,
+      sessionStatsUpdated: handleSessionStatsUpdated,
     });
 
     return unsubscribe;
@@ -277,6 +298,7 @@ export function useOverlayState(): UseOverlayStateReturn {
     updateAnswerState,
     handleError,
     handleMinimizeModeChanged,
+    handleSessionStatsUpdated,
   ]);
 
   const actions = useMemo<OverlayActions>(

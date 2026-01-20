@@ -28,4 +28,6 @@ export {
   getGroqApiKey,
   GROQ_MODELS,
   type GroqModelId,
+  type TokenUsage,
+  type StreamResponseResult,
 } from './groqProvider';

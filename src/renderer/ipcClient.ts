@@ -174,6 +174,17 @@ export function onMinimizeModeChanged(
     window.electronAPI.removeAllListeners(IPC_CHANNELS.MINIMIZE_MODE_CHANGED);
 }
 
+export function onSessionStatsUpdated(
+  callback: EventCallback<'sessionStatsUpdated'>
+): () => void {
+  window.electronAPI.on(
+    IPC_CHANNELS.SESSION_STATS_UPDATED,
+    callback as (...args: unknown[]) => void
+  );
+  return () =>
+    window.electronAPI.removeAllListeners(IPC_CHANNELS.SESSION_STATS_UPDATED);
+}
+
 export interface IPCSubscriptions {
   liveModeChanged?: EventCallback<'liveModeChanged'>;
   transcriptSegment?: EventCallback<'transcriptSegment'>;
@@ -182,6 +193,7 @@ export interface IPCSubscriptions {
   answerStateChanged?: EventCallback<'answerStateChanged'>;
   error?: EventCallback<'error'>;
   minimizeModeChanged?: EventCallback<'minimizeModeChanged'>;
+  sessionStatsUpdated?: EventCallback<'sessionStatsUpdated'>;
 }
 
 export function subscribeToEvents(subscriptions: IPCSubscriptions): () => void {
@@ -207,6 +219,9 @@ export function subscribeToEvents(subscriptions: IPCSubscriptions): () => void {
   }
   if (subscriptions.minimizeModeChanged) {
     cleanups.push(onMinimizeModeChanged(subscriptions.minimizeModeChanged));
+  }
+  if (subscriptions.sessionStatsUpdated) {
+    cleanups.push(onSessionStatsUpdated(subscriptions.sessionStatsUpdated));
   }
 
   return () => {

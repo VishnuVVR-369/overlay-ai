@@ -1665,3 +1665,37 @@ body {
   padding: 2px 6px;
   font-size: 11px;
 }
+
+/* ============================================================================
+   SESSION STATS FOOTER
+   ============================================================================ */
+
+.glass-stats-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 8px 16px;
+  background: var(--glass-bg-secondary);
+  border-top: 1px solid var(--glass-border-subtle);
+  backdrop-filter: blur(var(--glass-blur-md));
+  -webkit-backdrop-filter: blur(var(--glass-blur-md));
+}
+
+.glass-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--glass-text-muted);
+}
+
+.glass-stat-icon {
+  opacity: 0.7;
+}
+
+.glass-stat-value {
+  color: var(--glass-text-secondary);
+}

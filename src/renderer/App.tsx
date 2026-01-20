@@ -8,6 +8,7 @@ import { LiveTranscript } from './components/LiveTranscript';
 import { AnswerCard } from './components/AnswerCard';
 import { SettingsModal } from './components/SettingsModal';
 import { HelpModal } from './components/HelpModal';
+import { SessionStatsFooter } from './components/SessionStatsFooter';
 import { useOverlayState } from './hooks/useOverlayState';
 
 function App(): React.ReactElement {
@@ -88,6 +89,14 @@ function App(): React.ReactElement {
           />
         </section>
       </main>
+
+      <SessionStatsFooter
+        sessionStartedAt={state.sessionStats.sessionStartedAt}
+        wordsTranscribed={state.sessionStats.totalWordsTranscribed}
+        inputTokens={state.sessionStats.totalInputTokens}
+        outputTokens={state.sessionStats.totalOutputTokens}
+        isConnected={state.liveMode.state === 'connected'}
+      />
 
       <Toast message={state.lastError} visible={!!showToast} />
 
