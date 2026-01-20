@@ -36,8 +36,10 @@ import {
   clearOverlay,
   toggleMinimizeMode,
   applyMinimizeMode,
+  openChatWindow,
 } from './ipc';
 import { StealthWindowManager, getNativeWindowHandle } from './macos';
+import { destroyChatWindowManager } from './chatWindow';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 // Note: electron-squirrel-startup may not be installed - handle gracefully
@@ -167,8 +169,19 @@ function registerShortcuts() {
     }
   });
 
+  // Cmd+Shift+C: Toggle Chat Window
+  globalShortcut.register('CommandOrControl+Shift+C', async () => {
+    console.log('[Shortcut] Toggle Chat Window');
+    try {
+      const result = await openChatWindow();
+      console.log('[Shortcut] Chat window:', result.success);
+    } catch (error) {
+      console.error('[Shortcut] Failed to toggle chat window:', error);
+    }
+  });
+
   console.log(
-    '[Shortcuts] Registered: Cmd+Shift+L (Live), Cmd+Shift+X (Answer), Cmd+Shift+Z (Clear), Cmd+Shift+M (Minimize)'
+    '[Shortcuts] Registered: Cmd+Shift+L (Live), Cmd+Shift+X (Answer), Cmd+Shift+Z (Clear), Cmd+Shift+M (Minimize), Cmd+Shift+C (Chat)'
   );
 }
 
@@ -207,4 +220,5 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   unregisterShortcuts();
   cleanupIPC();
+  destroyChatWindowManager();
 });

@@ -10,6 +10,7 @@
  */
 
 import type { TranscriptSegment, Speaker } from './transcript';
+import type { ChatMessage, ChatState, SendMessageOptions } from './chat';
 
 // ============================================================================
 // Live Mode Types
@@ -161,6 +162,26 @@ export interface IPCInputs {
 
   /** Toggle minimize mode */
   toggleMinimizeMode: void;
+
+  // Chat methods
+
+  /** Open chat window */
+  openChatWindow: void;
+
+  /** Close chat window */
+  closeChatWindow: void;
+
+  /** Send chat message */
+  sendChatMessage: {
+    message: string;
+    includeTranscript: boolean;
+  };
+
+  /** Get chat history */
+  getChatHistory: void;
+
+  /** Clear chat history */
+  clearChatHistory: void;
 }
 
 /**
@@ -178,6 +199,14 @@ export interface IPCOutputs {
   getSettings: AppSettings;
   saveSettings: { success: boolean };
   toggleMinimizeMode: { isMinimized: boolean };
+
+  // Chat outputs
+
+  openChatWindow: { success: boolean };
+  closeChatWindow: { success: boolean };
+  sendChatMessage: { success: boolean };
+  getChatHistory: ChatState;
+  clearChatHistory: { success: boolean };
 }
 
 // ============================================================================
@@ -208,6 +237,14 @@ export interface IPCEvents {
 
   /** Minimize mode changed */
   minimizeModeChanged: { isMinimized: boolean };
+
+  // Chat events
+
+  /** Chat response chunk received (streaming) */
+  chatResponseChunk: { messageId: string; chunk: string; isComplete: boolean };
+
+  /** Chat state changed */
+  chatStateChanged: ChatState;
 }
 
 // ============================================================================
@@ -230,6 +267,14 @@ export const IPC_CHANNELS = {
   SAVE_SETTINGS: 'overlay:save-settings',
   TOGGLE_MINIMIZE_MODE: 'overlay:toggle-minimize-mode',
 
+  // Chat commands
+
+  OPEN_CHAT_WINDOW: 'overlay:open-chat-window',
+  CLOSE_CHAT_WINDOW: 'overlay:close-chat-window',
+  SEND_CHAT_MESSAGE: 'overlay:send-chat-message',
+  GET_CHAT_HISTORY: 'overlay:get-chat-history',
+  CLEAR_CHAT_HISTORY: 'overlay:clear-chat-history',
+
   // Events (main → renderer)
   LIVE_MODE_CHANGED: 'overlay:live-mode-changed',
   TRANSCRIPT_SEGMENT: 'overlay:transcript-segment',
@@ -238,6 +283,13 @@ export const IPC_CHANNELS = {
   ANSWER_STATE_CHANGED: 'overlay:answer-state-changed',
   ERROR: 'overlay:error',
   MINIMIZE_MODE_CHANGED: 'overlay:minimize-mode-changed',
+
+  // Chat events
+
+  CHAT_RESPONSE_CHUNK: 'overlay:chat-response-chunk',
+  CHAT_STATE_CHANGED: 'overlay:chat-state-changed',
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
+
+export type { ChatMessage, ChatState, SendMessageOptions };

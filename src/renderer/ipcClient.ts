@@ -17,6 +17,7 @@ import {
   type LiveTranscriptData,
   type ContextStats,
   type IPCEvents,
+  type ChatState,
 } from '../lib/ipc';
 
 // ============================================================================
@@ -260,6 +261,89 @@ export function onMinimizeModeChanged(
   );
   return () =>
     window.electronAPI.removeAllListeners(IPC_CHANNELS.MINIMIZE_MODE_CHANGED);
+}
+
+// ============================================================================
+// Chat Methods
+// ============================================================================
+
+/**
+ * Open chat window
+ */
+export async function openChatWindow(): Promise<{ success: boolean }> {
+  return window.electronAPI.invoke<{ success: boolean }>(
+    IPC_CHANNELS.OPEN_CHAT_WINDOW
+  );
+}
+
+/**
+ * Close chat window
+ */
+export async function closeChatWindow(): Promise<{ success: boolean }> {
+  return window.electronAPI.invoke<{ success: boolean }>(
+    IPC_CHANNELS.CLOSE_CHAT_WINDOW
+  );
+}
+
+/**
+ * Send chat message
+ */
+export async function sendChatMessage(
+  message: string,
+  includeTranscript: boolean
+): Promise<{ success: boolean }> {
+  return window.electronAPI.invoke<{ success: boolean }>(
+    IPC_CHANNELS.SEND_CHAT_MESSAGE,
+    { message, includeTranscript }
+  );
+}
+
+/**
+ * Get chat history
+ */
+export async function getChatHistory(): Promise<ChatState> {
+  return window.electronAPI.invoke<ChatState>(IPC_CHANNELS.GET_CHAT_HISTORY);
+}
+
+/**
+ * Clear chat history
+ */
+export async function clearChatHistory(): Promise<{ success: boolean }> {
+  return window.electronAPI.invoke<{ success: boolean }>(
+    IPC_CHANNELS.CLEAR_CHAT_HISTORY
+  );
+}
+
+// ============================================================================
+// Chat Event Subscriptions
+// ============================================================================
+
+/**
+ * Subscribe to chat response chunks (streaming)
+ */
+export function onChatResponseChunk(
+  callback: EventCallback<'chatResponseChunk'>
+): () => void {
+  window.electronAPI.on(
+    IPC_CHANNELS.CHAT_RESPONSE_CHUNK,
+    callback as (...args: unknown[]) => void
+  );
+  return () =>
+    window.electronAPI.removeAllListeners(IPC_CHANNELS.CHAT_RESPONSE_CHUNK);
+}
+
+/**
+ * Subscribe to chat state changes
+ */
+export function onChatStateChanged(
+  callback: EventCallback<'chatStateChanged'>
+): () => void {
+  window.electronAPI.on(
+    IPC_CHANNELS.CHAT_STATE_CHANGED,
+    callback as (...args: unknown[]) => void
+  );
+  return () =>
+    window.electronAPI.removeAllListeners(IPC_CHANNELS.CHAT_STATE_CHANGED);
 }
 
 // ============================================================================

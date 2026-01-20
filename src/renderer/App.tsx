@@ -12,6 +12,7 @@ import { AnswerCard } from './components/AnswerCard';
 import { SettingsModal } from './components/SettingsModal';
 import { HelpModal } from './components/HelpModal';
 import { useOverlayState } from './hooks/useOverlayState';
+import { openChatWindow } from './ipcClient';
 
 // ============================================================================
 // Icons
@@ -64,6 +65,21 @@ const HelpIcon = () => (
     <circle cx="12" cy="12" r="10" />
     <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
     <path d="M12 17h.01" />
+  </svg>
+);
+
+const ChatIcon = () => (
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
   </svg>
 );
 
@@ -236,6 +252,10 @@ function App(): React.ReactElement {
     actions.toggleMinimizeMode();
   }, [actions]);
 
+  const handleOpenChat = useCallback(async () => {
+    await openChatWindow();
+  }, []);
+
   // Show loading state while initializing
   if (isLoading) {
     return <LoadingOverlay />;
@@ -281,6 +301,14 @@ function App(): React.ReactElement {
             aria-label="Open help"
           >
             <HelpIcon />
+          </button>
+          <button
+            onClick={handleOpenChat}
+            className="glass-header-btn"
+            title="AI Chat (Cmd+Shift+C)"
+            aria-label="Open chat"
+          >
+            <ChatIcon />
           </button>
           <button
             onClick={handleOpenSettings}

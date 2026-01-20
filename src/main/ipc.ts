@@ -13,6 +13,7 @@ import {
   type AnswerData,
   type IPCEvents,
   type AppSettings,
+  type ChatState,
 } from '../lib/ipc';
 import type { TranscriptSegment, Speaker } from '../lib/transcript';
 import {
@@ -36,6 +37,8 @@ import {
   toggleMinimizeMode,
   isMinimizedMode as isMinimizedModeFromStore,
 } from './settingsStore';
+import { getChatWindowManager } from './chatWindow';
+import { getChatManager, destroyChatManager } from './chatManager';
 
 // ============================================================================
 // State Management
@@ -43,6 +46,7 @@ import {
 
 let mainWindow: BrowserWindow | null = null;
 let liveModeManager: LiveModeManager | null = null;
+let chatManagerInitialized = false;
 
 // ============================================================================
 // Event Emitters (Main → Renderer)
@@ -83,6 +87,90 @@ function sendAnswerChunk(chunk: string, isComplete: boolean): void {
     chunk,
     isComplete,
   });
+}
+
+// ============================================================================
+// Chat Management
+// ============================================================================
+
+function initializeChatManager(): void {
+  if (chatManagerInitialized) {
+    return;
+  }
+
+  const chatManager = getChatManager();
+  const chatWindowManager = getChatWindowManager();
+
+  chatManager.on('stateChanged', (state: unknown) => {
+    chatWindowManager.sendToRenderer(
+      IPC_CHANNELS.CHAT_STATE_CHANGED,
+      state as ChatState
+    );
+  });
+
+  chatManager.on('responseChunk', (...args: unknown[]) => {
+    const [messageId, chunk, isComplete] = args as [string, string, boolean];
+    chatWindowManager.sendToRenderer(IPC_CHANNELS.CHAT_RESPONSE_CHUNK, {
+      messageId,
+      chunk,
+      isComplete,
+    });
+  });
+
+  chatManager.on(
+    'responseChunk',
+    (messageId: string, chunk: string, isComplete: boolean) => {
+      chatWindowManager.sendToRenderer(IPC_CHANNELS.CHAT_RESPONSE_CHUNK, {
+        messageId,
+        chunk,
+        isComplete,
+      });
+    }
+  );
+
+  chatManagerInitialized = true;
+  console.log('[IPC] ChatManager initialized');
+}
+
+async function openChatWindow(): Promise<{ success: boolean }> {
+  const chatWindowManager = getChatWindowManager();
+  const { isOpen } = chatWindowManager.toggle();
+  console.log('[IPC] Chat window toggled, isOpen:', isOpen);
+  return { success: isOpen };
+}
+
+function closeChatWindow(): { success: boolean } {
+  const chatWindowManager = getChatWindowManager();
+  chatWindowManager.close();
+  return { success: true };
+}
+
+async function sendChatMessage(
+  message: string,
+  includeTranscript: boolean
+): Promise<{ success: boolean }> {
+  initializeChatManager();
+  const chatManager = getChatManager();
+  const chatWindowManager = getChatWindowManager();
+
+  const result = await chatManager.sendMessage(
+    message,
+    { includeTranscript },
+    (channel, data) => chatWindowManager.sendToRenderer(channel, data)
+  );
+
+  return result;
+}
+
+function getChatHistory() {
+  initializeChatManager();
+  const chatManager = getChatManager();
+  return chatManager.getHistory();
+}
+
+function clearChatHistory(): { success: boolean } {
+  const chatManager = getChatManager();
+  return chatManager.clearHistory();
 }
 
 // ============================================================================
@@ -412,6 +500,31 @@ export function initializeIPC(window: BrowserWindow): void {
     return toggleMinimizeModeWrapper();
   });
 
+  // Chat handlers
+
+  ipcMain.handle(IPC_CHANNELS.OPEN_CHAT_WINDOW, async () => {
+    return openChatWindow();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.CLOSE_CHAT_WINDOW, () => {
+    return closeChatWindow();
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.SEND_CHAT_MESSAGE,
+    async (_event, { message, includeTranscript }) => {
+      return sendChatMessage(message, includeTranscript);
+    }
+  );
+
+  ipcMain.handle(IPC_CHANNELS.GET_CHAT_HISTORY, () => {
+    return getChatHistory();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.CLEAR_CHAT_HISTORY, () => {
+    return clearChatHistory();
+  });
+
   console.log('[IPC] Handlers initialized');
 }
 
@@ -425,6 +538,10 @@ export function cleanupIPC(): void {
   disposeLiveModeManager();
   liveModeManager = null;
 
+  // Clean up chat
+  destroyChatManager();
+  chatManagerInitialized = false;
+
   ipcMain.removeHandler(IPC_CHANNELS.START_LIVE_MODE);
   ipcMain.removeHandler(IPC_CHANNELS.STOP_LIVE_MODE);
   ipcMain.removeHandler(IPC_CHANNELS.TRIGGER_ANSWER);
@@ -434,6 +551,11 @@ export function cleanupIPC(): void {
   ipcMain.removeHandler(IPC_CHANNELS.GET_SETTINGS);
   ipcMain.removeHandler(IPC_CHANNELS.SAVE_SETTINGS);
   ipcMain.removeHandler(IPC_CHANNELS.TOGGLE_MINIMIZE_MODE);
+  ipcMain.removeHandler(IPC_CHANNELS.OPEN_CHAT_WINDOW);
+  ipcMain.removeHandler(IPC_CHANNELS.CLOSE_CHAT_WINDOW);
+  ipcMain.removeHandler(IPC_CHANNELS.SEND_CHAT_MESSAGE);
+  ipcMain.removeHandler(IPC_CHANNELS.GET_CHAT_HISTORY);
+  ipcMain.removeHandler(IPC_CHANNELS.CLEAR_CHAT_HISTORY);
 
   mainWindow = null;
   console.log('[IPC] Handlers cleaned up');
@@ -450,4 +572,5 @@ export {
   toggleMinimizeModeWrapper as toggleMinimizeMode,
   applyMinimizeMode,
   isMinimizedModeFromStore as isMinimized,
+  openChatWindow,
 };
