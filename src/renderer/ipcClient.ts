@@ -1,10 +1,3 @@
-/**
- * IPC Client - Renderer process communication with Main
- *
- * Per PLAN.md Phase 5:
- * Call main-process routes and subscribe to updates.
- */
-
 import { createTRPCProxyClient } from '@trpc/client';
 import { ipcLink } from 'electron-trpc/renderer';
 import type { AppRouter } from '../main/trpc/router';
@@ -19,22 +12,10 @@ import {
   type IPCEvents,
 } from '../lib/ipc';
 
-// ============================================================================
-// tRPC Client
-// ============================================================================
-
-/**
- * Type-safe tRPC client for calling main process
- */
 export const trpc = createTRPCProxyClient<AppRouter>({
   links: [ipcLink()],
 });
 
-// ============================================================================
-// Direct IPC Methods
-// ============================================================================
-
-// Type declaration for Electron's contextBridge exposed API
 declare global {
   interface Window {
     electronAPI: {
@@ -45,25 +26,16 @@ declare global {
   }
 }
 
-/**
- * Start live mode (audio capture + Deepgram)
- */
 export async function startLiveMode(): Promise<LiveModeStatus> {
   return window.electronAPI.invoke<LiveModeStatus>(
     IPC_CHANNELS.START_LIVE_MODE
   );
 }
 
-/**
- * Stop live mode
- */
 export async function stopLiveMode(): Promise<LiveModeStatus> {
   return window.electronAPI.invoke<LiveModeStatus>(IPC_CHANNELS.STOP_LIVE_MODE);
 }
 
-/**
- * Toggle live mode
- */
 export async function toggleLiveMode(): Promise<LiveModeStatus> {
   const status = await getStatus();
   if (status.liveMode.state === 'connected') {
@@ -73,50 +45,32 @@ export async function toggleLiveMode(): Promise<LiveModeStatus> {
   }
 }
 
-/**
- * Trigger answer generation
- */
 export async function triggerAnswer(modelId?: string): Promise<AnswerData> {
   return window.electronAPI.invoke<AnswerData>(IPC_CHANNELS.TRIGGER_ANSWER, {
     modelId,
   });
 }
 
-/**
- * Clear overlay (transcript and answer)
- */
 export async function clearOverlay(): Promise<{ success: boolean }> {
   return window.electronAPI.invoke<{ success: boolean }>(
     IPC_CHANNELS.CLEAR_OVERLAY
   );
 }
 
-/**
- * Get current application status
- */
 export async function getStatus(): Promise<AppStatus> {
   return window.electronAPI.invoke<AppStatus>(IPC_CHANNELS.GET_STATUS);
 }
 
-/**
- * Close the window
- */
 export async function closeWindow(): Promise<{ success: boolean }> {
   return window.electronAPI.invoke<{ success: boolean }>(
     IPC_CHANNELS.CLOSE_WINDOW
   );
 }
 
-/**
- * Get current settings
- */
 export async function getSettings(): Promise<AppSettings> {
   return window.electronAPI.invoke<AppSettings>(IPC_CHANNELS.GET_SETTINGS);
 }
 
-/**
- * Save settings
- */
 export async function saveSettings(
   settings: Partial<AppSettings>
 ): Promise<{ success: boolean }> {
@@ -126,35 +80,18 @@ export async function saveSettings(
   );
 }
 
-/**
- * Toggle minimize mode
- */
 export async function toggleMinimizeMode(): Promise<{ isMinimized: boolean }> {
   return window.electronAPI.invoke<{ isMinimized: boolean }>(
     IPC_CHANNELS.TOGGLE_MINIMIZE_MODE
   );
 }
 
-// ============================================================================
-// tRPC Query Methods
-// ============================================================================
-
-// ============================================================================
-// tRPC Query Methods
-// ============================================================================
-
-/**
- * Get recent transcript via tRPC
- */
 export async function getRecentTranscript(
   windowMs = 30000
 ): Promise<LiveTranscriptData> {
   return trpc.getRecentTranscript.query({ windowMs });
 }
 
-/**
- * Get full context via tRPC
- */
 export async function getFullContext(): Promise<{
   context: string;
   stats: ContextStats;
@@ -162,15 +99,8 @@ export async function getFullContext(): Promise<{
   return trpc.getFullContext.query();
 }
 
-// ============================================================================
-// Event Subscriptions
-// ============================================================================
-
 type EventCallback<K extends keyof IPCEvents> = (data: IPCEvents[K]) => void;
 
-/**
- * Subscribe to live mode status changes
- */
 export function onLiveModeChanged(
   callback: EventCallback<'liveModeChanged'>
 ): () => void {
@@ -182,9 +112,6 @@ export function onLiveModeChanged(
     window.electronAPI.removeAllListeners(IPC_CHANNELS.LIVE_MODE_CHANGED);
 }
 
-/**
- * Subscribe to transcript segments
- */
 export function onTranscriptSegment(
   callback: EventCallback<'transcriptSegment'>
 ): () => void {
@@ -196,9 +123,6 @@ export function onTranscriptSegment(
     window.electronAPI.removeAllListeners(IPC_CHANNELS.TRANSCRIPT_SEGMENT);
 }
 
-/**
- * Subscribe to interim transcript updates
- */
 export function onInterimTranscript(
   callback: EventCallback<'interimTranscript'>
 ): () => void {
@@ -210,9 +134,6 @@ export function onInterimTranscript(
     window.electronAPI.removeAllListeners(IPC_CHANNELS.INTERIM_TRANSCRIPT);
 }
 
-/**
- * Subscribe to answer chunks (streaming)
- */
 export function onAnswerChunk(
   callback: EventCallback<'answerChunk'>
 ): () => void {
@@ -223,9 +144,6 @@ export function onAnswerChunk(
   return () => window.electronAPI.removeAllListeners(IPC_CHANNELS.ANSWER_CHUNK);
 }
 
-/**
- * Subscribe to answer state changes
- */
 export function onAnswerStateChanged(
   callback: EventCallback<'answerStateChanged'>
 ): () => void {
@@ -237,9 +155,6 @@ export function onAnswerStateChanged(
     window.electronAPI.removeAllListeners(IPC_CHANNELS.ANSWER_STATE_CHANGED);
 }
 
-/**
- * Subscribe to errors
- */
 export function onError(callback: EventCallback<'error'>): () => void {
   window.electronAPI.on(
     IPC_CHANNELS.ERROR,
@@ -248,9 +163,6 @@ export function onError(callback: EventCallback<'error'>): () => void {
   return () => window.electronAPI.removeAllListeners(IPC_CHANNELS.ERROR);
 }
 
-/**
- * Subscribe to minimize mode changes
- */
 export function onMinimizeModeChanged(
   callback: EventCallback<'minimizeModeChanged'>
 ): () => void {
@@ -262,10 +174,6 @@ export function onMinimizeModeChanged(
     window.electronAPI.removeAllListeners(IPC_CHANNELS.MINIMIZE_MODE_CHANGED);
 }
 
-// ============================================================================
-// Combined Subscription Helper
-// ============================================================================
-
 export interface IPCSubscriptions {
   liveModeChanged?: EventCallback<'liveModeChanged'>;
   transcriptSegment?: EventCallback<'transcriptSegment'>;
@@ -276,10 +184,6 @@ export interface IPCSubscriptions {
   minimizeModeChanged?: EventCallback<'minimizeModeChanged'>;
 }
 
-/**
- * Subscribe to multiple events at once
- * Returns cleanup function that removes all listeners
- */
 export function subscribeToEvents(subscriptions: IPCSubscriptions): () => void {
   const cleanups: (() => void)[] = [];
 

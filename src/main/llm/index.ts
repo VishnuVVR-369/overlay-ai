@@ -14,7 +14,6 @@ export {
 
 // System prompt
 export {
-  SYSTEM_PROMPT,
   DEFAULT_SYSTEM_PROMPT,
   getSystemPrompt,
   buildUserPrompt,

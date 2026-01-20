@@ -1,10 +1,3 @@
-/**
- * IPC Handlers - Main process IPC implementation
- *
- * Per PLAN.md Phase 5:
- * Register handlers for audio start/stop, context retrieval, LLM trigger, and clear state.
- */
-
 import { ipcMain, BrowserWindow } from 'electron';
 import { createIPCHandler } from 'electron-trpc/main';
 import {
@@ -33,24 +26,18 @@ import {
   saveSettings,
   isDeepgramConfiguredFromSettings,
   isGroqConfiguredFromSettings,
-  toggleMinimizeMode,
+  toggleMinimizeMode as toggleMinimizeModeInStore,
   isMinimizedMode as isMinimizedModeFromStore,
 } from './settingsStore';
-
-// ============================================================================
-// State Management
-// ============================================================================
 
 let mainWindow: BrowserWindow | null = null;
 let liveModeManager: LiveModeManager | null = null;
 
-// ============================================================================
-// Event Emitters (Main → Renderer)
-// ============================================================================
+const WINDOW_DIMENSIONS = {
+  minimized: { width: 280, height: 120 },
+  normal: { width: 500, height: 500 },
+} as const;
 
-/**
- * Send event to renderer process
- */
 function sendToRenderer<K extends keyof IPCEvents>(
   channel: string,
   data: IPCEvents[K]
@@ -60,24 +47,10 @@ function sendToRenderer<K extends keyof IPCEvents>(
   }
 }
 
-/**
- * Update and broadcast answer data
- */
-function updateAnswerData(data: AnswerData): void {
-  setAnswerData(data);
-  sendToRenderer<'answerStateChanged'>(IPC_CHANNELS.ANSWER_STATE_CHANGED, data);
-}
-
-/**
- * Send error to renderer
- */
 function sendError(message: string, code?: string): void {
   sendToRenderer<'error'>(IPC_CHANNELS.ERROR, { message, code });
 }
 
-/**
- * Send streaming answer chunk to renderer
- */
 function sendAnswerChunk(chunk: string, isComplete: boolean): void {
   sendToRenderer<'answerChunk'>(IPC_CHANNELS.ANSWER_CHUNK, {
     chunk,
@@ -85,23 +58,19 @@ function sendAnswerChunk(chunk: string, isComplete: boolean): void {
   });
 }
 
-// ============================================================================
-// Live Mode Management (using LiveModeManager state machine)
-// ============================================================================
+function updateAnswerData(data: AnswerData): void {
+  setAnswerData(data);
+  sendToRenderer<'answerStateChanged'>(IPC_CHANNELS.ANSWER_STATE_CHANGED, data);
+}
 
-/**
- * Initialize the LiveModeManager and wire up events
- */
 function initializeLiveModeManager(): void {
   liveModeManager = getDefaultLiveModeManager();
 
-  // Forward state changes to renderer
   liveModeManager.on('stateChanged', (status: LiveModeStatus) => {
     setLiveModeStatus(status);
     sendToRenderer<'liveModeChanged'>(IPC_CHANNELS.LIVE_MODE_CHANGED, status);
   });
 
-  // Forward transcript segments to renderer
   liveModeManager.on('segment', (segment: TranscriptSegment) => {
     sendToRenderer<'transcriptSegment'>(
       IPC_CHANNELS.TRANSCRIPT_SEGMENT,
@@ -109,7 +78,6 @@ function initializeLiveModeManager(): void {
     );
   });
 
-  // Forward interim transcripts to renderer
   liveModeManager.on('interim', (text: string, speaker: Speaker) => {
     setInterimTranscript({ text, speaker });
     sendToRenderer<'interimTranscript'>(IPC_CHANNELS.INTERIM_TRANSCRIPT, {
@@ -118,18 +86,11 @@ function initializeLiveModeManager(): void {
     });
   });
 
-  // Forward errors to renderer
   liveModeManager.on('error', (error: Error) => {
     sendError(error.message, 'LIVE_MODE_ERROR');
   });
-
-  console.log('[IPC] LiveModeManager initialized');
 }
 
-/**
- * Start live mode - connects audio engine and Deepgram
- * Uses the LiveModeManager state machine
- */
 async function startLiveMode(): Promise<LiveModeStatus> {
   if (!liveModeManager) {
     initializeLiveModeManager();
@@ -137,25 +98,15 @@ async function startLiveMode(): Promise<LiveModeStatus> {
   return liveModeManager!.start();
 }
 
-/**
- * Stop live mode - disconnects audio engine and Deepgram
- * Uses the LiveModeManager state machine
- */
 function stopLiveMode(): LiveModeStatus {
   if (!liveModeManager) {
     return { state: 'disconnected' };
   }
-
   const status = liveModeManager.stop();
-  // Clear interim transcript when stopping
   setInterimTranscript(null);
   return status;
 }
 
-/**
- * Toggle live mode
- * Uses the LiveModeManager state machine
- */
 async function toggleLiveMode(): Promise<LiveModeStatus> {
   if (!liveModeManager) {
     initializeLiveModeManager();
@@ -163,23 +114,10 @@ async function toggleLiveMode(): Promise<LiveModeStatus> {
   return liveModeManager!.toggle();
 }
 
-// ============================================================================
-// Answer Generation
-// ============================================================================
-
-/**
- * Trigger answer generation using the LLM provider
- *
- * Per PLAN.md Phase 6:
- * - Calls ContextBuffer.getFullContext()
- * - Passes context to LLMProvider.streamResponse()
- * - Forwards streaming chunks to renderer via IPC
- */
 async function triggerAnswer(modelId?: string): Promise<AnswerData> {
   const buffer = getDefaultContextBuffer();
   const context = buffer.getFullContext();
 
-  // Validate context
   if (!context) {
     const data: AnswerData = {
       state: 'error',
@@ -190,7 +128,6 @@ async function triggerAnswer(modelId?: string): Promise<AnswerData> {
     return data;
   }
 
-  // Check Groq configuration
   if (!isGroqConfiguredFromSettings()) {
     const data: AnswerData = {
       state: 'error',
@@ -204,10 +141,6 @@ async function triggerAnswer(modelId?: string): Promise<AnswerData> {
   const provider = getDefaultGroqProvider();
   const effectiveModelId = modelId ?? provider.getDefaultModelId();
 
-  console.log(`[IPC] Answer requested with model: ${effectiveModelId}`);
-  console.log(`[IPC] Context length: ${context.length} chars`);
-
-  // Update state to generating
   updateAnswerData({
     state: 'generating',
     text: '',
@@ -217,23 +150,19 @@ async function triggerAnswer(modelId?: string): Promise<AnswerData> {
   try {
     const chunks: string[] = [];
 
-    // Stream response from LLM
     for await (const chunk of provider.streamResponse(
       context,
       effectiveModelId
     )) {
       chunks.push(chunk);
-      // Send each chunk to renderer for real-time display
       sendAnswerChunk(chunk, false);
     }
 
-    // Send final completion signal
     sendAnswerChunk('', true);
 
-    const fullText = chunks.join('');
     const data: AnswerData = {
       state: 'complete',
-      text: fullText,
+      text: chunks.join(''),
       modelId: effectiveModelId,
       generatedAt: Date.now(),
     };
@@ -265,13 +194,6 @@ async function triggerAnswer(modelId?: string): Promise<AnswerData> {
   }
 }
 
-// ============================================================================
-// Clear Overlay
-// ============================================================================
-
-/**
- * Clear all overlay state
- */
 function clearOverlay(): { success: boolean } {
   getDefaultContextBuffer().clear();
   setInterimTranscript(null);
@@ -279,9 +201,6 @@ function clearOverlay(): { success: boolean } {
   return { success: true };
 }
 
-/**
- * Close the window
- */
 function closeWindow(): { success: boolean } {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.close();
@@ -290,156 +209,94 @@ function closeWindow(): { success: boolean } {
   return { success: false };
 }
 
-// ============================================================================
-// Minimize Mode
-// ============================================================================
+function getAppStatus() {
+  const buffer = getDefaultContextBuffer();
+  const stats = buffer.getStats();
 
-/**
- * Dimensions for minimized mode
- */
-const MINIMIZED_DIMENSIONS = {
-  width: 280,
-  height: 120,
-};
+  return {
+    liveMode: liveModeManager?.status ?? { state: 'disconnected' as const },
+    answer: { state: 'idle' as const, text: '' },
+    context: {
+      segmentCount: stats.segmentCount,
+      wordCount: stats.wordCount,
+      estimatedTokens: stats.estimatedTokens,
+      durationMs: stats.durationMs,
+    },
+    isDeepgramConfigured: isDeepgramConfiguredFromSettings(),
+    isGroqConfigured: isGroqConfiguredFromSettings(),
+  };
+}
 
-const NORMAL_DIMENSIONS = {
-  width: 500,
-  height: 500,
-};
+export function applyMinimizeMode(isMinimized: boolean): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
 
-/**
- * Apply minimized or normal window size
- */
-function applyMinimizeMode(isMinimized: boolean): void {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    return;
-  }
-
-  const dimensions = isMinimized ? MINIMIZED_DIMENSIONS : NORMAL_DIMENSIONS;
-
+  const dimensions = isMinimized
+    ? WINDOW_DIMENSIONS.minimized
+    : WINDOW_DIMENSIONS.normal;
   mainWindow.setSize(dimensions.width, dimensions.height);
   mainWindow.center();
 }
 
-/**
- * Toggle minimize mode
- */
-async function toggleMinimizeModeWrapper(): Promise<{ isMinimized: boolean }> {
-  const isMinimized = toggleMinimizeMode();
+async function toggleMinimizeMode(): Promise<{ isMinimized: boolean }> {
+  const isMinimized = toggleMinimizeModeInStore();
   applyMinimizeMode(isMinimized);
-
   sendToRenderer<'minimizeModeChanged'>(IPC_CHANNELS.MINIMIZE_MODE_CHANGED, {
     isMinimized,
   });
-
   return { isMinimized };
 }
 
-// ============================================================================
-// IPC Registration
-// ============================================================================
+function handleSaveSettings(settings: Partial<AppSettings>): {
+  success: boolean;
+} {
+  saveSettings(settings);
+  resetGroqProvider();
+  return { success: true };
+}
 
-/**
- * Initialize IPC handlers
- * Call this from the main process after creating the BrowserWindow
- */
 export function initializeIPC(window: BrowserWindow): void {
   mainWindow = window;
 
-  // Set up electron-trpc handler
-  createIPCHandler({
-    router: appRouter,
-    windows: [window],
-  });
+  createIPCHandler({ router: appRouter, windows: [window] });
 
-  // Register direct IPC handlers for commands that need async handling
-  ipcMain.handle(IPC_CHANNELS.START_LIVE_MODE, async () => {
-    return startLiveMode();
-  });
-
-  ipcMain.handle(IPC_CHANNELS.STOP_LIVE_MODE, () => {
-    return stopLiveMode();
-  });
-
+  ipcMain.handle(IPC_CHANNELS.START_LIVE_MODE, () => startLiveMode());
+  ipcMain.handle(IPC_CHANNELS.STOP_LIVE_MODE, () => stopLiveMode());
   ipcMain.handle(
     IPC_CHANNELS.TRIGGER_ANSWER,
-    async (_event, { modelId }: { modelId?: string }) => {
-      return triggerAnswer(modelId);
-    }
+    (_event, { modelId }: { modelId?: string }) => triggerAnswer(modelId)
   );
-
-  ipcMain.handle(IPC_CHANNELS.CLEAR_OVERLAY, () => {
-    return clearOverlay();
-  });
-
-  ipcMain.handle(IPC_CHANNELS.GET_STATUS, () => {
-    const buffer = getDefaultContextBuffer();
-    const stats = buffer.getStats();
-
-    return {
-      liveMode: liveModeManager?.status ?? { state: 'disconnected' },
-      answer: { state: 'idle', text: '' },
-      context: {
-        segmentCount: stats.segmentCount,
-        wordCount: stats.wordCount,
-        estimatedTokens: stats.estimatedTokens,
-        durationMs: stats.durationMs,
-      },
-      isDeepgramConfigured: isDeepgramConfiguredFromSettings(),
-      isGroqConfigured: isGroqConfiguredFromSettings(),
-    };
-  });
-
-  ipcMain.handle(IPC_CHANNELS.CLOSE_WINDOW, () => {
-    return closeWindow();
-  });
-
-  ipcMain.handle(IPC_CHANNELS.GET_SETTINGS, (): AppSettings => {
-    return getSettings();
-  });
-
+  ipcMain.handle(IPC_CHANNELS.CLEAR_OVERLAY, () => clearOverlay());
+  ipcMain.handle(IPC_CHANNELS.GET_STATUS, () => getAppStatus());
+  ipcMain.handle(IPC_CHANNELS.CLOSE_WINDOW, () => closeWindow());
+  ipcMain.handle(IPC_CHANNELS.GET_SETTINGS, (): AppSettings => getSettings());
   ipcMain.handle(
     IPC_CHANNELS.SAVE_SETTINGS,
-    (_event, settings: Partial<AppSettings>) => {
-      saveSettings(settings);
-      // Reset Groq provider to pick up new API key
-      resetGroqProvider();
-      return { success: true };
-    }
+    (_event, settings: Partial<AppSettings>) => handleSaveSettings(settings)
   );
-
-  ipcMain.handle(IPC_CHANNELS.TOGGLE_MINIMIZE_MODE, async () => {
-    return toggleMinimizeModeWrapper();
-  });
-
-  console.log('[IPC] Handlers initialized');
+  ipcMain.handle(IPC_CHANNELS.TOGGLE_MINIMIZE_MODE, () => toggleMinimizeMode());
 }
 
-/**
- * Clean up IPC handlers
- * Call this when the app is closing
- */
 export function cleanupIPC(): void {
-  // Stop and dispose LiveModeManager
   stopLiveMode();
   disposeLiveModeManager();
   liveModeManager = null;
 
-  ipcMain.removeHandler(IPC_CHANNELS.START_LIVE_MODE);
-  ipcMain.removeHandler(IPC_CHANNELS.STOP_LIVE_MODE);
-  ipcMain.removeHandler(IPC_CHANNELS.TRIGGER_ANSWER);
-  ipcMain.removeHandler(IPC_CHANNELS.CLEAR_OVERLAY);
-  ipcMain.removeHandler(IPC_CHANNELS.GET_STATUS);
-  ipcMain.removeHandler(IPC_CHANNELS.CLOSE_WINDOW);
-  ipcMain.removeHandler(IPC_CHANNELS.GET_SETTINGS);
-  ipcMain.removeHandler(IPC_CHANNELS.SAVE_SETTINGS);
-  ipcMain.removeHandler(IPC_CHANNELS.TOGGLE_MINIMIZE_MODE);
+  const handlers = [
+    IPC_CHANNELS.START_LIVE_MODE,
+    IPC_CHANNELS.STOP_LIVE_MODE,
+    IPC_CHANNELS.TRIGGER_ANSWER,
+    IPC_CHANNELS.CLEAR_OVERLAY,
+    IPC_CHANNELS.GET_STATUS,
+    IPC_CHANNELS.CLOSE_WINDOW,
+    IPC_CHANNELS.GET_SETTINGS,
+    IPC_CHANNELS.SAVE_SETTINGS,
+    IPC_CHANNELS.TOGGLE_MINIMIZE_MODE,
+  ];
+  handlers.forEach((channel) => ipcMain.removeHandler(channel));
 
   mainWindow = null;
-  console.log('[IPC] Handlers cleaned up');
 }
 
-// Export for use in main process
 export {
   startLiveMode,
   stopLiveMode,
@@ -447,7 +304,6 @@ export {
   triggerAnswer,
   clearOverlay,
   closeWindow,
-  toggleMinimizeModeWrapper as toggleMinimizeMode,
-  applyMinimizeMode,
+  toggleMinimizeMode,
   isMinimizedModeFromStore as isMinimized,
 };
