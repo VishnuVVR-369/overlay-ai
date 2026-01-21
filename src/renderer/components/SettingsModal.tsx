@@ -152,7 +152,7 @@ export function SettingsModal({
       onClose={onClose}
       title="Configuration"
       footer={footer}
-      scrollable={false}
+      scrollable={true}
     >
       {isLoading ? (
         <LoadingState />

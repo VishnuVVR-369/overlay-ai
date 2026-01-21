@@ -35,7 +35,7 @@ let liveModeManager: LiveModeManager | null = null;
 
 const WINDOW_DIMENSIONS = {
   minimized: { width: 280, height: 120 },
-  normal: { width: 500, height: 500 },
+  normal: { width: 400, height: 450 },
 } as const;
 
 function sendToRenderer<K extends keyof IPCEvents>(
