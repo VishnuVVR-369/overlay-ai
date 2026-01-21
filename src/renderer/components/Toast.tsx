@@ -14,8 +14,8 @@ export function Toast({
   }
 
   return (
-    <div className="fixed bottom-5 right-5 px-4 py-3.5 bg-glass-bg-deep border border-glass-error/30 rounded-glass-md backdrop-blur-glass-md shadow-glass-lg flex items-center gap-3 max-w-[340px] animate-glass-slide-up">
-      <div className="shrink-0 w-5 h-5 rounded-full bg-glass-error/15 flex items-center justify-center text-glass-error text-xs font-bold">
+    <div className="fixed bottom-5 right-5 px-4 py-3.5 bg-glass-bg-elevated border border-glass-error/25 rounded-glass-md backdrop-blur-glass-lg shadow-glass-md flex items-center gap-3 max-w-[340px] animate-glass-slide-up">
+      <div className="shrink-0 w-5 h-5 rounded-full bg-glass-error/12 flex items-center justify-center text-glass-error text-[11px] font-bold">
         !
       </div>
       <p className="text-sm text-glass-text-primary">{message}</p>

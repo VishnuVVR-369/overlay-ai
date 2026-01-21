@@ -38,7 +38,7 @@ function App(): React.ReactElement {
 
   if (state.isMinimized) {
     return (
-      <div className="glass-container relative flex flex-col h-screen max-h-screen overflow-hidden bg-glass-bg-deep backdrop-blur-glass-xl w-[280px] h-[120px]">
+      <div className="glass-container relative flex flex-col h-screen max-h-screen overflow-hidden w-[280px] h-[120px]">
         <MinimizedView
           liveModeState={state.liveMode.state}
           isGenerating={state.answerState === 'generating'}
@@ -54,7 +54,7 @@ function App(): React.ReactElement {
     state.answerState !== 'error';
 
   return (
-    <div className="glass-container relative flex flex-col h-screen max-h-screen overflow-hidden bg-glass-bg-deep backdrop-blur-glass-xl text-glass-text-primary">
+    <div className="glass-container relative flex flex-col h-screen max-h-screen overflow-hidden text-glass-text-primary">
       <Header
         liveModeState={state.liveMode.state}
         liveModeError={state.liveMode.error}

@@ -24,11 +24,11 @@ function ShortcutItem({
         <span className="text-[13px] font-medium text-glass-text-primary">
           {title}
         </span>
-        <kbd className="inline-flex items-center gap-1 px-2.5 py-1 bg-glass-bg-elevated border border-glass-border-subtle rounded-md font-mono text-[11px] text-glass-text-secondary">
+        <kbd className="inline-flex items-center gap-1 px-2.5 py-1 bg-glass-bg-primary border border-glass-border-subtle rounded-md font-mono text-[11px] text-glass-text-secondary">
           {shortcut}
         </kbd>
       </div>
-      <p className="text-xs text-glass-text-muted m-0 leading-relaxed">
+      <p className="text-xs text-glass-text-secondary m-0 leading-relaxed">
         {description}
       </p>
     </div>
@@ -44,7 +44,7 @@ interface SectionProps {
 function Section({ title, icon, children }: SectionProps): React.ReactElement {
   return (
     <section className="mb-7 last:mb-0">
-      <h3 className="text-[13px] font-semibold text-glass-text-secondary mb-4 flex items-center gap-2 uppercase tracking-wide">
+      <h3 className="text-[13px] font-semibold text-glass-text-primary mb-4 flex items-center gap-2 uppercase tracking-wide">
         {icon}
         {title}
       </h3>
@@ -85,15 +85,14 @@ const GETTING_STARTED_STEPS = [
     title: '1. Set up your API keys:',
     content: (
       <>
-        Click the <strong>Settings</strong> icon (⚙️) in the top-right corner.
-        Add your API keys - they&apos;re stored safely on your device.
-        You&apos;ll need:
+        Click <strong>Settings</strong> icon (⚙️) in top-right corner. Add your
+        API keys - they&apos;re stored safely on your device. You&apos;ll need:
         <br />
         <a
           href="https://console.deepgram.com/"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-glass-accent-light no-underline transition-colors duration-glass-fast hover:text-glass-accent hover:underline"
+          className="text-glass-accent no-underline transition-colors duration-glass-fast hover:text-glass-accent-dark hover:underline"
         >
           Deepgram
         </a>{' '}
@@ -102,7 +101,7 @@ const GETTING_STARTED_STEPS = [
           href="https://console.groq.com/"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-glass-accent-light no-underline transition-colors duration-glass-fast hover:text-glass-accent hover:underline"
+          className="text-glass-accent no-underline transition-colors duration-glass-fast hover:text-glass-accent-dark hover:underline"
         >
           Groq
         </a>{' '}
@@ -115,11 +114,11 @@ const GETTING_STARTED_STEPS = [
     content: (
       <>
         Press{' '}
-        <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-elevated border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary">
+        <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-primary border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary ">
           Cmd+Shift+L
         </kbd>{' '}
         to begin. The green light means it&apos;s recording. Your conversation
-        will appear in the transcript panel in real-time.
+        will appear in transcript panel in real-time.
       </>
     ),
   },
@@ -128,11 +127,11 @@ const GETTING_STARTED_STEPS = [
     content: (
       <>
         Stuck on a question? Press{' '}
-        <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-elevated border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary">
+        <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-primary border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary ">
           Cmd+Shift+X
         </kbd>{' '}
-        and Overlay AI will generate an answer based on the last 20 minutes of
-        your conversation. Answers appear in the bottom panel.
+        and Overlay AI will generate an answer based on last 20 minutes of your
+        conversation. Answers appear in bottom panel.
       </>
     ),
   },
@@ -141,11 +140,11 @@ const GETTING_STARTED_STEPS = [
     content: (
       <>
         Press{' '}
-        <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-elevated border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary">
+        <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-primary border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary ">
           Cmd+Shift+M
         </kbd>{' '}
-        to minimize the overlay. Click it or press the shortcut again to expand.
-        The overlay is invisible to screen sharing tools.
+        to minimize overlay. Click it or press shortcut again to expand. The
+        overlay is invisible to screen sharing tools.
       </>
     ),
   },
@@ -155,12 +154,12 @@ const HOW_IT_WORKS = [
   {
     title: '🎙️ Real-time transcription',
     description:
-      'Everything said is transcribed instantly and shown in the top panel. You can see who spoke (INT for interviewer, YOU for you).',
+      'Everything said is transcribed instantly and shown in top panel. You can see who spoke (INT for interviewer, YOU for you).',
   },
   {
-    title: '💾 Remembers the conversation',
+    title: '💾 Remembers conversation',
     description:
-      'Overlay AI keeps track of the last 20 minutes of your interview. This helps it understand the full context when you ask for help.',
+      'Overlay AI keeps track of last 20 minutes of your interview. This helps it understand full context when you ask for help.',
   },
   {
     title: '🤖 AI-powered answers',
@@ -175,10 +174,10 @@ const HOW_IT_WORKS = [
 ];
 
 const TIPS = [
-  '💡 Start Live Mode before your interview begins so the AI has context from the start.',
-  '💡 Check the green status indicator - it means everything is working properly.',
+  '💡 Start Live Mode before your interview begins so AI has context from start.',
+  '💡 Check green status indicator - it means everything is working properly.',
   '💡 For coding questions, answers include Python code, time complexity, and explanations.',
-  '💡 You can drag the overlay anywhere on your screen to position it comfortably.',
+  '💡 You can drag overlay anywhere on your screen to position it comfortably.',
   '💡 Press Cmd+Shift+Z to clear the display (context is preserved).',
 ];
 
@@ -207,7 +206,7 @@ export function HelpModal({
   const footer = (
     <button
       onClick={onClose}
-      className="px-4 py-2.5 rounded-glass-sm font-sans text-[13px] font-semibold cursor-pointer transition-all duration-glass-fast inline-flex items-center justify-center gap-2 bg-gradient-to-br from-glass-accent to-glass-accent-dark border-none text-white shadow-[0_2px_8px_rgba(99,102,241,0.4)] hover:from-glass-accent-light hover:to-glass-accent hover:shadow-[0_4px_16px_rgba(99,102,241,0.4)] hover:-translate-y-px active:translate-y-0"
+      className="px-5 py-2.5 rounded-glass-sm font-sans text-[13px] font-semibold cursor-pointer transition-all duration-glass-fast inline-flex items-center justify-center gap-2 bg-gradient-to-br from-glass-accent to-glass-accent-dark border-none text-white shadow-glass-glow hover:shadow-glass-glow-hover hover:-translate-y-px active:translate-y-0"
     >
       Got it
     </button>
@@ -220,7 +219,10 @@ export function HelpModal({
       title="Help & Instructions"
       footer={footer}
     >
-      <Section title="Keyboard Shortcuts" icon={<KeyboardIcon size={14} />}>
+      <Section
+        title="Keyboard Shortcuts"
+        icon={<KeyboardIcon size={14} strokeWidth={1.5} />}
+      >
         <div className="flex flex-col gap-3">
           {KEYBOARD_SHORTCUTS.map((shortcut) => (
             <ShortcutItem key={shortcut.title} {...shortcut} />
@@ -228,7 +230,10 @@ export function HelpModal({
         </div>
       </Section>
 
-      <Section title="Getting Started" icon={<InfoIcon size={14} />}>
+      <Section
+        title="Getting Started"
+        icon={<InfoIcon size={14} strokeWidth={1.5} />}
+      >
         <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
           <ol className="m-0 pl-5 flex flex-col gap-3">
             {GETTING_STARTED_STEPS.map((step, index) => (
@@ -236,7 +241,7 @@ export function HelpModal({
                 key={index}
                 className="text-[13px] text-glass-text-secondary leading-relaxed"
               >
-                <strong className="text-glass-text-primary">
+                <strong className="text-glass-text-primary font-semibold">
                   {step.title}
                 </strong>{' '}
                 {step.content}
@@ -246,15 +251,18 @@ export function HelpModal({
         </div>
       </Section>
 
-      <Section title="How It Works" icon={<InfoIcon size={14} />}>
-        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+      <Section
+        title="How It Works"
+        icon={<InfoIcon size={14} strokeWidth={1.5} />}
+      >
+        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md ">
           <ul className="m-0 pl-5 flex flex-col gap-2.5">
             {HOW_IT_WORKS.map((item) => (
               <li
                 key={item.title}
                 className="text-[13px] text-glass-text-secondary leading-relaxed"
               >
-                <strong className="text-glass-text-primary">
+                <strong className="text-glass-text-primary font-semibold">
                   {item.title}
                 </strong>{' '}
                 {item.description}
@@ -264,8 +272,8 @@ export function HelpModal({
         </div>
       </Section>
 
-      <Section title="Tips" icon={<InfoIcon size={14} />}>
-        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+      <Section title="Tips" icon={<InfoIcon size={14} strokeWidth={1.5} />}>
+        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md ">
           <ul className="m-0 pl-5 flex flex-col gap-2.5">
             {TIPS.map((tip, index) => (
               <li
@@ -279,15 +287,18 @@ export function HelpModal({
         </div>
       </Section>
 
-      <Section title="Troubleshooting" icon={<InfoIcon size={14} />}>
-        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+      <Section
+        title="Troubleshooting"
+        icon={<InfoIcon size={14} strokeWidth={1.5} />}
+      >
+        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md ">
           <ul className="m-0 pl-5 flex flex-col gap-3">
             {TROUBLESHOOTING.map((item) => (
               <li
                 key={item.title}
                 className="text-[13px] text-glass-text-secondary leading-relaxed"
               >
-                <strong className="text-glass-text-primary block mb-1">
+                <strong className="text-glass-text-primary font-semibold block mb-1">
                   {item.title}
                 </strong>
                 <span className="text-xs">{item.description}</span>

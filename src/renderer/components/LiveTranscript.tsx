@@ -20,15 +20,15 @@ interface GroupedSegment {
 const SPEAKER_CONFIG: Record<Speaker, { label: string; colorClass: string }> = {
   interviewer: {
     label: 'INT',
-    colorClass: 'glass-transcript-tag--interviewer',
+    colorClass: 'text-glass-speaker-interviewer',
   },
   me: {
     label: 'YOU',
-    colorClass: 'glass-transcript-tag--you',
+    colorClass: 'text-glass-speaker-you',
   },
 };
 
-const RECENT_WINDOW_MS = 60000; // 60 seconds
+const RECENT_WINDOW_MS = 60000;
 
 function filterRecentSegments(
   segments: TranscriptSegment[],
@@ -90,10 +90,16 @@ interface TranscriptGroupProps {
 
 function TranscriptGroup({ group }: TranscriptGroupProps): React.ReactElement {
   const hasInterim = group.texts.some((t) => t.isInterim);
+  const config = SPEAKER_CONFIG[group.speaker];
 
   return (
-    <div className="flex items-start gap-2.5 leading-relaxed animate-glass-fade-in">
-      <div className="flex-1 text-[13px] text-glass-text-primary break-words">
+    <div className="flex items-start gap-3 leading-relaxed animate-glass-fade-in">
+      <span
+        className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-md ${config.colorClass} bg-glass-accent/10 shrink-0 mt-0.5`}
+      >
+        {config.label}
+      </span>
+      <div className="flex-1 text-[14px] text-glass-text-primary break-words">
         {group.texts.map((item, idx) => (
           <span
             key={`${item.timestamp}-${idx}`}
@@ -111,14 +117,14 @@ function TranscriptGroup({ group }: TranscriptGroupProps): React.ReactElement {
 
 function EmptyState(): React.ReactElement {
   return (
-    <div className="flex flex-col items-center justify-center py-10 px-5 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md">
-      <div className="w-10 h-10 mb-3.5 border border-dashed border-glass-border-default rounded-full flex items-center justify-center text-glass-text-muted">
-        <MicrophoneIcon size={16} strokeWidth={1.5} />
+    <div className="flex flex-col items-center justify-center py-12 px-5 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md">
+      <div className="w-12 h-12 mb-4 border border-dashed border-glass-border-default rounded-full flex items-center justify-center text-glass-text-muted">
+        <MicrophoneIcon size={18} strokeWidth={1.5} />
       </div>
-      <span className="font-mono text-[11px] font-semibold tracking-widest text-glass-text-muted mb-1.5">
+      <span className="font-mono text-[11px] font-semibold tracking-widest text-glass-text-muted mb-2">
         AWAITING INPUT
       </span>
-      <span className="text-xs text-glass-text-subtle">
+      <span className="text-sm text-glass-text-subtle text-center">
         Audio transcript will appear here
       </span>
     </div>
@@ -155,10 +161,10 @@ export function LiveTranscript({
   }
 
   return (
-    <div className="relative bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md overflow-hidden">
-      <div className="shrink-0 flex items-center justify-between px-3 py-2 bg-glass-bg-secondary border-b border-glass-border-subtle">
-        <span className="flex items-center gap-2.5 font-mono text-[10px] font-semibold tracking-widest uppercase text-glass-text-muted">
-          <span className="w-1.5 h-1.5 bg-glass-success rounded-full animate-glass-pulse" />
+    <div className="relative bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md overflow-hidden shadow-glass-sm backdrop-blur-glass-sm">
+      <div className="shrink-0 flex items-center justify-between px-4 py-2.5 border-b border-glass-border-subtle">
+        <span className="flex items-center gap-2.5 font-mono text-[10px] font-semibold tracking-widest uppercase text-glass-text-secondary">
+          <span className="w-1.5 h-1.5 bg-glass-success rounded-full animate-glass-pulse shadow-[0_0_8px_rgba(26,191,126,0.4)]" />
           LIVE TRANSCRIPT
         </span>
         <span className="font-mono text-[10px] text-glass-text-subtle">
@@ -167,10 +173,10 @@ export function LiveTranscript({
       </div>
       <div
         ref={scrollRef}
-        className="overflow-y-auto px-3 py-2.5 glass-scrollbar"
+        className="overflow-y-auto px-4 py-3 glass-scrollbar"
         style={{ maxHeight }}
       >
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           {groupedSegments.map((group) => (
             <TranscriptGroup
               key={`${group.speaker}-${group.startTimestamp}`}
@@ -198,7 +204,7 @@ export function CompactTranscript({
 
   if (!displayText || !displaySpeaker) {
     return (
-      <div className="flex items-center justify-center py-4 px-3 bg-glass-bg-primary border border-glass-border-subtle rounded-lg">
+      <div className="flex items-center justify-center py-4 px-3 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-sm backdrop-blur-glass-sm">
         <span className="flex items-center gap-2 text-glass-text-muted text-xs">
           <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50" />
           Waiting for audio...
@@ -218,9 +224,11 @@ export function CompactTranscript({
       : 'text-glass-speaker-you';
 
   return (
-    <div className="flex items-center gap-2 py-2 px-3 bg-glass-bg-primary border border-glass-border-subtle rounded-lg overflow-hidden">
-      <span className={`font-mono text-[10px] font-bold ${speakerColorClass}`}>
-        {config.label}:
+    <div className="flex items-center gap-2 py-2 px-3 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-sm overflow-hidden">
+      <span
+        className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded ${speakerColorClass} bg-glass-accent/10 shrink-0`}
+      >
+        {config.label}
       </span>
       <span
         className={`text-glass-text-primary text-xs whitespace-nowrap overflow-hidden text-ellipsis flex-1 ${

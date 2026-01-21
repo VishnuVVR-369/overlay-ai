@@ -27,12 +27,12 @@ export function Header({
   onClose,
 }: HeaderProps): React.ReactElement {
   return (
-    <header className="shrink-0 px-3.5 py-2.5 flex items-center justify-between gap-3 border-b border-glass-border-subtle bg-glass-bg-secondary backdrop-blur-glass-lg draggable">
-      <div className="flex items-center gap-2.5 min-w-0">
-        <div className="w-[26px] h-[26px] bg-gradient-to-br from-glass-accent to-glass-accent-dark rounded-md flex items-center justify-center shadow-[0_2px_6px_rgba(99,102,241,0.4),inset_0_1px_1px_rgba(255,255,255,0.2)]">
-          <LogoIcon size={14} strokeWidth={2.5} />
+    <header className="shrink-0 px-4 py-3 flex items-center justify-between gap-3 glass-panel border-b border-glass-border-subtle draggable">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-[28px] h-[28px] bg-gradient-to-br from-glass-accent to-glass-accent-dark rounded-lg flex items-center justify-center shadow-glass-glow">
+          <LogoIcon size={14} strokeWidth={2.5} className="text-white" />
         </div>
-        <span className="text-[13px] font-semibold text-glass-text-primary tracking-tight">
+        <span className="text-[14px] font-semibold text-glass-text-primary tracking-tight">
           Overlay AI
         </span>
         <StatusBadge state={liveModeState} error={liveModeError} />
@@ -84,7 +84,7 @@ function HeaderButton({
   return (
     <button
       onClick={onClick}
-      className="w-7 h-7 p-0 bg-transparent border-none rounded-glass-sm text-glass-text-muted cursor-pointer flex items-center justify-center transition-all duration-glass-fast hover:bg-glass-bg-hover hover:text-glass-text-primary active:bg-glass-bg-active"
+      className="w-[36px] h-[36px] p-0 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-sm text-glass-text-muted cursor-pointer flex items-center justify-center transition-all duration-glass-fast hover:bg-glass-bg-hover hover:text-glass-text-primary hover:border-glass-border-default active:scale-95"
       title={title}
       aria-label={ariaLabel}
     >

@@ -17,7 +17,7 @@ function ModelBadge({ modelId }: { modelId: string }): React.ReactElement {
     modelId.split('/').pop()?.split('-').slice(0, 2).join('-') || modelId;
 
   return (
-    <span className="font-mono text-[10px] px-2.5 py-1 bg-glass-bg-primary border border-glass-border-subtle rounded-full text-glass-text-muted">
+    <span className="font-mono text-[10px] px-3 py-1 bg-glass-bg-primary border border-glass-border-subtle rounded-full text-glass-text-secondary shadow-glass-xs">
       {shortName}
     </span>
   );
@@ -25,7 +25,7 @@ function ModelBadge({ modelId }: { modelId: string }): React.ReactElement {
 
 function GeneratingIndicator(): React.ReactElement {
   return (
-    <div className="flex items-center gap-2 px-3 py-1 bg-glass-accent-subtle rounded-full font-mono text-[10px] text-glass-accent-light">
+    <div className="flex items-center gap-2 px-3 py-1.5 bg-glass-accent-subtle rounded-full font-mono text-[10px] text-glass-accent-dark shadow-glass-xs">
       <span className="w-1.5 h-1.5 bg-current rounded-full animate-glass-pulse" />
       <span>GENERATING</span>
     </div>
@@ -34,13 +34,13 @@ function GeneratingIndicator(): React.ReactElement {
 
 function LoadingState(): React.ReactElement {
   return (
-    <div className="flex flex-col items-center justify-center py-10">
-      <div className="flex items-center gap-1.5 mb-4">
-        <span className="w-[7px] h-[7px] bg-glass-accent rounded-full animate-glass-bounce" />
-        <span className="w-[7px] h-[7px] bg-glass-accent rounded-full animate-glass-bounce [animation-delay:0.15s]" />
-        <span className="w-[7px] h-[7px] bg-glass-accent rounded-full animate-glass-bounce [animation-delay:0.3s]" />
+    <div className="flex flex-col items-center justify-center py-12">
+      <div className="flex items-center gap-1.5 mb-5">
+        <span className="w-2 h-2 bg-glass-accent rounded-full animate-glass-bounce" />
+        <span className="w-2 h-2 bg-glass-accent rounded-full animate-glass-bounce [animation-delay:0.15s]" />
+        <span className="w-2 h-2 bg-glass-accent rounded-full animate-glass-bounce [animation-delay:0.3s]" />
       </div>
-      <p className="text-xs text-glass-text-muted font-mono">
+      <p className="text-sm text-glass-text-secondary font-mono">
         GENERATING RESPONSE...
       </p>
     </div>
@@ -49,15 +49,15 @@ function LoadingState(): React.ReactElement {
 
 function ErrorState({ message }: { message: string }): React.ReactElement {
   return (
-    <div className="flex items-start gap-3.5 p-4 bg-glass-error/[0.08] border border-glass-error/20 rounded-glass-md">
-      <div className="shrink-0 w-[22px] h-[22px] rounded-full bg-glass-error/15 flex items-center justify-center text-glass-error">
-        <AlertIcon size={16} />
+    <div className="flex items-start gap-3.5 p-4 bg-glass-error/[0.05] border border-glass-error/20 rounded-glass-md">
+      <div className="shrink-0 w-[22px] h-[22px] rounded-full bg-glass-error/12 flex items-center justify-center text-glass-error">
+        <AlertIcon size={15} strokeWidth={2} />
       </div>
-      <div>
+      <div className="flex-1">
         <h4 className="text-[13px] font-semibold text-glass-error mb-1">
           Generation Failed
         </h4>
-        <p className="text-xs text-glass-error/80">{message}</p>
+        <p className="text-xs text-glass-error/80 leading-relaxed">{message}</p>
       </div>
     </div>
   );
@@ -65,7 +65,7 @@ function ErrorState({ message }: { message: string }): React.ReactElement {
 
 function IdleState(): React.ReactElement {
   return (
-    <div className="flex flex-col items-center justify-center text-center">
+    <div className="flex flex-col items-center justify-center text-center py-10">
       <div className="w-16 h-16 mb-4 border border-dashed border-glass-border-default rounded-full flex items-center justify-center bg-glass-bg-secondary">
         <SparkleIcon
           size={28}
@@ -73,17 +73,17 @@ function IdleState(): React.ReactElement {
           className="text-glass-text-muted"
         />
       </div>
-      <h3 className="text-[15px] font-medium text-glass-text-secondary mb-2">
+      <h3 className="text-[15px] font-medium text-glass-text-primary mb-2.5">
         Ready to assist
       </h3>
-      <p className="text-[13px] text-glass-text-muted">
+      <p className="text-[13px] text-glass-text-secondary mb-1.5">
         Press{' '}
-        <kbd className="inline-flex items-center gap-1 px-2.5 py-1 bg-glass-bg-elevated border border-glass-border-subtle rounded-md font-mono text-[11px] text-glass-text-secondary">
+        <kbd className="inline-flex items-center gap-1 px-2.5 py-1 bg-glass-bg-primary border border-glass-border-subtle rounded-md font-mono text-[11px] text-glass-text-primary shadow-glass-xs">
           Cmd+Shift+X
         </kbd>{' '}
         to generate an answer
       </p>
-      <p className="mt-3 text-[10px] text-glass-text-subtle">
+      <p className="text-[11px] text-glass-text-subtle">
         Based on last 20 minutes of conversation
       </p>
     </div>
@@ -138,11 +138,11 @@ export function AnswerCard({
   const showContent = state === 'generating' || state === 'complete';
 
   return (
-    <div className="glass-answer relative bg-glass-bg-primary border border-glass-border-subtle rounded-glass-lg backdrop-blur-glass-md shadow-glass-md overflow-hidden animate-glass-slide-up">
-      <div className="shrink-0 px-3.5 py-2.5 border-b border-glass-border-subtle bg-glass-bg-secondary flex items-center justify-between">
-        <div className="flex items-center gap-2.5 font-mono text-[11px] font-semibold tracking-wide uppercase text-glass-accent-light">
+    <div className="glass-answer relative bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md backdrop-blur-glass-md shadow-glass-md overflow-hidden animate-glass-slide-up">
+      <div className="shrink-0 px-4 py-2.5 border-b border-glass-border-subtle flex items-center justify-between">
+        <div className="flex items-center gap-2.5 font-mono text-[11px] font-semibold tracking-wide uppercase text-glass-accent">
           <span className="w-4 h-4 border-[1.5px] border-current rounded flex items-center justify-center text-[10px]">
-            <CommandIcon size={14} />
+            <CommandIcon size={14} strokeWidth={1.5} />
           </span>
           <span>RESPONSE</span>
         </div>
@@ -156,7 +156,7 @@ export function AnswerCard({
       </div>
 
       <div
-        className="p-3.5 overflow-y-auto glass-scrollbar"
+        className="p-4 overflow-y-auto glass-scrollbar"
         style={{ maxHeight }}
       >
         {state === 'idle' && <IdleState />}

@@ -19,24 +19,24 @@ const STATUS_CONFIG: Record<LiveModeState, StatusConfig> = {
     label: 'OFFLINE',
     stateClass: 'glass-status--disconnected',
     colorClass:
-      'text-glass-neutral border-glass-border-subtle bg-glass-bg-secondary',
+      'text-glass-text-muted border-glass-border-subtle bg-glass-bg-secondary',
   },
   connecting: {
     label: 'CONNECTING',
     stateClass: 'glass-status--connecting',
     colorClass:
-      'text-glass-warning border-glass-warning/25 bg-glass-warning/[0.08]',
+      'text-glass-warning border-glass-warning/25 bg-glass-warning/[0.06]',
   },
   connected: {
     label: 'LISTENING',
     stateClass: 'glass-status--connected',
     colorClass:
-      'text-glass-success border-glass-success/25 bg-glass-success/[0.08]',
+      'text-glass-success border-glass-success/25 bg-glass-success/[0.06]',
   },
   error: {
     label: 'ERROR',
     stateClass: 'glass-status--error',
-    colorClass: 'text-glass-error border-glass-error/25 bg-glass-error/[0.08]',
+    colorClass: 'text-glass-error border-glass-error/25 bg-glass-error/[0.06]',
   },
 };
 
@@ -80,7 +80,7 @@ export function InlineStatus({
   const config = STATUS_CONFIG[state];
 
   const colorClass = {
-    disconnected: 'text-glass-neutral',
+    disconnected: 'text-glass-text-muted',
     connecting: 'text-glass-warning',
     connected: 'text-glass-success',
     error: 'text-glass-error',
