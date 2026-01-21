@@ -56,19 +56,19 @@ function Section({ title, icon, children }: SectionProps): React.ReactElement {
 const KEYBOARD_SHORTCUTS: ShortcutItemProps[] = [
   {
     title: 'Toggle Live Mode',
-    shortcut: '\u2318\u21e7L',
+    shortcut: 'Cmd+Shift+L',
     description:
       'Start or stop audio transcription. Connect/disconnect to Deepgram.',
   },
   {
     title: 'Trigger Answer',
-    shortcut: '\u2318\u21e7X',
+    shortcut: 'Cmd+Shift+X',
     description:
       'Generate an AI-powered answer based on last 20 minutes of conversation.',
   },
   {
     title: 'Clear Overlay',
-    shortcut: '\u2318\u21e7Z',
+    shortcut: 'Cmd+Shift+Z',
     description:
       'Clear transcript and answer history. Context buffer is preserved.',
   },
@@ -82,11 +82,13 @@ const KEYBOARD_SHORTCUTS: ShortcutItemProps[] = [
 
 const GETTING_STARTED_STEPS = [
   {
-    title: 'Configure API Keys:',
+    title: '1. Set up your API keys:',
     content: (
       <>
-        Click settings icon to add your Deepgram and Groq API keys. You can get
-        these from{' '}
+        Click the <strong>Settings</strong> icon (⚙️) in the top-right corner.
+        Add your API keys - they&apos;re stored safely on your device.
+        You&apos;ll need:
+        <br />
         <a
           href="https://console.deepgram.com/"
           target="_blank"
@@ -95,7 +97,7 @@ const GETTING_STARTED_STEPS = [
         >
           Deepgram
         </a>{' '}
-        and{' '}
+        for transcription and{' '}
         <a
           href="https://console.groq.com/"
           target="_blank"
@@ -103,32 +105,47 @@ const GETTING_STARTED_STEPS = [
           className="text-glass-accent-light no-underline transition-colors duration-glass-fast hover:text-glass-accent hover:underline"
         >
           Groq
-        </a>
-        .
+        </a>{' '}
+        for AI answers.
       </>
     ),
   },
   {
-    title: 'Start Live Mode:',
+    title: '2. Start listening:',
     content: (
       <>
         Press{' '}
         <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-elevated border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary">
-          {'\u2318\u21e7L'}
+          Cmd+Shift+L
         </kbd>{' '}
-        to begin transcription. The status indicator shows connection state.
+        to begin. The green light means it&apos;s recording. Your conversation
+        will appear in the transcript panel in real-time.
       </>
     ),
   },
   {
-    title: 'Get Answers:',
+    title: '3. Get help when you need it:',
     content: (
       <>
-        When you need help, press{' '}
+        Stuck on a question? Press{' '}
         <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-elevated border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary">
-          {'\u2318\u21e7X'}
+          Cmd+Shift+X
         </kbd>{' '}
-        to generate an AI response based on conversation context.
+        and Overlay AI will generate an answer based on the last 20 minutes of
+        your conversation. Answers appear in the bottom panel.
+      </>
+    ),
+  },
+  {
+    title: '4. Hide when needed:',
+    content: (
+      <>
+        Press{' '}
+        <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-elevated border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary">
+          Cmd+Shift+M
+        </kbd>{' '}
+        to minimize the overlay. Click it or press the shortcut again to expand.
+        The overlay is invisible to screen sharing tools.
       </>
     ),
   },
@@ -136,32 +153,51 @@ const GETTING_STARTED_STEPS = [
 
 const HOW_IT_WORKS = [
   {
-    title: 'Real-time Transcription:',
+    title: '🎙️ Real-time transcription',
     description:
-      'Audio is captured and sent to Deepgram for live transcription. Both system audio and microphone input are processed.',
+      'Everything said is transcribed instantly and shown in the top panel. You can see who spoke (INT for interviewer, YOU for you).',
   },
   {
-    title: 'Context Buffer:',
+    title: '💾 Remembers the conversation',
     description:
-      'The last 20 minutes of conversation are maintained in memory for context-aware answers.',
+      'Overlay AI keeps track of the last 20 minutes of your interview. This helps it understand the full context when you ask for help.',
   },
   {
-    title: 'AI Answers:',
+    title: '🤖 AI-powered answers',
     description:
-      "Answers are generated using Groq's fast LLM models, optimized for coding questions and system design problems.",
+      'When triggered, it analyzes your conversation and generates helpful answers optimized for coding and technical interviews.',
   },
   {
-    title: 'Stealth Mode:',
+    title: '👻 Invisible to screen sharing',
     description:
-      'The overlay window is hidden from screen capture software, keeping your workflow private.',
+      'The overlay is hidden from Zoom, Teams, and other screen sharing tools. Only you can see it.',
   },
 ];
 
 const TIPS = [
-  'The transcript shows last 30 seconds of conversation for quick reference.',
-  'Green status indicator means Live Mode is active and listening.',
-  'Answers include code examples, explanations, and time complexity analysis for coding questions.',
-  'You can drag overlay window to reposition it on your screen.',
+  '💡 Start Live Mode before your interview begins so the AI has context from the start.',
+  '💡 Check the green status indicator - it means everything is working properly.',
+  '💡 For coding questions, answers include Python code, time complexity, and explanations.',
+  '💡 You can drag the overlay anywhere on your screen to position it comfortably.',
+  '💡 Press Cmd+Shift+Z to clear the display (context is preserved).',
+];
+
+const TROUBLESHOOTING = [
+  {
+    title: 'Nothing being transcribed?',
+    description:
+      'Make sure Live Mode is on (green indicator). Check your microphone is not muted and API keys are correct in Settings.',
+  },
+  {
+    title: 'Answers not generating?',
+    description:
+      'Verify your Groq API key in Settings. Also make sure you have at least a few seconds of transcript first.',
+  },
+  {
+    title: 'Status shows error?',
+    description:
+      'Open Settings and verify both API keys are valid. You can also try restarting the app.',
+  },
 ];
 
 export function HelpModal({
@@ -237,6 +273,24 @@ export function HelpModal({
                 className="text-[13px] text-glass-text-secondary leading-relaxed"
               >
                 {tip}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </Section>
+
+      <Section title="Troubleshooting" icon={<InfoIcon size={14} />}>
+        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+          <ul className="m-0 pl-5 flex flex-col gap-3">
+            {TROUBLESHOOTING.map((item) => (
+              <li
+                key={item.title}
+                className="text-[13px] text-glass-text-secondary leading-relaxed"
+              >
+                <strong className="text-glass-text-primary block mb-1">
+                  {item.title}
+                </strong>
+                <span className="text-xs">{item.description}</span>
               </li>
             ))}
           </ul>
