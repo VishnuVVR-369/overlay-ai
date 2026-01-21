@@ -72,22 +72,24 @@ export function SessionStatsFooter({
   }
 
   return (
-    <footer className="glass-stats-footer">
-      <div className="glass-stat">
-        <ClockIcon size={12} className="glass-stat-icon" />
-        <span className="glass-stat-value">{formatDuration(duration)}</span>
+    <footer className="shrink-0 flex items-center justify-center gap-6 px-4 py-2 bg-glass-bg-secondary border-t border-glass-border-subtle backdrop-blur-glass-md">
+      <div className="flex items-center gap-1.5 font-mono text-[11px] text-glass-text-muted">
+        <ClockIcon size={12} className="opacity-70" />
+        <span className="text-glass-text-secondary">
+          {formatDuration(duration)}
+        </span>
       </div>
 
-      <div className="glass-stat">
-        <TextIcon size={12} className="glass-stat-icon" />
-        <span className="glass-stat-value">
+      <div className="flex items-center gap-1.5 font-mono text-[11px] text-glass-text-muted">
+        <TextIcon size={12} className="opacity-70" />
+        <span className="text-glass-text-secondary">
           {formatNumber(wordsTranscribed)} words
         </span>
       </div>
 
-      <div className="glass-stat">
-        <TokenIcon size={12} className="glass-stat-icon" />
-        <span className="glass-stat-value">
+      <div className="flex items-center gap-1.5 font-mono text-[11px] text-glass-text-muted">
+        <TokenIcon size={12} className="opacity-70" />
+        <span className="text-glass-text-secondary">
           {formatNumber(totalTokens)} tokens
         </span>
       </div>

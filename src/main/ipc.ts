@@ -55,7 +55,10 @@ function sendError(message: string, code?: string): void {
 }
 
 function sendSessionStats(stats: SessionStats): void {
-  sendToRenderer<'sessionStatsUpdated'>(IPC_CHANNELS.SESSION_STATS_UPDATED, stats);
+  sendToRenderer<'sessionStatsUpdated'>(
+    IPC_CHANNELS.SESSION_STATS_UPDATED,
+    stats
+  );
 }
 
 function countWords(text: string): number {
@@ -175,10 +178,8 @@ async function triggerAnswer(modelId?: string): Promise<AnswerData> {
 
   try {
     const chunks: string[] = [];
-    const { chunks: chunkGenerator, tokenUsage } = provider.streamResponseWithUsage(
-      context,
-      effectiveModelId
-    );
+    const { chunks: chunkGenerator, tokenUsage } =
+      provider.streamResponseWithUsage(context, effectiveModelId);
 
     for await (const chunk of chunkGenerator) {
       chunks.push(chunk);
