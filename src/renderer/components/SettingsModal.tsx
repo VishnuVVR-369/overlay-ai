@@ -219,8 +219,7 @@ export function SettingsModal({
           </div>
 
           <p className="text-[11px] text-glass-text-subtle italic mt-4">
-            API keys are stored securely on your device and take precedence over
-            environment variables.
+            API keys are stored securely on your device
           </p>
         </>
       )}
