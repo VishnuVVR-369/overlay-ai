@@ -8,7 +8,10 @@ interface MinimizedViewProps {
   onToggle: () => void;
 }
 
-const STATUS_STYLES: Record<LiveModeState, { colorClass: string; label: string }> = {
+const STATUS_STYLES: Record<
+  LiveModeState,
+  { colorClass: string; label: string }
+> = {
   connected: { colorClass: 'text-glass-success', label: 'LIVE' },
   connecting: { colorClass: 'text-glass-warning', label: 'CONNECTING' },
   error: { colorClass: 'text-glass-error', label: 'ERROR' },

@@ -67,7 +67,11 @@ function IdleState(): React.ReactElement {
   return (
     <div className="flex flex-col items-center justify-center text-center">
       <div className="w-16 h-16 mb-4 border border-dashed border-glass-border-default rounded-full flex items-center justify-center bg-glass-bg-secondary">
-        <SparkleIcon size={28} strokeWidth={1.5} className="text-glass-text-muted" />
+        <SparkleIcon
+          size={28}
+          strokeWidth={1.5}
+          className="text-glass-text-muted"
+        />
       </div>
       <h3 className="text-[15px] font-medium text-glass-text-secondary mb-2">
         Ready to assist

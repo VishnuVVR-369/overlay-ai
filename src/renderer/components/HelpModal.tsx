@@ -200,7 +200,9 @@ export function HelpModal({
                 key={index}
                 className="text-[13px] text-glass-text-secondary leading-relaxed"
               >
-                <strong className="text-glass-text-primary">{step.title}</strong>{' '}
+                <strong className="text-glass-text-primary">
+                  {step.title}
+                </strong>{' '}
                 {step.content}
               </li>
             ))}
@@ -216,7 +218,9 @@ export function HelpModal({
                 key={item.title}
                 className="text-[13px] text-glass-text-secondary leading-relaxed"
               >
-                <strong className="text-glass-text-primary">{item.title}</strong>{' '}
+                <strong className="text-glass-text-primary">
+                  {item.title}
+                </strong>{' '}
                 {item.description}
               </li>
             ))}

@@ -18,17 +18,20 @@ const STATUS_CONFIG: Record<LiveModeState, StatusConfig> = {
   disconnected: {
     label: 'OFFLINE',
     stateClass: 'glass-status--disconnected',
-    colorClass: 'text-glass-neutral border-glass-border-subtle bg-glass-bg-secondary',
+    colorClass:
+      'text-glass-neutral border-glass-border-subtle bg-glass-bg-secondary',
   },
   connecting: {
     label: 'CONNECTING',
     stateClass: 'glass-status--connecting',
-    colorClass: 'text-glass-warning border-glass-warning/25 bg-glass-warning/[0.08]',
+    colorClass:
+      'text-glass-warning border-glass-warning/25 bg-glass-warning/[0.08]',
   },
   connected: {
     label: 'LISTENING',
     stateClass: 'glass-status--connected',
-    colorClass: 'text-glass-success border-glass-success/25 bg-glass-success/[0.08]',
+    colorClass:
+      'text-glass-success border-glass-success/25 bg-glass-success/[0.08]',
   },
   error: {
     label: 'ERROR',
@@ -49,7 +52,10 @@ export function StatusIndicator({
     <div
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-full font-mono text-[10px] font-medium tracking-wide transition-all duration-glass-fast ${config.stateClass} ${config.colorClass}`}
     >
-      <span className="glass-status-dot relative w-1.5 h-1.5" aria-hidden="true" />
+      <span
+        className="glass-status-dot relative w-1.5 h-1.5"
+        aria-hidden="true"
+      />
       {showLabel && <span>{displayLabel}</span>}
     </div>
   );
