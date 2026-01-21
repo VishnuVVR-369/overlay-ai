@@ -5,129 +5,55 @@
 @tailwind utilities;
 
 /* ============================================================================
-   GLASSMORPHIC DESIGN SYSTEM
-
-   A modern, clean interface with frosted glass effects.
-   Features soft translucency, subtle gradients, and elegant depth.
-   ============================================================================ */
-
-/* ============================================================================
-   CSS CUSTOM PROPERTIES
+   BASE STYLES - Cannot be done with Tailwind utilities
    ============================================================================ */
 :root {
   color-scheme: dark;
-
-  /* Glass Background Colors */
-  --glass-bg-deep: rgba(15, 15, 20, 0.85);
-  --glass-bg-primary: rgba(255, 255, 255, 0.05);
-  --glass-bg-secondary: rgba(255, 255, 255, 0.08);
-  --glass-bg-elevated: rgba(255, 255, 255, 0.1);
-  --glass-bg-hover: rgba(255, 255, 255, 0.12);
-  --glass-bg-active: rgba(255, 255, 255, 0.15);
-
-  /* Accent Colors */
-  --glass-accent: #6366f1;
-  --glass-accent-light: #818cf8;
-  --glass-accent-dark: #4f46e5;
-  --glass-accent-glow: rgba(99, 102, 241, 0.4);
-  --glass-accent-subtle: rgba(99, 102, 241, 0.15);
-
-  /* Status Colors */
-  --glass-success: #10b981;
-  --glass-success-glow: rgba(16, 185, 129, 0.4);
-  --glass-warning: #f59e0b;
-  --glass-warning-glow: rgba(245, 158, 11, 0.4);
-  --glass-error: #ef4444;
-  --glass-error-glow: rgba(239, 68, 68, 0.4);
-  --glass-neutral: rgba(255, 255, 255, 0.3);
-
-  /* Text Colors */
-  --glass-text-primary: rgba(255, 255, 255, 0.95);
-  --glass-text-secondary: rgba(255, 255, 255, 0.7);
-  --glass-text-muted: rgba(255, 255, 255, 0.5);
-  --glass-text-subtle: rgba(255, 255, 255, 0.35);
-
-  /* Speaker Colors */
-  --glass-speaker-interviewer: #60a5fa;
-  --glass-speaker-you: #34d399;
-
-  /* Border Colors */
-  --glass-border-subtle: rgba(255, 255, 255, 0.08);
-  --glass-border-default: rgba(255, 255, 255, 0.12);
-  --glass-border-strong: rgba(255, 255, 255, 0.18);
-
-  /* Border Radius */
-  --glass-radius-sm: 8px;
-  --glass-radius-md: 12px;
-  --glass-radius-lg: 16px;
-  --glass-radius-xl: 20px;
-  --glass-radius-full: 9999px;
-
-  /* Shadows */
-  --glass-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
-  --glass-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.2);
-  --glass-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.25);
-  --glass-shadow-glow: 0 0 40px var(--glass-accent-glow);
-  --glass-shadow-inset: inset 0 1px 1px rgba(255, 255, 255, 0.1);
-
-  /* Blur */
-  --glass-blur-sm: 8px;
-  --glass-blur-md: 16px;
-  --glass-blur-lg: 24px;
-  --glass-blur-xl: 40px;
-
-  /* Transitions */
-  --glass-transition-fast: 0.15s ease;
-  --glass-transition-normal: 0.25s ease;
-  --glass-transition-slow: 0.4s ease;
 }
 
-/* ============================================================================
-   BASE STYLES
-   ============================================================================ */
-html, body {
+html,
+body {
   background-color: transparent;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: var(--glass-text-primary);
 }
 
 body {
   overflow: hidden;
 }
 
-.font-mono {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+/* ============================================================================
+   ELECTRON DRAG REGIONS - App-specific behavior
+   ============================================================================ */
+.draggable {
+  -webkit-app-region: drag;
+}
+
+.non-draggable {
+  -webkit-app-region: no-drag;
 }
 
 /* ============================================================================
-   GLASS CONTAINER - Main App Container
+   GLASS CONTAINER PSEUDO-ELEMENTS - Gradient overlays and noise texture
    ============================================================================ */
-.glass-container {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  max-height: 100vh;
-  overflow: hidden;
-  background: var(--glass-bg-deep);
-  backdrop-filter: blur(var(--glass-blur-xl));
-  -webkit-backdrop-filter: blur(var(--glass-blur-xl));
-}
-
-/* Subtle gradient overlay */
 .glass-container::before {
   content: '';
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at 20% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
+    radial-gradient(
+      ellipse at 20% 0%,
+      rgba(99, 102, 241, 0.08) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 80% 100%,
+      rgba(139, 92, 246, 0.06) 0%,
+      transparent 50%
+    );
   pointer-events: none;
 }
 
-/* Noise texture for depth */
 .glass-container::after {
   content: '';
   position: absolute;
@@ -138,25 +64,8 @@ body {
 }
 
 /* ============================================================================
-   GLASS PANEL - Cards and Sections
+   GLASS PANEL HIGHLIGHT - Top border gradient effect
    ============================================================================ */
-.glass-panel {
-  position: relative;
-  background: var(--glass-bg-primary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-lg);
-  backdrop-filter: blur(var(--glass-blur-md));
-  -webkit-backdrop-filter: blur(var(--glass-blur-md));
-  box-shadow:
-    var(--glass-shadow-md),
-    var(--glass-shadow-inset);
-  overflow: hidden;
-  transition:
-    border-color var(--glass-transition-fast),
-    box-shadow var(--glass-transition-fast);
-}
-
-/* Top highlight */
 .glass-panel::before {
   content: '';
   position: absolute;
@@ -172,221 +81,50 @@ body {
   );
 }
 
-.glass-panel:hover {
-  border-color: var(--glass-border-default);
-}
-
-/* Panel header */
-.glass-panel-header {
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--glass-border-subtle);
-  background: var(--glass-bg-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.glass-panel-header h2 {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--glass-text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.glass-panel-content {
-  padding: 16px 18px;
+/* ============================================================================
+   GLASS ANSWER ACCENT - Top accent border gradient
+   ============================================================================ */
+.glass-answer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #6366f1, #818cf8, #6366f1);
+  opacity: 0.8;
 }
 
 /* ============================================================================
-   GLASS HEADER - Top Navigation Bar
+   GLASS MODAL ACCENT - Top accent gradient
    ============================================================================ */
-.glass-header {
-  flex-shrink: 0;
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-bottom: 1px solid var(--glass-border-subtle);
-  background: var(--glass-bg-secondary);
-  backdrop-filter: blur(var(--glass-blur-lg));
-  -webkit-backdrop-filter: blur(var(--glass-blur-lg));
-}
-
-.glass-header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.glass-header-right {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.glass-header-btn {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: var(--glass-radius-sm);
-  color: var(--glass-text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--glass-transition-fast);
-}
-
-.glass-header-btn:hover {
-  background: var(--glass-bg-hover);
-  color: var(--glass-text-primary);
-}
-
-.glass-header-btn:active {
-  background: var(--glass-bg-active);
-}
-
-.glass-logo {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.glass-logo-mark {
-  width: 26px;
-  height: 26px;
-  background: linear-gradient(135deg, var(--glass-accent), var(--glass-accent-dark));
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow:
-    0 2px 6px var(--glass-accent-glow),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-}
-
-.glass-logo-mark svg {
-  width: 14px;
-  height: 14px;
-  color: white;
-}
-
-.glass-logo-text {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--glass-text-primary);
-  letter-spacing: -0.01em;
-}
-
-/* Keyboard shortcuts display */
-.glass-shortcuts {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.glass-shortcut {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--glass-text-muted);
-}
-
-.glass-shortcut kbd {
-  padding: 3px 7px;
-  background: var(--glass-bg-secondary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: 5px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--glass-text-secondary);
+.glass-modal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #6366f1, transparent);
+  opacity: 0.6;
 }
 
 /* ============================================================================
-   GLASS MAIN - Scrollable Content Area
+   TRANSCRIPT FADE - Bottom fade gradient overlay
    ============================================================================ */
-.glass-main {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-}
-
-.glass-transcript-section {
-  flex-shrink: 1;
-  min-height: 60px;
-  max-height: 35%;
-  overflow: hidden;
-}
-
-.glass-transcript-section .glass-transcript {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.glass-transcript-section .glass-transcript-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.glass-answer-section {
-  flex: 1;
-  min-height: 50px;
-  overflow: hidden;
-}
-
-.glass-answer-section .glass-answer {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.glass-answer-section .glass-answer-content {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
-  overflow-y: auto;
+.glass-transcript-fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.05), transparent);
+  pointer-events: none;
 }
 
 /* ============================================================================
-   GLASS STATUS - Status Indicators
+   STATUS INDICATOR ANIMATIONS - Pulse and ping effects via ::after
    ============================================================================ */
-.glass-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: var(--glass-bg-secondary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-full);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  transition: all var(--glass-transition-fast);
-}
-
-.glass-status-dot {
-  position: relative;
-  width: 6px;
-  height: 6px;
-}
-
 .glass-status-dot::before {
   content: '';
   position: absolute;
@@ -395,28 +133,14 @@ body {
   background: currentColor;
 }
 
-/* Connected/Active state */
-.glass-status--connected {
-  color: var(--glass-success);
-  border-color: rgba(16, 185, 129, 0.25);
-  background: rgba(16, 185, 129, 0.08);
-}
-
 .glass-status--connected .glass-status-dot::after {
   content: '';
   position: absolute;
   inset: -3px;
   border-radius: 50%;
-  background: var(--glass-success);
+  background: #10b981;
   opacity: 0.4;
   animation: glass-pulse 2s ease-in-out infinite;
-}
-
-/* Connecting state */
-.glass-status--connecting {
-  color: var(--glass-warning);
-  border-color: rgba(245, 158, 11, 0.25);
-  background: rgba(245, 158, 11, 0.08);
 }
 
 .glass-status--connecting .glass-status-dot::after {
@@ -429,138 +153,40 @@ body {
   animation: glass-ping 1.5s ease-out infinite;
 }
 
-/* Error state */
-.glass-status--error {
-  color: var(--glass-error);
-  border-color: rgba(239, 68, 68, 0.25);
-  background: rgba(239, 68, 68, 0.08);
+/* ============================================================================
+   SCROLLBAR STYLING - WebKit scrollbar customization
+   ============================================================================ */
+.glass-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 
-/* Disconnected/Idle state */
-.glass-status--disconnected {
-  color: var(--glass-neutral);
-  border-color: var(--glass-border-subtle);
+.glass-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.glass-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.glass-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+
+.glass-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 /* ============================================================================
-   GLASS TRANSCRIPT - Live Transcript Display
+   BLINKING CURSOR - Text input cursor animation
    ============================================================================ */
-.glass-transcript {
-  position: relative;
-  background: var(--glass-bg-primary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-md);
-  overflow: hidden;
-}
-
-.glass-transcript-header {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: var(--glass-bg-secondary);
-  border-bottom: 1px solid var(--glass-border-subtle);
-}
-
-.glass-transcript-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--glass-text-muted);
-}
-
-.glass-transcript-dot {
-  width: 6px;
-  height: 6px;
-  background: var(--glass-success);
-  border-radius: 50%;
-  animation: glass-pulse 2s ease-in-out infinite;
-}
-
-.glass-transcript-count {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--glass-text-subtle);
-}
-
-.glass-transcript-scroll {
-  overflow-y: auto;
-  padding: 10px 12px;
-}
-
-.glass-transcript-log {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* Speaker groups */
-.glass-transcript-group {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  line-height: 1.6;
-  animation: glass-fade-in 0.2s ease-out;
-}
-
-/* Speaker tag */
-.glass-transcript-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  background: var(--glass-bg-secondary);
-  margin-top: 2px;
-}
-
-.glass-transcript-tag--interviewer {
-  color: var(--glass-speaker-interviewer);
-  background: rgba(96, 165, 250, 0.1);
-  border: 1px solid rgba(96, 165, 250, 0.2);
-}
-
-.glass-transcript-tag--you {
-  color: var(--glass-speaker-you);
-  background: rgba(52, 211, 153, 0.1);
-  border: 1px solid rgba(52, 211, 153, 0.2);
-}
-
-.glass-transcript-tag-chevron {
-  opacity: 0.5;
-  font-weight: 400;
-}
-
-/* Content */
-.glass-transcript-content {
-  flex: 1;
-  font-size: 13px;
-  color: var(--glass-text-primary);
-  word-break: break-word;
-}
-
-.glass-transcript-text--interim {
-  opacity: 0.5;
-  font-style: italic;
-}
-
-/* Blinking cursor */
 .glass-cursor {
   display: inline-block;
   width: 2px;
   height: 14px;
-  background: var(--glass-accent);
+  background: #6366f1;
   margin-left: 3px;
   vertical-align: text-bottom;
   animation: glass-blink 1s step-end infinite;
@@ -570,259 +196,34 @@ body {
   height: 12px;
 }
 
-/* Bottom fade */
-.glass-transcript-fade {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 24px;
-  background: linear-gradient(
-    to top,
-    var(--glass-bg-primary),
-    transparent
-  );
-  pointer-events: none;
-}
-
-/* Empty state */
-.glass-transcript-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-  background: var(--glass-bg-primary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-md);
-}
-
-.glass-transcript-empty-icon {
-  width: 40px;
-  height: 40px;
-  margin-bottom: 14px;
-  border: 1px dashed var(--glass-border-default);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--glass-text-muted);
-}
-
-.glass-transcript-empty-text {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--glass-text-muted);
-  margin-bottom: 6px;
-}
-
-.glass-transcript-empty-hint {
-  font-size: 12px;
-  color: var(--glass-text-subtle);
-}
-
 /* ============================================================================
-   GLASS ANSWER - Answer Card
+   GLASS PROSE - Markdown content styling
    ============================================================================ */
-.glass-answer {
-  position: relative;
-  background: var(--glass-bg-primary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-lg);
-  backdrop-filter: blur(var(--glass-blur-md));
-  -webkit-backdrop-filter: blur(var(--glass-blur-md));
-  box-shadow: var(--glass-shadow-md);
-  overflow: hidden;
-}
-
-/* Accent top border */
-.glass-answer::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--glass-accent), var(--glass-accent-light), var(--glass-accent));
-  opacity: 0.8;
-}
-
-.glass-answer-header {
-  flex-shrink: 0;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--glass-border-subtle);
-  background: var(--glass-bg-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.glass-answer-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--glass-accent-light);
-}
-
-.glass-answer-title-icon {
-  width: 16px;
-  height: 16px;
-  border: 1.5px solid currentColor;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-}
-
-/* Model badge */
-.glass-model-badge {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  padding: 4px 10px;
-  background: var(--glass-bg-primary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-full);
-  color: var(--glass-text-muted);
-}
-
-/* Generating indicator */
-.glass-generating {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 12px;
-  background: var(--glass-accent-subtle);
-  border-radius: var(--glass-radius-full);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--glass-accent-light);
-}
-
-.glass-generating-dot {
-  width: 6px;
-  height: 6px;
-  background: currentColor;
-  border-radius: 50%;
-  animation: glass-pulse 1.2s ease-in-out infinite;
-}
-
-/* Content area */
-.glass-answer-content {
-  padding: 14px;
-  max-height: 250px;
-  overflow-y: auto;
-}
-
-/* Idle state */
-.glass-answer-idle {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-
-.glass-answer-idle-icon {
-  width: 64px;
-  height: 64px;
-  margin-bottom: 18px;
-  border: 1px dashed var(--glass-border-default);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--glass-bg-secondary);
-}
-
-.glass-answer-idle-icon svg {
-  width: 28px;
-  height: 28px;
-  color: var(--glass-text-muted);
-}
-
-.glass-answer-idle h3 {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--glass-text-secondary);
-  margin-bottom: 8px;
-}
-
-.glass-answer-idle p {
-  font-size: 13px;
-  color: var(--glass-text-muted);
-}
-
-/* Error state */
-.glass-answer-error {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 18px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: var(--glass-radius-md);
-}
-
-.glass-answer-error-icon {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(239, 68, 68, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--glass-error);
-}
-
-.glass-answer-error h4 {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--glass-error);
-  margin-bottom: 4px;
-}
-
-.glass-answer-error p {
-  font-size: 12px;
-  color: rgba(239, 68, 68, 0.8);
-}
-
-/* ============================================================================
-   GLASS PROSE - Markdown Content
-   ============================================================================ */
-.glass-prose {
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--glass-text-primary);
-}
-
 .glass-prose h1,
 .glass-prose h2,
 .glass-prose h3 {
-  color: var(--glass-text-primary);
+  color: rgba(255, 255, 255, 0.95);
   font-weight: 600;
   margin-top: 1.5em;
   margin-bottom: 0.75em;
 }
 
-.glass-prose h1 { font-size: 1.3em; }
-.glass-prose h2 { font-size: 1.15em; }
-.glass-prose h3 { font-size: 1.05em; }
+.glass-prose h1 {
+  font-size: 1.3em;
+}
+.glass-prose h2 {
+  font-size: 1.15em;
+}
+.glass-prose h3 {
+  font-size: 1.05em;
+}
 
 .glass-prose p {
   margin-bottom: 1em;
 }
 
 .glass-prose strong {
-  color: var(--glass-text-primary);
+  color: rgba(255, 255, 255, 0.95);
   font-weight: 600;
 }
 
@@ -830,18 +231,18 @@ body {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.9em;
   padding: 3px 7px;
-  background: var(--glass-bg-elevated);
-  border: 1px solid var(--glass-border-subtle);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 5px;
-  color: var(--glass-accent-light);
+  color: #818cf8;
 }
 
 .glass-prose pre {
   margin: 1.25em 0;
   padding: 18px;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
   overflow-x: auto;
   position: relative;
 }
@@ -853,7 +254,7 @@ body {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, var(--glass-accent), transparent);
+  background: linear-gradient(90deg, #6366f1, transparent);
   opacity: 0.4;
 }
 
@@ -861,7 +262,7 @@ body {
   padding: 0;
   background: transparent;
   border: none;
-  color: var(--glass-text-primary);
+  color: rgba(255, 255, 255, 0.95);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -877,21 +278,21 @@ body {
 }
 
 .glass-prose ul li::marker {
-  color: var(--glass-accent);
+  color: #6366f1;
 }
 
 .glass-prose ol li::marker {
-  color: var(--glass-text-muted);
+  color: rgba(255, 255, 255, 0.5);
   font-family: 'JetBrains Mono', monospace;
 }
 
 .glass-prose blockquote {
   margin: 1.25em 0;
   padding: 14px 18px;
-  border-left: 3px solid var(--glass-accent);
-  background: var(--glass-bg-secondary);
-  border-radius: 0 var(--glass-radius-sm) var(--glass-radius-sm) 0;
-  color: var(--glass-text-secondary);
+  border-left: 3px solid #6366f1;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 0 8px 8px 0;
+  color: rgba(255, 255, 255, 0.7);
   font-style: italic;
 }
 
@@ -899,363 +300,23 @@ body {
   margin: 2em 0;
   border: none;
   height: 1px;
-  background: var(--glass-border-subtle);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .glass-prose a {
-  color: var(--glass-accent-light);
+  color: #818cf8;
   text-decoration: none;
-  transition: color var(--glass-transition-fast);
+  transition: color 0.15s ease;
 }
 
 .glass-prose a:hover {
-  color: var(--glass-accent);
+  color: #6366f1;
   text-decoration: underline;
 }
 
 /* ============================================================================
-   GLASS MODAL
+   WARNING LIST MARKER - Custom chevron marker for warning items
    ============================================================================ */
-.glass-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(var(--glass-blur-sm));
-  -webkit-backdrop-filter: blur(var(--glass-blur-sm));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  animation: glass-fade-in 0.2s ease-out;
-  max-height: 100vh;
-  overflow: hidden;
-}
-
-.glass-modal {
-  position: relative;
-  width: 100%;
-  max-width: 460px;
-  max-height: 90vh;
-  margin: 20px;
-  background: var(--glass-bg-deep);
-  border: 1px solid var(--glass-border-default);
-  border-radius: var(--glass-radius-xl);
-  backdrop-filter: blur(var(--glass-blur-lg));
-  -webkit-backdrop-filter: blur(var(--glass-blur-lg));
-  box-shadow:
-    var(--glass-shadow-lg),
-    0 0 60px rgba(99, 102, 241, 0.1);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  animation: glass-slide-up 0.3s ease-out;
-}
-
-/* Top accent */
-.glass-modal::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--glass-accent), transparent);
-  opacity: 0.6;
-}
-
-.glass-modal-header {
-  padding: 18px 22px;
-  border-bottom: 1px solid var(--glass-border-subtle);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-}
-
-.glass-modal-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--glass-text-primary);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.glass-modal-close {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--glass-radius-sm);
-  background: transparent;
-  border: none;
-  color: var(--glass-text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--glass-transition-fast);
-}
-
-.glass-modal-close:hover {
-  background: var(--glass-bg-hover);
-  color: var(--glass-text-primary);
-}
-
-.glass-modal-body {
-  padding: 22px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  flex: 1;
-  min-height: 0;
-}
-
-.glass-modal-footer {
-  padding: 18px 22px;
-  border-top: 1px solid var(--glass-border-subtle);
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-/* ============================================================================
-   GLASS FORM ELEMENTS
-   ============================================================================ */
-.glass-input-group {
-  margin-bottom: 22px;
-}
-
-.glass-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  color: var(--glass-text-secondary);
-  margin-bottom: 10px;
-}
-
-.glass-input-hint {
-  font-size: 12px;
-  color: var(--glass-text-muted);
-  margin-bottom: 10px;
-}
-
-.glass-input-hint a {
-  color: var(--glass-accent-light);
-  text-decoration: none;
-}
-
-.glass-input-hint a:hover {
-  text-decoration: underline;
-}
-
-.glass-input-wrapper {
-  position: relative;
-}
-
-.glass-input {
-  width: 100%;
-  padding: 12px 16px;
-  padding-right: 48px;
-  background: var(--glass-bg-primary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-md);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  color: var(--glass-text-primary);
-  transition: all var(--glass-transition-fast);
-}
-
-.glass-input::placeholder {
-  color: var(--glass-text-subtle);
-}
-
-.glass-input:focus {
-  outline: none;
-  border-color: var(--glass-accent);
-  box-shadow: 0 0 0 3px var(--glass-accent-subtle);
-}
-
-.glass-textarea {
-  width: 100%;
-  padding: 12px 16px;
-  background: var(--glass-bg-primary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-md);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  color: var(--glass-text-primary);
-  transition: all var(--glass-transition-fast);
-  resize: vertical;
-  min-height: 120px;
-}
-
-.glass-textarea::placeholder {
-  color: var(--glass-text-subtle);
-}
-
-.glass-textarea:focus {
-  outline: none;
-  border-color: var(--glass-accent);
-  box-shadow: 0 0 0 3px var(--glass-accent-subtle);
-}
-
-.glass-input-toggle {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
-  background: transparent;
-  border: none;
-  border-radius: var(--glass-radius-sm);
-  color: var(--glass-text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--glass-transition-fast);
-}
-
-.glass-input-toggle:hover {
-  color: var(--glass-text-primary);
-  background: var(--glass-bg-hover);
-}
-
-/* ============================================================================
-   GLASS BUTTONS
-   ============================================================================ */
-.glass-btn {
-  padding: 10px 18px;
-  border-radius: var(--glass-radius-sm);
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--glass-transition-fast);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.glass-btn--ghost {
-  background: transparent;
-  border: 1px solid var(--glass-border-default);
-  color: var(--glass-text-secondary);
-}
-
-.glass-btn--ghost:hover {
-  background: var(--glass-bg-hover);
-  border-color: var(--glass-border-strong);
-  color: var(--glass-text-primary);
-}
-
-.glass-btn--primary {
-  background: linear-gradient(135deg, var(--glass-accent), var(--glass-accent-dark));
-  border: none;
-  color: white;
-  font-weight: 600;
-  box-shadow: 0 2px 8px var(--glass-accent-glow);
-}
-
-.glass-btn--primary:hover {
-  background: linear-gradient(135deg, var(--glass-accent-light), var(--glass-accent));
-  box-shadow: 0 4px 16px var(--glass-accent-glow);
-  transform: translateY(-1px);
-}
-
-.glass-btn--primary:active {
-  transform: translateY(0);
-}
-
-.glass-btn--primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.glass-btn--icon {
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: var(--glass-radius-sm);
-  color: var(--glass-text-muted);
-  cursor: pointer;
-  transition: all var(--glass-transition-fast);
-}
-
-.glass-btn--icon:hover {
-  background: var(--glass-bg-hover);
-  color: var(--glass-text-primary);
-}
-
-/* Keyboard shortcut style */
-.glass-kbd {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  background: var(--glass-bg-elevated);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: 6px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--glass-text-secondary);
-}
-
-/* ============================================================================
-   GLASS WARNING
-   ============================================================================ */
-.glass-warning {
-  flex-shrink: 0;
-  margin: 0 12px;
-  padding: 10px 14px;
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  border-radius: var(--glass-radius-md);
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.glass-warning-icon {
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(245, 158, 11, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--glass-warning);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.glass-warning h4 {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--glass-warning);
-  margin-bottom: 6px;
-}
-
-.glass-warning ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.glass-warning li {
-  font-size: 12px;
-  color: rgba(245, 158, 11, 0.8);
-  padding-left: 14px;
-  position: relative;
-  margin-bottom: 2px;
-}
-
 .glass-warning li::before {
   content: '>';
   position: absolute;
@@ -1266,124 +327,11 @@ body {
 }
 
 /* ============================================================================
-   GLASS LOADING STATES
-   ============================================================================ */
-.glass-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px;
-}
-
-.glass-loading-spinner {
-  width: 36px;
-  height: 36px;
-  border: 2px solid var(--glass-border-default);
-  border-top-color: var(--glass-accent);
-  border-radius: 50%;
-  animation: glass-spin 0.8s linear infinite;
-  margin-bottom: 18px;
-}
-
-.glass-loading-text {
-  font-size: 13px;
-  color: var(--glass-text-muted);
-}
-
-.glass-loading-dots {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.glass-loading-dots span {
-  width: 7px;
-  height: 7px;
-  background: var(--glass-accent);
-  border-radius: 50%;
-  animation: glass-bounce 0.6s ease-in-out infinite;
-}
-
-.glass-loading-dots span:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.glass-loading-dots span:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-/* ============================================================================
-   GLASS TOAST
-   ============================================================================ */
-.glass-toast {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 14px 18px;
-  background: var(--glass-bg-deep);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: var(--glass-radius-md);
-  backdrop-filter: blur(var(--glass-blur-md));
-  -webkit-backdrop-filter: blur(var(--glass-blur-md));
-  box-shadow: var(--glass-shadow-lg);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: 340px;
-  animation: glass-slide-up 0.25s ease-out;
-}
-
-.glass-toast-icon {
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(239, 68, 68, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--glass-error);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.glass-toast-text {
-  font-size: 13px;
-  color: var(--glass-text-primary);
-}
-
-/* ============================================================================
-   SCROLLBARS
-   ============================================================================ */
-.glass-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: var(--glass-border-default) transparent;
-}
-
-.glass-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.glass-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.glass-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--glass-border-default);
-  border-radius: 3px;
-}
-
-.glass-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--glass-text-muted);
-}
-
-/* ============================================================================
-   ANIMATIONS
+   ANIMATIONS - Referenced by Tailwind config but needed for pseudo-elements
    ============================================================================ */
 @keyframes glass-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.4;
     transform: scale(1);
   }
@@ -1405,26 +353,13 @@ body {
 }
 
 @keyframes glass-blink {
-  0%, 50% {
+  0%,
+  50% {
     opacity: 1;
   }
-  51%, 100% {
+  51%,
+  100% {
     opacity: 0;
-  }
-}
-
-@keyframes glass-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes glass-bounce {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
   }
 }
 
@@ -1449,253 +384,7 @@ body {
 }
 
 .glass-animate-in {
-  animation: glass-fade-in 0.25s ease-out, glass-slide-up 0.3s ease-out;
-}
-
-/* ============================================================================
-   DRAGGABLE REGIONS
-   ============================================================================ */
-.draggable {
-  -webkit-app-region: drag;
-}
-
-.non-draggable {
-  -webkit-app-region: no-drag;
-}
-
-/* ============================================================================
-   MINIMIZED MODE
-   ============================================================================ */
-
-.glass-container.minimized {
-  width: 280px;
-  height: 120px;
-}
-
-.minimized-container {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-app-region: drag;
-  position: relative;
-}
-
-.minimized-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.minimized-toggle {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
-  background: var(--glass-bg-secondary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-md);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  transition: all var(--glass-transition-fast);
-  -webkit-app-region: no-drag;
-  z-index: 10;
-}
-
-.minimized-toggle:hover {
-  background: var(--glass-bg-hover);
-  border-color: var(--glass-accent);
-  transform: scale(1.05);
-}
-
-.minimized-toggle:active {
-  background: var(--glass-bg-active);
-  transform: scale(0.95);
-}
-
-.minimized-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--glass-bg-secondary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-full);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-}
-
-.minimized-status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.minimized-status-label {
-  text-transform: uppercase;
-}
-
-.minimized-generating {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  background: var(--glass-accent-subtle);
-  border-radius: var(--glass-radius-sm);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-}
-
-.minimized-generating-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--glass-accent-light);
-  animation: glass-pulse 1s ease-in-out infinite;
-}
-
-/* ============================================================================
-   HELP MODAL STYLES
-   ============================================================================ */
-
-.glass-help-section {
-  margin-bottom: 28px;
-}
-
-.glass-help-section:last-child {
-  margin-bottom: 0;
-}
-
-.glass-help-section-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--glass-text-secondary);
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.glass-help-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.glass-help-item {
-  padding: 14px;
-  background: var(--glass-bg-secondary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-md);
-}
-
-.glass-help-item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.glass-help-item-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--glass-text-primary);
-}
-
-.glass-help-item-desc {
-  font-size: 12px;
-  color: var(--glass-text-muted);
-  margin: 0;
-  line-height: 1.5;
-}
-
-.glass-help-card {
-  padding: 18px;
-  background: var(--glass-bg-secondary);
-  border: 1px solid var(--glass-border-subtle);
-  border-radius: var(--glass-radius-md);
-}
-
-.glass-help-list {
-  margin: 0;
-  padding-left: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.glass-help-list--ordered {
-  gap: 12px;
-}
-
-.glass-help-list-item {
-  font-size: 13px;
-  color: var(--glass-text-secondary);
-  line-height: 1.6;
-}
-
-.glass-help-list-title {
-  color: var(--glass-text-primary);
-}
-
-.glass-link {
-  color: var(--glass-accent-light);
-  text-decoration: none;
-  transition: color var(--glass-transition-fast);
-}
-
-.glass-link:hover {
-  color: var(--glass-accent);
-  text-decoration: underline;
-}
-
-.glass-kbd--sm {
-  padding: 2px 6px;
-  font-size: 11px;
-}
-
-/* ============================================================================
-   SESSION STATS FOOTER
-   ============================================================================ */
-
-.glass-stats-footer {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
-  padding: 8px 16px;
-  background: var(--glass-bg-secondary);
-  border-top: 1px solid var(--glass-border-subtle);
-  backdrop-filter: blur(var(--glass-blur-md));
-  -webkit-backdrop-filter: blur(var(--glass-blur-md));
-}
-
-.glass-stat {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--glass-text-muted);
-}
-
-.glass-stat-icon {
-  opacity: 0.7;
-}
-
-.glass-stat-value {
-  color: var(--glass-text-secondary);
+  animation:
+    glass-fade-in 0.25s ease-out,
+    glass-slide-up 0.3s ease-out;
 }

@@ -1,0 +1,67 @@
+# =============================================================================
+# Docker Context Exclusions
+# =============================================================================
+# These files are excluded from the Docker build context to:
+# - Reduce build context size and improve build speed
+# - Prevent sensitive data from being included in images
+# - Avoid conflicts with container-installed dependencies
+# =============================================================================
+
+# Dependencies (installed fresh in container)
+node_modules/
+
+# Build outputs (generated in container)
+dist/
+coverage/
+
+# Rust build artifacts (built fresh in container)
+native/audio-engine/target/
+
+# Environment files (passed via env_file in docker-compose)
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-*
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Vite cache
+vite.config.ts.timestamp-*
+
+# Documentation (not needed for builds)
+docs/
+*.md
+!README.md
+
+# CI/CD (not needed in container)
+.github/
+
+# Electron packaged apps
+*.dmg
+*.exe
+*.AppImage
+
+# Resources (binaries are platform-specific)
+resources/
+
+# Miscellaneous
+ToDo.txt
+.dockerignore
+Dockerfile
+docker-compose.yml

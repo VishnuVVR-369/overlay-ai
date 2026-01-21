@@ -39,7 +39,7 @@ function App(): React.ReactElement {
 
   if (state.isMinimized) {
     return (
-      <div className="glass-container minimized">
+      <div className="glass-container relative flex flex-col h-screen max-h-screen overflow-hidden bg-glass-bg-deep backdrop-blur-glass-xl w-[280px] h-[120px]">
         <MinimizedView
           liveModeState={state.liveMode.state}
           isGenerating={state.answerState === 'generating'}
@@ -55,7 +55,7 @@ function App(): React.ReactElement {
     state.answerState !== 'error';
 
   return (
-    <div className="glass-container">
+    <div className="glass-container relative flex flex-col h-screen max-h-screen overflow-hidden bg-glass-bg-deep backdrop-blur-glass-xl text-glass-text-primary">
       <Header
         liveModeState={state.liveMode.state}
         liveModeError={state.liveMode.error}
@@ -70,8 +70,8 @@ function App(): React.ReactElement {
         isGroqConfigured={state.isGroqConfigured}
       />
 
-      <main className="glass-main glass-scrollbar">
-        <section className="glass-transcript-section">
+      <main className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 p-3 glass-scrollbar">
+        <section className="shrink min-h-[60px] max-h-[35%] overflow-hidden [&>div]:h-full [&>div]:flex [&>div]:flex-col [&>div>div:last-child]:flex-1 [&>div>div:last-child]:min-h-0 [&>div>div:last-child]:overflow-y-auto">
           <LiveTranscript
             segments={state.segments}
             interimText={state.interimText}
@@ -80,7 +80,7 @@ function App(): React.ReactElement {
           />
         </section>
 
-        <section className="glass-answer-section">
+        <section className="flex-1 min-h-[50px] overflow-hidden [&>div]:h-full [&>div]:flex [&>div]:flex-col [&>div>div:last-child]:flex-1 [&>div>div:last-child]:min-h-0 [&>div>div:last-child]:max-h-none [&>div>div:last-child]:overflow-y-auto">
           <AnswerCard
             state={state.answerState}
             text={state.answerText}

@@ -92,12 +92,12 @@ function TranscriptGroup({ group }: TranscriptGroupProps): React.ReactElement {
   const hasInterim = group.texts.some((t) => t.isInterim);
 
   return (
-    <div className="glass-transcript-group">
-      <div className="glass-transcript-content">
+    <div className="flex items-start gap-2.5 leading-relaxed animate-glass-fade-in">
+      <div className="flex-1 text-[13px] text-glass-text-primary break-words">
         {group.texts.map((item, idx) => (
           <span
             key={`${item.timestamp}-${idx}`}
-            className={item.isInterim ? 'glass-transcript-text--interim' : ''}
+            className={item.isInterim ? 'opacity-50 italic' : ''}
           >
             {item.text}
             {idx < group.texts.length - 1 && ' '}
@@ -111,12 +111,14 @@ function TranscriptGroup({ group }: TranscriptGroupProps): React.ReactElement {
 
 function EmptyState(): React.ReactElement {
   return (
-    <div className="glass-transcript-empty">
-      <div className="glass-transcript-empty-icon">
+    <div className="flex flex-col items-center justify-center py-10 px-5 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md">
+      <div className="w-10 h-10 mb-3.5 border border-dashed border-glass-border-default rounded-full flex items-center justify-center text-glass-text-muted">
         <MicrophoneIcon size={16} strokeWidth={1.5} />
       </div>
-      <span className="glass-transcript-empty-text">AWAITING INPUT</span>
-      <span className="glass-transcript-empty-hint">
+      <span className="font-mono text-[11px] font-semibold tracking-widest text-glass-text-muted mb-1.5">
+        AWAITING INPUT
+      </span>
+      <span className="text-xs text-glass-text-subtle">
         Audio transcript will appear here
       </span>
     </div>
@@ -153,22 +155,22 @@ export function LiveTranscript({
   }
 
   return (
-    <div className="glass-transcript">
-      <div className="glass-transcript-header">
-        <span className="glass-transcript-title">
-          <span className="glass-transcript-dot" />
+    <div className="relative bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md overflow-hidden">
+      <div className="shrink-0 flex items-center justify-between px-3 py-2 bg-glass-bg-secondary border-b border-glass-border-subtle">
+        <span className="flex items-center gap-2.5 font-mono text-[10px] font-semibold tracking-widest uppercase text-glass-text-muted">
+          <span className="w-1.5 h-1.5 bg-glass-success rounded-full animate-glass-pulse" />
           LIVE TRANSCRIPT
         </span>
-        <span className="glass-transcript-count">
+        <span className="font-mono text-[10px] text-glass-text-subtle">
           {recentSegments.length} segments
         </span>
       </div>
       <div
         ref={scrollRef}
-        className="glass-transcript-scroll glass-scrollbar"
+        className="overflow-y-auto px-3 py-2.5 glass-scrollbar"
         style={{ maxHeight }}
       >
-        <div className="glass-transcript-log">
+        <div className="flex flex-col gap-2">
           {groupedSegments.map((group) => (
             <TranscriptGroup
               key={`${group.speaker}-${group.startTimestamp}`}
@@ -196,8 +198,8 @@ export function CompactTranscript({
 
   if (!displayText || !displaySpeaker) {
     return (
-      <div className="flex items-center justify-center py-4 px-3 bg-[var(--glass-bg-primary)] border border-[var(--glass-border-subtle)] rounded-lg">
-        <span className="flex items-center gap-2 text-[var(--glass-text-muted)] text-xs">
+      <div className="flex items-center justify-center py-4 px-3 bg-glass-bg-primary border border-glass-border-subtle rounded-lg">
+        <span className="flex items-center gap-2 text-glass-text-muted text-xs">
           <span className="w-1.5 h-1.5 rounded-full bg-current opacity-50" />
           Waiting for audio...
         </span>
@@ -210,15 +212,18 @@ export function CompactTranscript({
   const truncatedText =
     displayText.length > 80 ? `${displayText.slice(-80)}...` : displayText;
 
+  const speakerColorClass =
+    displaySpeaker === 'interviewer'
+      ? 'text-glass-speaker-interviewer'
+      : 'text-glass-speaker-you';
+
   return (
-    <div className="flex items-center gap-2 py-2 px-3 bg-[var(--glass-bg-primary)] border border-[var(--glass-border-subtle)] rounded-lg overflow-hidden">
-      <span
-        className={`font-mono text-[10px] font-bold ${config.colorClass.replace('glass-transcript-tag--', 'text-[var(--glass-speaker-')})}`}
-      >
+    <div className="flex items-center gap-2 py-2 px-3 bg-glass-bg-primary border border-glass-border-subtle rounded-lg overflow-hidden">
+      <span className={`font-mono text-[10px] font-bold ${speakerColorClass}`}>
         {config.label}:
       </span>
       <span
-        className={`text-[var(--glass-text-primary)] text-xs whitespace-nowrap overflow-hidden text-ellipsis flex-1 ${
+        className={`text-glass-text-primary text-xs whitespace-nowrap overflow-hidden text-ellipsis flex-1 ${
           isInterim ? 'opacity-50 italic' : ''
         }`}
       >

@@ -31,8 +31,8 @@ let mainWindow: BrowserWindow | null = null;
 let stealthManager: StealthWindowManager | null = null;
 
 const WINDOW_CONFIG = {
-  width: 500,
-  height: 500,
+  width: 400,
+  height: 450,
   transparent: true,
   frame: false,
   movable: true,

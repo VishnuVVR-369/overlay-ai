@@ -19,12 +19,18 @@ function ShortcutItem({
   description,
 }: ShortcutItemProps): React.ReactElement {
   return (
-    <div className="glass-help-item">
-      <div className="glass-help-item-header">
-        <span className="glass-help-item-title">{title}</span>
-        <kbd className="glass-kbd">{shortcut}</kbd>
+    <div className="p-3.5 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+      <div className="flex justify-between items-center mb-1.5">
+        <span className="text-[13px] font-medium text-glass-text-primary">
+          {title}
+        </span>
+        <kbd className="inline-flex items-center gap-1 px-2.5 py-1 bg-glass-bg-elevated border border-glass-border-subtle rounded-md font-mono text-[11px] text-glass-text-secondary">
+          {shortcut}
+        </kbd>
       </div>
-      <p className="glass-help-item-desc">{description}</p>
+      <p className="text-xs text-glass-text-muted m-0 leading-relaxed">
+        {description}
+      </p>
     </div>
   );
 }
@@ -37,8 +43,8 @@ interface SectionProps {
 
 function Section({ title, icon, children }: SectionProps): React.ReactElement {
   return (
-    <section className="glass-help-section">
-      <h3 className="glass-help-section-title">
+    <section className="mb-7 last:mb-0">
+      <h3 className="text-[13px] font-semibold text-glass-text-secondary mb-4 flex items-center gap-2 uppercase tracking-wide">
         {icon}
         {title}
       </h3>
@@ -50,19 +56,19 @@ function Section({ title, icon, children }: SectionProps): React.ReactElement {
 const KEYBOARD_SHORTCUTS: ShortcutItemProps[] = [
   {
     title: 'Toggle Live Mode',
-    shortcut: '\u2318\u21e7L',
+    shortcut: 'Cmd+Shift+L',
     description:
       'Start or stop audio transcription. Connect/disconnect to Deepgram.',
   },
   {
     title: 'Trigger Answer',
-    shortcut: '\u2318\u21e7X',
+    shortcut: 'Cmd+Shift+X',
     description:
       'Generate an AI-powered answer based on last 20 minutes of conversation.',
   },
   {
     title: 'Clear Overlay',
-    shortcut: '\u2318\u21e7Z',
+    shortcut: 'Cmd+Shift+Z',
     description:
       'Clear transcript and answer history. Context buffer is preserved.',
   },
@@ -76,48 +82,70 @@ const KEYBOARD_SHORTCUTS: ShortcutItemProps[] = [
 
 const GETTING_STARTED_STEPS = [
   {
-    title: 'Configure API Keys:',
+    title: '1. Set up your API keys:',
     content: (
       <>
-        Click settings icon to add your Deepgram and Groq API keys. You can get
-        these from{' '}
+        Click the <strong>Settings</strong> icon (⚙️) in the top-right corner.
+        Add your API keys - they&apos;re stored safely on your device.
+        You&apos;ll need:
+        <br />
         <a
           href="https://console.deepgram.com/"
           target="_blank"
           rel="noopener noreferrer"
-          className="glass-link"
+          className="text-glass-accent-light no-underline transition-colors duration-glass-fast hover:text-glass-accent hover:underline"
         >
           Deepgram
         </a>{' '}
-        and{' '}
+        for transcription and{' '}
         <a
           href="https://console.groq.com/"
           target="_blank"
           rel="noopener noreferrer"
-          className="glass-link"
+          className="text-glass-accent-light no-underline transition-colors duration-glass-fast hover:text-glass-accent hover:underline"
         >
           Groq
-        </a>
-        .
+        </a>{' '}
+        for AI answers.
       </>
     ),
   },
   {
-    title: 'Start Live Mode:',
+    title: '2. Start listening:',
     content: (
       <>
-        Press <kbd className="glass-kbd glass-kbd--sm">{'\u2318\u21e7L'}</kbd>{' '}
-        to begin transcription. The status indicator shows connection state.
+        Press{' '}
+        <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-elevated border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary">
+          Cmd+Shift+L
+        </kbd>{' '}
+        to begin. The green light means it&apos;s recording. Your conversation
+        will appear in the transcript panel in real-time.
       </>
     ),
   },
   {
-    title: 'Get Answers:',
+    title: '3. Get help when you need it:',
     content: (
       <>
-        When you need help, press{' '}
-        <kbd className="glass-kbd glass-kbd--sm">{'\u2318\u21e7X'}</kbd> to
-        generate an AI response based on conversation context.
+        Stuck on a question? Press{' '}
+        <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-elevated border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary">
+          Cmd+Shift+X
+        </kbd>{' '}
+        and Overlay AI will generate an answer based on the last 20 minutes of
+        your conversation. Answers appear in the bottom panel.
+      </>
+    ),
+  },
+  {
+    title: '4. Hide when needed:',
+    content: (
+      <>
+        Press{' '}
+        <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-elevated border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary">
+          Cmd+Shift+M
+        </kbd>{' '}
+        to minimize the overlay. Click it or press the shortcut again to expand.
+        The overlay is invisible to screen sharing tools.
       </>
     ),
   },
@@ -125,32 +153,51 @@ const GETTING_STARTED_STEPS = [
 
 const HOW_IT_WORKS = [
   {
-    title: 'Real-time Transcription:',
+    title: '🎙️ Real-time transcription',
     description:
-      'Audio is captured and sent to Deepgram for live transcription. Both system audio and microphone input are processed.',
+      'Everything said is transcribed instantly and shown in the top panel. You can see who spoke (INT for interviewer, YOU for you).',
   },
   {
-    title: 'Context Buffer:',
+    title: '💾 Remembers the conversation',
     description:
-      'The last 20 minutes of conversation are maintained in memory for context-aware answers.',
+      'Overlay AI keeps track of the last 20 minutes of your interview. This helps it understand the full context when you ask for help.',
   },
   {
-    title: 'AI Answers:',
+    title: '🤖 AI-powered answers',
     description:
-      "Answers are generated using Groq's fast LLM models, optimized for coding questions and system design problems.",
+      'When triggered, it analyzes your conversation and generates helpful answers optimized for coding and technical interviews.',
   },
   {
-    title: 'Stealth Mode:',
+    title: '👻 Invisible to screen sharing',
     description:
-      'The overlay window is hidden from screen capture software, keeping your workflow private.',
+      'The overlay is hidden from Zoom, Teams, and other screen sharing tools. Only you can see it.',
   },
 ];
 
 const TIPS = [
-  'The transcript shows last 30 seconds of conversation for quick reference.',
-  'Green status indicator means Live Mode is active and listening.',
-  'Answers include code examples, explanations, and time complexity analysis for coding questions.',
-  'You can drag overlay window to reposition it on your screen.',
+  '💡 Start Live Mode before your interview begins so the AI has context from the start.',
+  '💡 Check the green status indicator - it means everything is working properly.',
+  '💡 For coding questions, answers include Python code, time complexity, and explanations.',
+  '💡 You can drag the overlay anywhere on your screen to position it comfortably.',
+  '💡 Press Cmd+Shift+Z to clear the display (context is preserved).',
+];
+
+const TROUBLESHOOTING = [
+  {
+    title: 'Nothing being transcribed?',
+    description:
+      'Make sure Live Mode is on (green indicator). Check your microphone is not muted and API keys are correct in Settings.',
+  },
+  {
+    title: 'Answers not generating?',
+    description:
+      'Verify your Groq API key in Settings. Also make sure you have at least a few seconds of transcript first.',
+  },
+  {
+    title: 'Status shows error?',
+    description:
+      'Open Settings and verify both API keys are valid. You can also try restarting the app.',
+  },
 ];
 
 export function HelpModal({
@@ -158,7 +205,10 @@ export function HelpModal({
   onClose,
 }: HelpModalProps): React.ReactElement | null {
   const footer = (
-    <button onClick={onClose} className="glass-btn glass-btn--primary">
+    <button
+      onClick={onClose}
+      className="px-4 py-2.5 rounded-glass-sm font-sans text-[13px] font-semibold cursor-pointer transition-all duration-glass-fast inline-flex items-center justify-center gap-2 bg-gradient-to-br from-glass-accent to-glass-accent-dark border-none text-white shadow-[0_2px_8px_rgba(99,102,241,0.4)] hover:from-glass-accent-light hover:to-glass-accent hover:shadow-[0_4px_16px_rgba(99,102,241,0.4)] hover:-translate-y-px active:translate-y-0"
+    >
       Got it
     </button>
   );
@@ -171,7 +221,7 @@ export function HelpModal({
       footer={footer}
     >
       <Section title="Keyboard Shortcuts" icon={<KeyboardIcon size={14} />}>
-        <div className="glass-help-grid">
+        <div className="flex flex-col gap-3">
           {KEYBOARD_SHORTCUTS.map((shortcut) => (
             <ShortcutItem key={shortcut.title} {...shortcut} />
           ))}
@@ -179,11 +229,16 @@ export function HelpModal({
       </Section>
 
       <Section title="Getting Started" icon={<InfoIcon size={14} />}>
-        <div className="glass-help-card">
-          <ol className="glass-help-list glass-help-list--ordered">
+        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+          <ol className="m-0 pl-5 flex flex-col gap-3">
             {GETTING_STARTED_STEPS.map((step, index) => (
-              <li key={index} className="glass-help-list-item">
-                <strong className="glass-help-list-title">{step.title}</strong>{' '}
+              <li
+                key={index}
+                className="text-[13px] text-glass-text-secondary leading-relaxed"
+              >
+                <strong className="text-glass-text-primary">
+                  {step.title}
+                </strong>{' '}
                 {step.content}
               </li>
             ))}
@@ -192,11 +247,16 @@ export function HelpModal({
       </Section>
 
       <Section title="How It Works" icon={<InfoIcon size={14} />}>
-        <div className="glass-help-card">
-          <ul className="glass-help-list">
+        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+          <ul className="m-0 pl-5 flex flex-col gap-2.5">
             {HOW_IT_WORKS.map((item) => (
-              <li key={item.title} className="glass-help-list-item">
-                <strong className="glass-help-list-title">{item.title}</strong>{' '}
+              <li
+                key={item.title}
+                className="text-[13px] text-glass-text-secondary leading-relaxed"
+              >
+                <strong className="text-glass-text-primary">
+                  {item.title}
+                </strong>{' '}
                 {item.description}
               </li>
             ))}
@@ -205,11 +265,32 @@ export function HelpModal({
       </Section>
 
       <Section title="Tips" icon={<InfoIcon size={14} />}>
-        <div className="glass-help-card">
-          <ul className="glass-help-list">
+        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+          <ul className="m-0 pl-5 flex flex-col gap-2.5">
             {TIPS.map((tip, index) => (
-              <li key={index} className="glass-help-list-item">
+              <li
+                key={index}
+                className="text-[13px] text-glass-text-secondary leading-relaxed"
+              >
                 {tip}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </Section>
+
+      <Section title="Troubleshooting" icon={<InfoIcon size={14} />}>
+        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+          <ul className="m-0 pl-5 flex flex-col gap-3">
+            {TROUBLESHOOTING.map((item) => (
+              <li
+                key={item.title}
+                className="text-[13px] text-glass-text-secondary leading-relaxed"
+              >
+                <strong className="text-glass-text-primary block mb-1">
+                  {item.title}
+                </strong>
+                <span className="text-xs">{item.description}</span>
               </li>
             ))}
           </ul>
