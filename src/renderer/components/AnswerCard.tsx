@@ -16,13 +16,17 @@ function ModelBadge({ modelId }: { modelId: string }): React.ReactElement {
   const shortName =
     modelId.split('/').pop()?.split('-').slice(0, 2).join('-') || modelId;
 
-  return <span className="glass-model-badge">{shortName}</span>;
+  return (
+    <span className="font-mono text-[10px] px-2.5 py-1 bg-glass-bg-primary border border-glass-border-subtle rounded-full text-glass-text-muted">
+      {shortName}
+    </span>
+  );
 }
 
 function GeneratingIndicator(): React.ReactElement {
   return (
-    <div className="glass-generating">
-      <span className="glass-generating-dot" />
+    <div className="flex items-center gap-2 px-3 py-1 bg-glass-accent-subtle rounded-full font-mono text-[10px] text-glass-accent-light">
+      <span className="w-1.5 h-1.5 bg-current rounded-full animate-glass-pulse" />
       <span>GENERATING</span>
     </div>
   );
@@ -31,12 +35,12 @@ function GeneratingIndicator(): React.ReactElement {
 function LoadingState(): React.ReactElement {
   return (
     <div className="flex flex-col items-center justify-center py-10">
-      <div className="glass-loading-dots mb-4">
-        <span />
-        <span />
-        <span />
+      <div className="flex items-center gap-1.5 mb-4">
+        <span className="w-[7px] h-[7px] bg-glass-accent rounded-full animate-glass-bounce" />
+        <span className="w-[7px] h-[7px] bg-glass-accent rounded-full animate-glass-bounce [animation-delay:0.15s]" />
+        <span className="w-[7px] h-[7px] bg-glass-accent rounded-full animate-glass-bounce [animation-delay:0.3s]" />
       </div>
-      <p className="text-xs text-[var(--glass-text-muted)] font-mono">
+      <p className="text-xs text-glass-text-muted font-mono">
         GENERATING RESPONSE...
       </p>
     </div>
@@ -45,13 +49,15 @@ function LoadingState(): React.ReactElement {
 
 function ErrorState({ message }: { message: string }): React.ReactElement {
   return (
-    <div className="glass-answer-error">
-      <div className="glass-answer-error-icon">
+    <div className="flex items-start gap-3.5 p-4 bg-glass-error/[0.08] border border-glass-error/20 rounded-glass-md">
+      <div className="shrink-0 w-[22px] h-[22px] rounded-full bg-glass-error/15 flex items-center justify-center text-glass-error">
         <AlertIcon size={16} />
       </div>
       <div>
-        <h4>Generation Failed</h4>
-        <p>{message}</p>
+        <h4 className="text-[13px] font-semibold text-glass-error mb-1">
+          Generation Failed
+        </h4>
+        <p className="text-xs text-glass-error/80">{message}</p>
       </div>
     </div>
   );
@@ -59,15 +65,21 @@ function ErrorState({ message }: { message: string }): React.ReactElement {
 
 function IdleState(): React.ReactElement {
   return (
-    <div className="glass-answer-idle">
-      <div className="glass-answer-idle-icon">
-        <SparkleIcon size={28} strokeWidth={1.5} />
+    <div className="flex flex-col items-center justify-center text-center">
+      <div className="w-16 h-16 mb-4 border border-dashed border-glass-border-default rounded-full flex items-center justify-center bg-glass-bg-secondary">
+        <SparkleIcon size={28} strokeWidth={1.5} className="text-glass-text-muted" />
       </div>
-      <h3>Ready to assist</h3>
-      <p>
-        Press <kbd className="glass-kbd">Cmd+Shift+X</kbd> to generate an answer
+      <h3 className="text-[15px] font-medium text-glass-text-secondary mb-2">
+        Ready to assist
+      </h3>
+      <p className="text-[13px] text-glass-text-muted">
+        Press{' '}
+        <kbd className="inline-flex items-center gap-1 px-2.5 py-1 bg-glass-bg-elevated border border-glass-border-subtle rounded-md font-mono text-[11px] text-glass-text-secondary">
+          Cmd+Shift+X
+        </kbd>{' '}
+        to generate an answer
       </p>
-      <p className="mt-3 text-[10px] text-[var(--glass-text-subtle)]">
+      <p className="mt-3 text-[10px] text-glass-text-subtle">
         Based on last 20 minutes of conversation
       </p>
     </div>
@@ -122,10 +134,10 @@ export function AnswerCard({
   const showContent = state === 'generating' || state === 'complete';
 
   return (
-    <div className="glass-answer glass-animate-in">
-      <div className="glass-answer-header">
-        <div className="glass-answer-title">
-          <span className="glass-answer-title-icon">
+    <div className="glass-answer relative bg-glass-bg-primary border border-glass-border-subtle rounded-glass-lg backdrop-blur-glass-md shadow-glass-md overflow-hidden animate-glass-slide-up">
+      <div className="shrink-0 px-3.5 py-2.5 border-b border-glass-border-subtle bg-glass-bg-secondary flex items-center justify-between">
+        <div className="flex items-center gap-2.5 font-mono text-[11px] font-semibold tracking-wide uppercase text-glass-accent-light">
+          <span className="w-4 h-4 border-[1.5px] border-current rounded flex items-center justify-center text-[10px]">
             <CommandIcon size={14} />
           </span>
           <span>RESPONSE</span>
@@ -140,7 +152,7 @@ export function AnswerCard({
       </div>
 
       <div
-        className="glass-answer-content glass-scrollbar"
+        className="p-3.5 overflow-y-auto glass-scrollbar"
         style={{ maxHeight }}
       >
         {state === 'idle' && <IdleState />}
@@ -148,7 +160,7 @@ export function AnswerCard({
         {state === 'generating' && !text && <LoadingState />}
 
         {showContent && text && (
-          <div className="glass-prose">
+          <div className="glass-prose text-sm leading-relaxed text-glass-text-primary">
             <Streamdown
               mode="streaming"
               parseIncompleteMarkdown
@@ -170,14 +182,12 @@ export function CompactAnswer({
 }: Pick<AnswerCardProps, 'state' | 'text'>): React.ReactElement {
   if (state === 'idle' || !text) {
     return (
-      <p className="text-xs text-[var(--glass-text-muted)] font-mono">
-        NO RESPONSE YET
-      </p>
+      <p className="text-xs text-glass-text-muted font-mono">NO RESPONSE YET</p>
     );
   }
 
   return (
-    <div className="glass-prose">
+    <div className="glass-prose text-sm leading-relaxed text-glass-text-primary">
       <Streamdown
         mode="streaming"
         parseIncompleteMarkdown

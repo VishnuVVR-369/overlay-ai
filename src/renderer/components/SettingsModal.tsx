@@ -39,26 +39,28 @@ function PasswordInput({
   }, []);
 
   return (
-    <div className="glass-input-group">
-      <label className="glass-label">
+    <div className="mb-5">
+      <label className="block text-xs font-semibold tracking-wide text-glass-text-secondary mb-2.5">
         <span className="flex items-center gap-2">
           {icon}
           {label}
         </span>
       </label>
-      <p className="glass-input-hint">{hint}</p>
-      <div className="glass-input-wrapper">
+      <p className="text-xs text-glass-text-muted mb-2.5 [&_a]:text-glass-accent-light [&_a]:no-underline hover:[&_a]:underline">
+        {hint}
+      </p>
+      <div className="relative">
         <input
           type={showPassword ? 'text' : 'password'}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="glass-input"
+          className="w-full py-3 px-4 pr-12 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md font-mono text-[13px] text-glass-text-primary placeholder:text-glass-text-subtle transition-all duration-glass-fast focus:outline-none focus:border-glass-accent focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)]"
         />
         <button
           type="button"
           onClick={toggleVisibility}
-          className="glass-input-toggle"
+          className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 bg-transparent border-none rounded-glass-sm text-glass-text-muted cursor-pointer flex items-center justify-center transition-all duration-glass-fast hover:text-glass-text-primary hover:bg-glass-bg-hover"
           aria-label={showPassword ? 'Hide API key' : 'Show API key'}
         >
           {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
@@ -70,9 +72,9 @@ function PasswordInput({
 
 function LoadingState(): React.ReactElement {
   return (
-    <div className="glass-loading">
-      <div className="glass-loading-spinner" />
-      <p className="glass-loading-text">Loading settings...</p>
+    <div className="flex flex-col items-center justify-center py-12">
+      <div className="w-9 h-9 border-2 border-glass-border-default border-t-glass-accent rounded-full animate-glass-spin mb-4" />
+      <p className="text-sm text-glass-text-muted">Loading settings...</p>
     </div>
   );
 }
@@ -128,13 +130,16 @@ export function SettingsModal({
 
   const footer = (
     <>
-      <button onClick={onClose} className="glass-btn glass-btn--ghost">
+      <button
+        onClick={onClose}
+        className="px-4 py-2.5 rounded-glass-sm font-sans text-[13px] font-medium cursor-pointer transition-all duration-glass-fast inline-flex items-center justify-center gap-2 bg-transparent border border-glass-border-default text-glass-text-secondary hover:bg-glass-bg-hover hover:border-glass-border-strong hover:text-glass-text-primary"
+      >
         Cancel
       </button>
       <button
         onClick={handleSave}
         disabled={isSaving || isLoading}
-        className="glass-btn glass-btn--primary"
+        className="px-4 py-2.5 rounded-glass-sm font-sans text-[13px] font-semibold cursor-pointer transition-all duration-glass-fast inline-flex items-center justify-center gap-2 bg-gradient-to-br from-glass-accent to-glass-accent-dark border-none text-white shadow-[0_2px_8px_rgba(99,102,241,0.4)] hover:from-glass-accent-light hover:to-glass-accent hover:shadow-[0_4px_16px_rgba(99,102,241,0.4)] hover:-translate-y-px active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
       >
         {isSaving ? 'Saving...' : 'Save'}
       </button>
@@ -193,14 +198,14 @@ export function SettingsModal({
             }
           />
 
-          <div className="glass-input-group">
-            <label className="glass-label">
+          <div className="mb-5">
+            <label className="block text-xs font-semibold tracking-wide text-glass-text-secondary mb-2.5">
               <span className="flex items-center gap-2">
                 <MessageIcon size={14} />
                 Custom System Prompt
               </span>
             </label>
-            <p className="glass-input-hint">
+            <p className="text-xs text-glass-text-muted mb-2.5">
               Customize how AI assistant behaves. Leave empty to use default
               interview assistant prompt.
             </p>
@@ -208,12 +213,12 @@ export function SettingsModal({
               value={customSystemPrompt}
               onChange={(e) => setCustomSystemPrompt(e.target.value)}
               placeholder="Enter your custom system prompt..."
-              className="glass-textarea"
+              className="w-full py-3 px-4 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md font-mono text-[13px] text-glass-text-primary placeholder:text-glass-text-subtle transition-all duration-glass-fast resize-y min-h-[120px] focus:outline-none focus:border-glass-accent focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)]"
               rows={6}
             />
           </div>
 
-          <p className="text-[11px] text-[var(--glass-text-subtle)] italic mt-4">
+          <p className="text-[11px] text-glass-text-subtle italic mt-4">
             API keys are stored securely on your device and take precedence over
             environment variables.
           </p>

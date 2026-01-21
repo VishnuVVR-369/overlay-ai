@@ -19,12 +19,18 @@ function ShortcutItem({
   description,
 }: ShortcutItemProps): React.ReactElement {
   return (
-    <div className="glass-help-item">
-      <div className="glass-help-item-header">
-        <span className="glass-help-item-title">{title}</span>
-        <kbd className="glass-kbd">{shortcut}</kbd>
+    <div className="p-3.5 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+      <div className="flex justify-between items-center mb-1.5">
+        <span className="text-[13px] font-medium text-glass-text-primary">
+          {title}
+        </span>
+        <kbd className="inline-flex items-center gap-1 px-2.5 py-1 bg-glass-bg-elevated border border-glass-border-subtle rounded-md font-mono text-[11px] text-glass-text-secondary">
+          {shortcut}
+        </kbd>
       </div>
-      <p className="glass-help-item-desc">{description}</p>
+      <p className="text-xs text-glass-text-muted m-0 leading-relaxed">
+        {description}
+      </p>
     </div>
   );
 }
@@ -37,8 +43,8 @@ interface SectionProps {
 
 function Section({ title, icon, children }: SectionProps): React.ReactElement {
   return (
-    <section className="glass-help-section">
-      <h3 className="glass-help-section-title">
+    <section className="mb-7 last:mb-0">
+      <h3 className="text-[13px] font-semibold text-glass-text-secondary mb-4 flex items-center gap-2 uppercase tracking-wide">
         {icon}
         {title}
       </h3>
@@ -85,7 +91,7 @@ const GETTING_STARTED_STEPS = [
           href="https://console.deepgram.com/"
           target="_blank"
           rel="noopener noreferrer"
-          className="glass-link"
+          className="text-glass-accent-light no-underline transition-colors duration-glass-fast hover:text-glass-accent hover:underline"
         >
           Deepgram
         </a>{' '}
@@ -94,7 +100,7 @@ const GETTING_STARTED_STEPS = [
           href="https://console.groq.com/"
           target="_blank"
           rel="noopener noreferrer"
-          className="glass-link"
+          className="text-glass-accent-light no-underline transition-colors duration-glass-fast hover:text-glass-accent hover:underline"
         >
           Groq
         </a>
@@ -106,7 +112,10 @@ const GETTING_STARTED_STEPS = [
     title: 'Start Live Mode:',
     content: (
       <>
-        Press <kbd className="glass-kbd glass-kbd--sm">{'\u2318\u21e7L'}</kbd>{' '}
+        Press{' '}
+        <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-elevated border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary">
+          {'\u2318\u21e7L'}
+        </kbd>{' '}
         to begin transcription. The status indicator shows connection state.
       </>
     ),
@@ -116,8 +125,10 @@ const GETTING_STARTED_STEPS = [
     content: (
       <>
         When you need help, press{' '}
-        <kbd className="glass-kbd glass-kbd--sm">{'\u2318\u21e7X'}</kbd> to
-        generate an AI response based on conversation context.
+        <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-elevated border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary">
+          {'\u2318\u21e7X'}
+        </kbd>{' '}
+        to generate an AI response based on conversation context.
       </>
     ),
   },
@@ -158,7 +169,10 @@ export function HelpModal({
   onClose,
 }: HelpModalProps): React.ReactElement | null {
   const footer = (
-    <button onClick={onClose} className="glass-btn glass-btn--primary">
+    <button
+      onClick={onClose}
+      className="px-4 py-2.5 rounded-glass-sm font-sans text-[13px] font-semibold cursor-pointer transition-all duration-glass-fast inline-flex items-center justify-center gap-2 bg-gradient-to-br from-glass-accent to-glass-accent-dark border-none text-white shadow-[0_2px_8px_rgba(99,102,241,0.4)] hover:from-glass-accent-light hover:to-glass-accent hover:shadow-[0_4px_16px_rgba(99,102,241,0.4)] hover:-translate-y-px active:translate-y-0"
+    >
       Got it
     </button>
   );
@@ -171,7 +185,7 @@ export function HelpModal({
       footer={footer}
     >
       <Section title="Keyboard Shortcuts" icon={<KeyboardIcon size={14} />}>
-        <div className="glass-help-grid">
+        <div className="flex flex-col gap-3">
           {KEYBOARD_SHORTCUTS.map((shortcut) => (
             <ShortcutItem key={shortcut.title} {...shortcut} />
           ))}
@@ -179,11 +193,14 @@ export function HelpModal({
       </Section>
 
       <Section title="Getting Started" icon={<InfoIcon size={14} />}>
-        <div className="glass-help-card">
-          <ol className="glass-help-list glass-help-list--ordered">
+        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+          <ol className="m-0 pl-5 flex flex-col gap-3">
             {GETTING_STARTED_STEPS.map((step, index) => (
-              <li key={index} className="glass-help-list-item">
-                <strong className="glass-help-list-title">{step.title}</strong>{' '}
+              <li
+                key={index}
+                className="text-[13px] text-glass-text-secondary leading-relaxed"
+              >
+                <strong className="text-glass-text-primary">{step.title}</strong>{' '}
                 {step.content}
               </li>
             ))}
@@ -192,11 +209,14 @@ export function HelpModal({
       </Section>
 
       <Section title="How It Works" icon={<InfoIcon size={14} />}>
-        <div className="glass-help-card">
-          <ul className="glass-help-list">
+        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+          <ul className="m-0 pl-5 flex flex-col gap-2.5">
             {HOW_IT_WORKS.map((item) => (
-              <li key={item.title} className="glass-help-list-item">
-                <strong className="glass-help-list-title">{item.title}</strong>{' '}
+              <li
+                key={item.title}
+                className="text-[13px] text-glass-text-secondary leading-relaxed"
+              >
+                <strong className="text-glass-text-primary">{item.title}</strong>{' '}
                 {item.description}
               </li>
             ))}
@@ -205,10 +225,13 @@ export function HelpModal({
       </Section>
 
       <Section title="Tips" icon={<InfoIcon size={14} />}>
-        <div className="glass-help-card">
-          <ul className="glass-help-list">
+        <div className="p-4 bg-glass-bg-secondary border border-glass-border-subtle rounded-glass-md">
+          <ul className="m-0 pl-5 flex flex-col gap-2.5">
             {TIPS.map((tip, index) => (
-              <li key={index} className="glass-help-list-item">
+              <li
+                key={index}
+                className="text-[13px] text-glass-text-secondary leading-relaxed"
+              >
                 {tip}
               </li>
             ))}

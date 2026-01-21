@@ -11,24 +11,29 @@ export interface StatusIndicatorProps {
 interface StatusConfig {
   label: string;
   stateClass: string;
+  colorClass: string;
 }
 
 const STATUS_CONFIG: Record<LiveModeState, StatusConfig> = {
   disconnected: {
     label: 'OFFLINE',
     stateClass: 'glass-status--disconnected',
+    colorClass: 'text-glass-neutral border-glass-border-subtle bg-glass-bg-secondary',
   },
   connecting: {
     label: 'CONNECTING',
     stateClass: 'glass-status--connecting',
+    colorClass: 'text-glass-warning border-glass-warning/25 bg-glass-warning/[0.08]',
   },
   connected: {
     label: 'LISTENING',
     stateClass: 'glass-status--connected',
+    colorClass: 'text-glass-success border-glass-success/25 bg-glass-success/[0.08]',
   },
   error: {
     label: 'ERROR',
     stateClass: 'glass-status--error',
+    colorClass: 'text-glass-error border-glass-error/25 bg-glass-error/[0.08]',
   },
 };
 
@@ -41,9 +46,11 @@ export function StatusIndicator({
   const displayLabel = state === 'error' && error ? 'ERROR' : config.label;
 
   return (
-    <div className={`glass-status ${config.stateClass}`}>
-      <span className="glass-status-dot" aria-hidden="true" />
-      {showLabel && <span className="glass-status-label">{displayLabel}</span>}
+    <div
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-full font-mono text-[10px] font-medium tracking-wide transition-all duration-glass-fast ${config.stateClass} ${config.colorClass}`}
+    >
+      <span className="glass-status-dot relative w-1.5 h-1.5" aria-hidden="true" />
+      {showLabel && <span>{displayLabel}</span>}
     </div>
   );
 }
@@ -67,10 +74,10 @@ export function InlineStatus({
   const config = STATUS_CONFIG[state];
 
   const colorClass = {
-    disconnected: 'text-[var(--glass-neutral)]',
-    connecting: 'text-[var(--glass-warning)]',
-    connected: 'text-[var(--glass-success)]',
-    error: 'text-[var(--glass-error)]',
+    disconnected: 'text-glass-neutral',
+    connecting: 'text-glass-warning',
+    connected: 'text-glass-success',
+    error: 'text-glass-error',
   }[state];
 
   return (

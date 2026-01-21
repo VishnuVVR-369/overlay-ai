@@ -27,22 +27,18 @@ export function Header({
   onClose,
 }: HeaderProps): React.ReactElement {
   return (
-    <header
-      className="glass-header draggable"
-      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-    >
-      <div className="glass-header-left">
-        <div className="glass-logo-mark">
+    <header className="shrink-0 px-3.5 py-2.5 flex items-center justify-between gap-3 border-b border-glass-border-subtle bg-glass-bg-secondary backdrop-blur-glass-lg draggable">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="w-[26px] h-[26px] bg-gradient-to-br from-glass-accent to-glass-accent-dark rounded-md flex items-center justify-center shadow-[0_2px_6px_rgba(99,102,241,0.4),inset_0_1px_1px_rgba(255,255,255,0.2)]">
           <LogoIcon size={14} strokeWidth={2.5} />
         </div>
-        <span className="glass-logo-text">Overlay AI</span>
+        <span className="text-[13px] font-semibold text-glass-text-primary tracking-tight">
+          Overlay AI
+        </span>
         <StatusBadge state={liveModeState} error={liveModeError} />
       </div>
 
-      <div
-        className="glass-header-right non-draggable"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-      >
+      <div className="flex items-center gap-1 shrink-0 non-draggable">
         <HeaderButton
           onClick={onOpenHelp}
           title="Help and Instructions"
@@ -88,7 +84,7 @@ function HeaderButton({
   return (
     <button
       onClick={onClick}
-      className="glass-header-btn"
+      className="w-7 h-7 p-0 bg-transparent border-none rounded-glass-sm text-glass-text-muted cursor-pointer flex items-center justify-center transition-all duration-glass-fast hover:bg-glass-bg-hover hover:text-glass-text-primary active:bg-glass-bg-active"
       title={title}
       aria-label={ariaLabel}
     >
