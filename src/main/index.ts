@@ -7,6 +7,7 @@ if (!app.isPackaged) {
 }
 console.log('[ENV] DEEPGRAM_API_KEY set:', !!process.env.DEEPGRAM_API_KEY);
 console.log('[ENV] GROQ_API_KEY set:', !!process.env.GROQ_API_KEY);
+console.log('[ENV] ALLOW_SCREEN_SHARING:', process.env.ALLOW_SCREEN_SHARING);
 
 import {
   initializeIPC,
@@ -65,11 +66,29 @@ function createWindow(): void {
 
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
+  const allowScreenSharing =
+    !app.isPackaged && process.env.ALLOW_SCREEN_SHARING === 'true';
+  const useContentProtection = !allowScreenSharing;
+
   stealthManager = new StealthWindowManager(mainWindow, {
-    useContentProtection: true,
+    useContentProtection,
     useNativeSharingType: false,
   });
   stealthManager.enableStealth();
+
+  if (app.isPackaged) {
+    console.log(
+      '[Security] Production build: Content protection always enabled'
+    );
+  } else if (allowScreenSharing) {
+    console.log(
+      '[Security] Development: Screen sharing enabled (visible to screenshots/screen share)'
+    );
+  } else {
+    console.log(
+      '[Security] Development: Content protection enabled (invisible to screenshots/screen share)'
+    );
+  }
 
   const nativeHandle = getNativeWindowHandle(mainWindow);
   if (nativeHandle.isValid) {
