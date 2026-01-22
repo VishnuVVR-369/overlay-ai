@@ -6,6 +6,7 @@ import {
   HelpIcon,
   CloseIcon,
   MinimizeIcon,
+  ChatIcon,
 } from './Icons';
 import type { LiveModeState } from '../types';
 
@@ -16,6 +17,7 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onMinimize: () => void;
   onClose: () => void;
+  onOpenChat: () => void;
 }
 
 export function Header({
@@ -25,6 +27,7 @@ export function Header({
   onOpenSettings,
   onMinimize,
   onClose,
+  onOpenChat,
 }: HeaderProps): React.ReactElement {
   return (
     <header className="shrink-0 px-3.5 py-2.5 flex items-center justify-between gap-3 border-b border-glass-border-subtle bg-glass-bg-secondary backdrop-blur-glass-lg draggable">
@@ -39,6 +42,12 @@ export function Header({
       </div>
 
       <div className="flex items-center gap-1 shrink-0 non-draggable">
+        <HeaderButton
+          onClick={onOpenChat}
+          title="Chat"
+          ariaLabel="Open chat"
+          icon={<ChatIcon size={15} />}
+        />
         <HeaderButton
           onClick={onOpenHelp}
           title="Help and Instructions"

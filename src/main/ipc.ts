@@ -31,10 +31,14 @@ import {
   isMinimizedMode as isMinimizedModeFromStore,
 } from './settingsStore';
 import { getSessionStatsManager, SessionStatsManager } from './sessionStats';
+import type { ChatState } from '../lib/chat';
+import { getChatWindowManager } from './chatWindow';
+import { getChatManager, destroyChatManager } from './llm/chatManager';
 
 let mainWindow: BrowserWindow | null = null;
 let liveModeManager: LiveModeManager | null = null;
 let sessionStatsManager: SessionStatsManager | null = null;
+let chatManagerInitialized = false;
 
 const WINDOW_DIMENSIONS = {
   minimized: { width: 280, height: 120 },
@@ -118,6 +122,64 @@ function initializeLiveModeManager(): void {
   liveModeManager.on('error', (error: Error) => {
     sendError(error.message, 'LIVE_MODE_ERROR');
   });
+}
+
+function initializeChatManager(): void {
+  if (chatManagerInitialized) {
+    return;
+  }
+
+  const chatManager = getChatManager();
+  const chatWindowManager = getChatWindowManager();
+
+  chatManager.on('stateChanged', (state: unknown) => {
+    chatWindowManager.sendToRenderer(
+      IPC_CHANNELS.CHAT_STATE_CHANGED,
+      state as ChatState
+    );
+  });
+
+  chatManagerInitialized = true;
+  console.log('[IPC] ChatManager initialized');
+}
+
+function closeChatWindow(): { success: boolean } {
+  const chatWindowManager = getChatWindowManager();
+  chatWindowManager.close();
+  return { success: true };
+}
+
+async function sendChatMessage(
+  message: string,
+  includeTranscript: boolean
+): Promise<{ success: boolean }> {
+  initializeChatManager();
+  const chatManager = getChatManager();
+  const chatWindowManager = getChatWindowManager();
+  const result = await chatManager.sendMessage(
+    message,
+    { includeTranscript },
+    (channel, data) => chatWindowManager.sendToRenderer(channel, data)
+  );
+  return result;
+}
+
+async function openChatWindow(): Promise<{ success: boolean }> {
+  const chatWindowManager = getChatWindowManager();
+  const { isOpen } = chatWindowManager.toggle();
+  console.log('[IPC] Chat window toggled, isOpen:', isOpen);
+  return { success: isOpen };
+}
+
+function getChatHistory() {
+  initializeChatManager();
+  const chatManager = getChatManager();
+  return chatManager.getHistory();
+}
+
+function clearChatHistory(): { success: boolean } {
+  const chatManager = getChatManager();
+  return chatManager.clearHistory();
 }
 
 async function startLiveMode(): Promise<LiveModeStatus> {
@@ -310,12 +372,28 @@ export function initializeIPC(window: BrowserWindow): void {
     (_event, settings: Partial<AppSettings>) => handleSaveSettings(settings)
   );
   ipcMain.handle(IPC_CHANNELS.TOGGLE_MINIMIZE_MODE, () => toggleMinimizeMode());
+  ipcMain.handle(IPC_CHANNELS.OPEN_CHAT_WINDOW, async () => openChatWindow());
+  ipcMain.handle(IPC_CHANNELS.CLOSE_CHAT_WINDOW, () => closeChatWindow());
+  ipcMain.handle(
+    IPC_CHANNELS.SEND_CHAT_MESSAGE,
+    (
+      _event,
+      {
+        message,
+        includeTranscript,
+      }: { message: string; includeTranscript: boolean }
+    ) => sendChatMessage(message, includeTranscript)
+  );
+  ipcMain.handle(IPC_CHANNELS.GET_CHAT_HISTORY, () => getChatHistory());
+  ipcMain.handle(IPC_CHANNELS.CLEAR_CHAT_HISTORY, () => clearChatHistory());
 }
 
 export function cleanupIPC(): void {
   stopLiveMode();
   disposeLiveModeManager();
   liveModeManager = null;
+  destroyChatManager();
+  chatManagerInitialized = false;
 
   const handlers = [
     IPC_CHANNELS.START_LIVE_MODE,
@@ -327,6 +405,11 @@ export function cleanupIPC(): void {
     IPC_CHANNELS.GET_SETTINGS,
     IPC_CHANNELS.SAVE_SETTINGS,
     IPC_CHANNELS.TOGGLE_MINIMIZE_MODE,
+    IPC_CHANNELS.OPEN_CHAT_WINDOW,
+    IPC_CHANNELS.CLOSE_CHAT_WINDOW,
+    IPC_CHANNELS.SEND_CHAT_MESSAGE,
+    IPC_CHANNELS.GET_CHAT_HISTORY,
+    IPC_CHANNELS.CLEAR_CHAT_HISTORY,
   ];
   handlers.forEach((channel) => ipcMain.removeHandler(channel));
 
@@ -342,4 +425,5 @@ export {
   closeWindow,
   toggleMinimizeMode,
   isMinimizedModeFromStore as isMinimized,
+  openChatWindow,
 };
