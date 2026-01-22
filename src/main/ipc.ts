@@ -6,6 +6,7 @@ import {
   type AnswerData,
   type IPCEvents,
   type AppSettings,
+  type SessionStats,
 } from '../lib/ipc';
 import type { TranscriptSegment, Speaker } from '../lib/transcript';
 import {
@@ -29,9 +30,11 @@ import {
   toggleMinimizeMode as toggleMinimizeModeInStore,
   isMinimizedMode as isMinimizedModeFromStore,
 } from './settingsStore';
+import { getSessionStatsManager, SessionStatsManager } from './sessionStats';
 
 let mainWindow: BrowserWindow | null = null;
 let liveModeManager: LiveModeManager | null = null;
+let sessionStatsManager: SessionStatsManager | null = null;
 
 const WINDOW_DIMENSIONS = {
   minimized: { width: 280, height: 120 },
@@ -51,6 +54,17 @@ function sendError(message: string, code?: string): void {
   sendToRenderer<'error'>(IPC_CHANNELS.ERROR, { message, code });
 }
 
+function sendSessionStats(stats: SessionStats): void {
+  sendToRenderer<'sessionStatsUpdated'>(
+    IPC_CHANNELS.SESSION_STATS_UPDATED,
+    stats
+  );
+}
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
 function sendAnswerChunk(chunk: string, isComplete: boolean): void {
   sendToRenderer<'answerChunk'>(IPC_CHANNELS.ANSWER_CHUNK, {
     chunk,
@@ -65,10 +79,20 @@ function updateAnswerData(data: AnswerData): void {
 
 function initializeLiveModeManager(): void {
   liveModeManager = getDefaultLiveModeManager();
+  sessionStatsManager = getSessionStatsManager();
+
+  sessionStatsManager.on('statsUpdated', (stats: SessionStats) => {
+    sendSessionStats(stats);
+  });
 
   liveModeManager.on('stateChanged', (status: LiveModeStatus) => {
     setLiveModeStatus(status);
     sendToRenderer<'liveModeChanged'>(IPC_CHANNELS.LIVE_MODE_CHANGED, status);
+
+    if (status.state === 'connected') {
+      sessionStatsManager?.startSession();
+    }
+    // Don't end session on disconnect - stats persist until clearOverlay is called
   });
 
   liveModeManager.on('segment', (segment: TranscriptSegment) => {
@@ -76,6 +100,11 @@ function initializeLiveModeManager(): void {
       IPC_CHANNELS.TRANSCRIPT_SEGMENT,
       segment
     );
+
+    const wordCount = countWords(segment.text);
+    if (wordCount > 0) {
+      sessionStatsManager?.addWords(wordCount);
+    }
   });
 
   liveModeManager.on('interim', (text: string, speaker: Speaker) => {
@@ -149,16 +178,22 @@ async function triggerAnswer(modelId?: string): Promise<AnswerData> {
 
   try {
     const chunks: string[] = [];
+    const { chunks: chunkGenerator, tokenUsage } =
+      provider.streamResponseWithUsage(context, effectiveModelId);
 
-    for await (const chunk of provider.streamResponse(
-      context,
-      effectiveModelId
-    )) {
+    for await (const chunk of chunkGenerator) {
       chunks.push(chunk);
       sendAnswerChunk(chunk, false);
     }
 
     sendAnswerChunk('', true);
+
+    try {
+      const usage = await tokenUsage;
+      sessionStatsManager?.addTokens(usage.inputTokens, usage.outputTokens);
+    } catch {
+      console.warn('[IPC] Failed to get token usage');
+    }
 
     const data: AnswerData = {
       state: 'complete',
@@ -198,6 +233,7 @@ function clearOverlay(): { success: boolean } {
   getDefaultContextBuffer().clear();
   setInterimTranscript(null);
   updateAnswerData({ state: 'idle', text: '' });
+  sessionStatsManager?.reset();
   return { success: true };
 }
 

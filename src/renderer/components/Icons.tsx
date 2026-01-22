@@ -184,3 +184,31 @@ export const MicrophoneIcon: React.FC<IconProps> = ({
     <line x1="12" x2="12" y1="19" y2="22" />
   </svg>
 );
+
+export const ClockIcon = createIcon(
+  <>
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </>
+);
+
+export const TextIcon = createIcon(
+  <>
+    <path d="M17 6.1H3" />
+    <path d="M21 12.1H3" />
+    <path d="M15.1 18H3" />
+  </>
+);
+
+export const TokenIcon = createIcon(
+  <>
+    <path d="M12 2v4" />
+    <path d="m16.24 4.24-2.83 2.83" />
+    <path d="M20 12h-4" />
+    <path d="m19.76 16.24-2.83-2.83" />
+    <path d="M12 20v-4" />
+    <path d="m7.76 19.76 2.83-2.83" />
+    <path d="M4 12h4" />
+    <path d="m4.24 7.76 2.83 2.83" />
+  </>
+);

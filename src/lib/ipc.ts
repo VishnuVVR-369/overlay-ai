@@ -35,6 +35,13 @@ export interface ContextStats {
   durationMs: number;
 }
 
+export interface SessionStats {
+  sessionStartedAt: number | null;
+  totalWordsTranscribed: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+}
+
 export interface AppStatus {
   liveMode: LiveModeStatus;
   answer: AnswerData;
@@ -93,6 +100,7 @@ export interface IPCEvents {
   answerStateChanged: AnswerData;
   error: { message: string; code?: string };
   minimizeModeChanged: { isMinimized: boolean };
+  sessionStatsUpdated: SessionStats;
 }
 
 export const IPC_CHANNELS = {
@@ -112,6 +120,7 @@ export const IPC_CHANNELS = {
   ANSWER_STATE_CHANGED: 'overlay:answer-state-changed',
   ERROR: 'overlay:error',
   MINIMIZE_MODE_CHANGED: 'overlay:minimize-mode-changed',
+  SESSION_STATS_UPDATED: 'overlay:session-stats-updated',
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

@@ -9,6 +9,16 @@ import {
   isGroqConfiguredFromSettings,
 } from '../settingsStore';
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface StreamResponseResult {
+  chunks: AsyncGenerator<string, void, unknown>;
+  tokenUsage: Promise<TokenUsage>;
+}
+
 export const GROQ_MODELS = {
   LLAMA_3_3_70B: 'llama-3.3-70b-versatile',
   OPENAI_GPT_OSS_120B: 'openai/gpt-oss-120b',
@@ -61,53 +71,98 @@ export class GroqProvider implements LLMProvider {
     context: string,
     modelId: string = DEFAULT_MODEL_ID
   ): AsyncGenerator<string, void, unknown> {
+    const result = this.streamResponseWithUsage(context, modelId);
+    yield* result.chunks;
+  }
+
+  streamResponseWithUsage(
+    context: string,
+    modelId: string = DEFAULT_MODEL_ID
+  ): StreamResponseResult {
     const client = this.getClient();
+    let resolveTokenUsage: (usage: TokenUsage) => void;
+    let rejectTokenUsage: (error: Error) => void;
 
-    try {
-      const stream = await client.chat.completions.create({
-        model: modelId,
-        messages: [
-          { role: 'system', content: getSystemPrompt() },
-          { role: 'user', content: buildUserPrompt(context) },
-        ],
-        stream: true,
-        temperature: 0.7,
-        max_tokens: 2048,
-      });
+    const tokenUsagePromise = new Promise<TokenUsage>((resolve, reject) => {
+      resolveTokenUsage = resolve;
+      rejectTokenUsage = reject;
+    });
 
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content;
-        if (content) {
-          yield content;
+    const providerName = this.name;
+
+    async function* generateChunks(): AsyncGenerator<string, void, unknown> {
+      try {
+        const stream = await client.chat.completions.create({
+          model: modelId,
+          messages: [
+            { role: 'system', content: getSystemPrompt() },
+            { role: 'user', content: buildUserPrompt(context) },
+          ],
+          stream: true,
+          temperature: 0.7,
+          max_tokens: 2048,
+        });
+
+        let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content;
+          if (content) {
+            yield content;
+          }
+
+          // Usage info may be available in the final chunk (type assertion needed)
+          const chunkWithUsage = chunk as typeof chunk & {
+            usage?: { prompt_tokens?: number; completion_tokens?: number };
+          };
+          if (chunkWithUsage.usage) {
+            tokenUsage = {
+              inputTokens: chunkWithUsage.usage.prompt_tokens || 0,
+              outputTokens: chunkWithUsage.usage.completion_tokens || 0,
+            };
+          }
         }
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('rate limit')) {
+
+        resolveTokenUsage(tokenUsage);
+      } catch (error) {
+        if (error instanceof Error) {
+          rejectTokenUsage(error);
+          if (error.message.includes('rate limit')) {
+            throw new LLMError(
+              'Rate limit exceeded',
+              LLM_ERROR_CODES.RATE_LIMITED,
+              providerName,
+              error
+            );
+          }
+          if (error.message.includes('context length')) {
+            throw new LLMError(
+              'Context too long for model',
+              LLM_ERROR_CODES.CONTEXT_TOO_LONG,
+              providerName,
+              error
+            );
+          }
           throw new LLMError(
-            'Rate limit exceeded',
-            LLM_ERROR_CODES.RATE_LIMITED,
-            this.name,
+            error.message,
+            LLM_ERROR_CODES.API_ERROR,
+            providerName,
             error
           );
         }
-        if (error.message.includes('context length')) {
-          throw new LLMError(
-            'Context too long for model',
-            LLM_ERROR_CODES.CONTEXT_TOO_LONG,
-            this.name,
-            error
-          );
-        }
+        rejectTokenUsage(new Error('Unknown error'));
         throw new LLMError(
-          error.message,
+          'Unknown error',
           LLM_ERROR_CODES.API_ERROR,
-          this.name,
-          error
+          providerName
         );
       }
-      throw new LLMError('Unknown error', LLM_ERROR_CODES.API_ERROR, this.name);
     }
+
+    return {
+      chunks: generateChunks(),
+      tokenUsage: tokenUsagePromise,
+    };
   }
 
   async generateResponse(
