@@ -55,7 +55,7 @@ function PasswordInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full py-3 px-4 pr-12 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md font-mono text-[13px] text-glass-text-primary placeholder:text-glass-text-subtle transition-all duration-glass-fast focus:outline-none focus:border-glass-accent focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)]"
+          className="w-full py-3 px-4 pr-12 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md font-mono text-[13px] text-glass-text-primary placeholder:text-glass-text-subtle transition-all duration-glass-fast focus:outline-none focus:border-glass-accent focus:shadow-[0_0_0_3px_rgba(155,182,255,0.2)]"
         />
         <button
           type="button"
@@ -139,7 +139,7 @@ export function SettingsModal({
       <button
         onClick={handleSave}
         disabled={isSaving || isLoading}
-        className="px-4 py-2.5 rounded-glass-sm font-sans text-[13px] font-semibold cursor-pointer transition-all duration-glass-fast inline-flex items-center justify-center gap-2 bg-gradient-to-br from-glass-accent to-glass-accent-dark border-none text-white shadow-[0_2px_8px_rgba(99,102,241,0.4)] hover:from-glass-accent-light hover:to-glass-accent hover:shadow-[0_4px_16px_rgba(99,102,241,0.4)] hover:-translate-y-px active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+        className="px-4 py-2.5 rounded-glass-sm font-sans text-[13px] font-semibold cursor-pointer transition-all duration-glass-fast inline-flex items-center justify-center gap-2 bg-gradient-to-br from-glass-accent to-glass-accent-dark border-none text-white shadow-[0_2px_10px_rgba(155,182,255,0.35)] hover:from-glass-accent-light hover:to-glass-accent hover:shadow-[0_6px_18px_rgba(155,182,255,0.4)] hover:-translate-y-px active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
       >
         {isSaving ? 'Saving...' : 'Save'}
       </button>
@@ -213,7 +213,7 @@ export function SettingsModal({
               value={customSystemPrompt}
               onChange={(e) => setCustomSystemPrompt(e.target.value)}
               placeholder="Enter your custom system prompt..."
-              className="w-full py-3 px-4 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md font-mono text-[13px] text-glass-text-primary placeholder:text-glass-text-subtle transition-all duration-glass-fast resize-y min-h-[120px] focus:outline-none focus:border-glass-accent focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)]"
+              className="w-full py-3 px-4 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md font-mono text-[13px] text-glass-text-primary placeholder:text-glass-text-subtle transition-all duration-glass-fast resize-y min-h-[120px] focus:outline-none focus:border-glass-accent focus:shadow-[0_0_0_3px_rgba(155,182,255,0.2)]"
               rows={6}
             />
           </div>

@@ -55,7 +55,7 @@ function App(): React.ReactElement {
     state.answerState !== 'error';
 
   return (
-    <div className="glass-container relative flex flex-col h-screen max-h-screen overflow-hidden bg-glass-bg-deep backdrop-blur-glass-xl text-glass-text-primary">
+    <div className="glass-container relative flex flex-col h-screen max-h-screen overflow-hidden bg-glass-bg-deep backdrop-blur-glass-2xl text-glass-text-primary">
       <Header
         liveModeState={state.liveMode.state}
         liveModeError={state.liveMode.error}
