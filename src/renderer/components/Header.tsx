@@ -29,7 +29,7 @@ export function Header({
   return (
     <header className="shrink-0 px-3.5 py-2.5 flex items-center justify-between gap-3 border-b border-glass-border-subtle bg-glass-bg-secondary backdrop-blur-glass-lg draggable">
       <div className="flex items-center gap-2.5 min-w-0">
-        <div className="w-[26px] h-[26px] bg-gradient-to-br from-glass-accent to-glass-accent-dark rounded-md flex items-center justify-center shadow-[0_2px_6px_rgba(99,102,241,0.4),inset_0_1px_1px_rgba(255,255,255,0.2)]">
+        <div className="w-[26px] h-[26px] bg-gradient-to-br from-glass-accent to-glass-accent-dark rounded-md flex items-center justify-center shadow-[0_2px_8px_rgba(155,182,255,0.4),inset_0_1px_1px_rgba(255,255,255,0.25)]">
           <LogoIcon size={14} strokeWidth={2.5} />
         </div>
         <span className="text-[13px] font-semibold text-glass-text-primary tracking-tight">

@@ -207,7 +207,7 @@ export function HelpModal({
   const footer = (
     <button
       onClick={onClose}
-      className="px-4 py-2.5 rounded-glass-sm font-sans text-[13px] font-semibold cursor-pointer transition-all duration-glass-fast inline-flex items-center justify-center gap-2 bg-gradient-to-br from-glass-accent to-glass-accent-dark border-none text-white shadow-[0_2px_8px_rgba(99,102,241,0.4)] hover:from-glass-accent-light hover:to-glass-accent hover:shadow-[0_4px_16px_rgba(99,102,241,0.4)] hover:-translate-y-px active:translate-y-0"
+      className="px-4 py-2.5 rounded-glass-sm font-sans text-[13px] font-semibold cursor-pointer transition-all duration-glass-fast inline-flex items-center justify-center gap-2 bg-gradient-to-br from-glass-accent to-glass-accent-dark border-none text-white shadow-[0_2px_10px_rgba(155,182,255,0.35)] hover:from-glass-accent-light hover:to-glass-accent hover:shadow-[0_6px_18px_rgba(155,182,255,0.4)] hover:-translate-y-px active:translate-y-0"
     >
       Got it
     </button>

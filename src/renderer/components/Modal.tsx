@@ -48,11 +48,11 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-glass-sm flex items-center justify-center z-[100] animate-glass-fade-in max-h-screen overflow-hidden"
+      className="fixed inset-0 bg-black/35 backdrop-blur-glass-md flex items-center justify-center z-[100] animate-glass-fade-in max-h-screen overflow-hidden"
       onClick={handleBackdropClick}
     >
       <div
-        className="glass-modal relative w-full max-w-[460px] m-5 bg-glass-bg-deep border border-glass-border-default rounded-glass-xl backdrop-blur-glass-lg shadow-[0_8px_32px_rgba(0,0,0,0.25),0_0_60px_rgba(99,102,241,0.1)] overflow-hidden flex flex-col animate-glass-slide-up"
+        className="glass-modal relative w-full max-w-[460px] m-5 bg-glass-bg-deep border border-glass-border-default rounded-glass-xl backdrop-blur-glass-lg shadow-[0_12px_40px_rgba(0,0,0,0.22),0_0_80px_rgba(155,182,255,0.18)] overflow-hidden flex flex-col animate-glass-slide-up"
         onClick={handleContentClick}
         style={{ maxHeight }}
       >
