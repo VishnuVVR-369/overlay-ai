@@ -27,6 +27,9 @@ ringbuf = "0.3"
 # Signal handling (Ctrl+C)
 ctrlc = "3.4"
 
+# High-quality resampling
+rubato = "0.14"
+
 # macOS ScreenCaptureKit bindings (for system audio capture)
 # Note: Using =1.2.0 to avoid macOS 26+ SCScreenshotConfiguration symbols
 [target.'cfg(target_os = "macos")'.dependencies]

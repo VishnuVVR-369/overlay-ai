@@ -7,13 +7,14 @@
 //! - Outputs raw PCM to stdout or file
 
 use crate::config::{
-    LOG_INTERVAL_MIXER, OUTPUT_BUFFER_SIZE, OUTPUT_CHANNELS, RING_BUFFER_SIZE, SLEEP_MS_NO_DATA,
-    SYSTEM_AUDIO_BUFFER_SIZE,
+    LOG_INTERVAL_MIXER, LOWPASS_CUTOFF_HZ, OUTPUT_BUFFER_SIZE, OUTPUT_CHANNELS, RING_BUFFER_SIZE,
+    SLEEP_MS_NO_DATA, SYSTEM_AUDIO_BUFFER_SIZE,
 };
 use crate::device::get_input_device;
 use crate::errors::AudioEngineError;
 use crate::mixing::mix_to_stereo;
-use crate::resampling::resample_to_16khz_mono;
+use crate::processing::AudioPreprocessor;
+use crate::resampling::{resample_linear_f32, StreamingResampler};
 use crate::ring_buffer::{create_ring_buffer, RingBufferConsumer, RingBufferProducer};
 use crate::sample_conversion::SampleConverter;
 use crate::system_audio::SystemAudioCapture;
@@ -35,6 +36,152 @@ pub struct CaptureArgs {
     pub sample_rate: u32,
     pub device: String,
     pub output_file: Option<String>,
+}
+
+struct MicProcessor {
+    input_sample_rate: u32,
+    input_channels: u16,
+    target_sample_rate: u32,
+    preprocessor: AudioPreprocessor,
+    resampler: Option<StreamingResampler>,
+    use_linear_resample: bool,
+}
+
+impl MicProcessor {
+    fn new(input_sample_rate: u32, input_channels: u16, target_sample_rate: u32) -> Self {
+        let resampler = if input_sample_rate != target_sample_rate {
+            match StreamingResampler::new(input_sample_rate, target_sample_rate) {
+                Ok(r) => Some(r),
+                Err(e) => {
+                    eprintln!(
+                        "[WARN] Failed to initialize rubato resampler ({}). Falling back to linear.",
+                        e
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        let use_linear_resample = input_sample_rate != target_sample_rate && resampler.is_none();
+
+        Self {
+            input_sample_rate,
+            input_channels,
+            target_sample_rate,
+            preprocessor: AudioPreprocessor::new(
+                input_sample_rate,
+                target_sample_rate,
+                LOWPASS_CUTOFF_HZ,
+            ),
+            resampler,
+            use_linear_resample,
+        }
+    }
+
+    fn process<T, F>(
+        &mut self,
+        data: &[T],
+        convert: &F,
+        system_consumer: &RingBufferConsumer,
+        producer: &RingBufferProducer,
+    ) where
+        T: Copy,
+        F: Fn(&T) -> i16,
+    {
+        let call_count = PROCESS_AUDIO_COUNTER.fetch_add(1, Ordering::Relaxed);
+
+        let input_channels = self.input_channels as usize;
+        if input_channels == 0 {
+            return;
+        }
+
+        let frames = data.len() / input_channels;
+        let mut mono = Vec::with_capacity(frames);
+
+        for frame in 0..frames {
+            let base = frame * input_channels;
+            let mut sum = 0.0f32;
+            for ch in 0..input_channels {
+                let idx = base + ch;
+                if let Some(sample) = data.get(idx) {
+                    let s_i16 = convert(sample);
+                    sum += s_i16 as f32 / i16::MAX as f32;
+                }
+            }
+            mono.push(sum / input_channels as f32);
+        }
+
+        // Preprocess (DC blocking, optional low-pass for downsampling)
+        self.preprocessor.process_in_place(&mut mono);
+
+        // Resample to target rate
+        let resampled = if self.input_sample_rate == self.target_sample_rate {
+            mono
+        } else if let Some(resampler) = self.resampler.as_mut() {
+            match resampler.process(&mono) {
+                Ok(out) => out,
+                Err(e) => {
+                    eprintln!(
+                        "[WARN] rubato resampler error ({}). Falling back to linear.",
+                        e
+                    );
+                    self.use_linear_resample = true;
+                    resample_linear_f32(&mono, self.input_sample_rate, self.target_sample_rate)
+                }
+            }
+        } else if self.use_linear_resample {
+            resample_linear_f32(&mono, self.input_sample_rate, self.target_sample_rate)
+        } else {
+            mono
+        };
+
+        if resampled.is_empty() {
+            return;
+        }
+
+        // Convert to i16
+        let mut mic_resampled = Vec::with_capacity(resampled.len());
+        for &s in &resampled {
+            let scaled = s * i16::MAX as f32;
+            mic_resampled.push(scaled.clamp(i16::MIN as f32, i16::MAX as f32) as i16);
+        }
+
+        // Get system audio samples from ring buffer (same count as mic samples)
+        let (system_samples, system_read) = if let Ok(mut cons) = system_consumer.lock() {
+            let available = cons.len();
+            let mut buf = vec![0i16; mic_resampled.len()];
+            let read = cons.pop_slice(&mut buf);
+            if read < buf.len() {
+                // Not enough system audio, fill rest with silence
+                buf.truncate(read);
+                buf.resize(mic_resampled.len(), 0);
+            }
+            (buf, (read, available))
+        } else {
+            // If we can't lock, use silence
+            (vec![0i16; mic_resampled.len()], (0, 0))
+        };
+
+        // Log mixing details for first few calls and periodically
+        if call_count < 5 || call_count.is_multiple_of(LOG_INTERVAL_MIXER) {
+            eprintln!(
+                "[DEBUG] Mixer #{}: mic={} samples, system={}/{} samples (read/available)",
+                call_count,
+                mic_resampled.len(),
+                system_read.0,
+                system_read.1
+            );
+        }
+
+        // Mix to stereo (Channel 0 = System, Channel 1 = Mic)
+        let stereo = mix_to_stereo(&system_samples, &mic_resampled);
+
+        // Push to ring buffer (drop samples if buffer is full)
+        if let Ok(mut prod) = producer.lock() {
+            let _ = prod.push_slice(&stereo);
+        }
+    }
 }
 
 /// Capture audio from the microphone and system, mix to stereo, and write to output
@@ -90,6 +237,7 @@ pub fn run_audio_capture(args: CaptureArgs) -> Result<()> {
         &config,
         input_sample_rate,
         input_channels,
+        args.sample_rate,
         &producer,
         &system_consumer,
     )?;
@@ -117,6 +265,7 @@ fn build_input_stream(
     config: &cpal::SupportedStreamConfig,
     input_sample_rate: u32,
     input_channels: u16,
+    target_sample_rate: u32,
     producer: &RingBufferProducer,
     system_consumer: &RingBufferConsumer,
 ) -> Result<cpal::Stream> {
@@ -132,6 +281,7 @@ fn build_input_stream(
             &stream_config,
             input_sample_rate,
             input_channels,
+            target_sample_rate,
             producer,
             system_consumer,
             err_fn,
@@ -142,6 +292,7 @@ fn build_input_stream(
             &stream_config,
             input_sample_rate,
             input_channels,
+            target_sample_rate,
             producer,
             system_consumer,
             err_fn,
@@ -152,6 +303,7 @@ fn build_input_stream(
             &stream_config,
             input_sample_rate,
             input_channels,
+            target_sample_rate,
             producer,
             system_consumer,
             err_fn,
@@ -173,6 +325,7 @@ fn build_stream_for_format<T, F>(
     stream_config: &cpal::StreamConfig,
     input_sample_rate: u32,
     input_channels: u16,
+    target_sample_rate: u32,
     producer: &RingBufferProducer,
     system_consumer: &RingBufferConsumer,
     err_fn: impl FnMut(cpal::StreamError) + Send + 'static,
@@ -185,81 +338,18 @@ where
     let mic_prod = Arc::clone(producer);
     let sys_cons = Arc::clone(system_consumer);
     let convert_clone = convert.clone();
+    let mut processor = MicProcessor::new(input_sample_rate, input_channels, target_sample_rate);
 
     device
         .build_input_stream(
             stream_config,
             move |data: &[T], _: &cpal::InputCallbackInfo| {
-                process_audio_data(
-                    data,
-                    input_sample_rate,
-                    input_channels,
-                    &mic_prod,
-                    &sys_cons,
-                    &convert_clone,
-                );
+                processor.process(data, &convert_clone, &sys_cons, &mic_prod);
             },
             err_fn,
             None,
         )
         .context("Failed to build input stream")
-}
-
-/// Process audio data from the input stream (microphone)
-/// Mixes with system audio from the system_consumer ring buffer
-fn process_audio_data<T, F>(
-    data: &[T],
-    input_sample_rate: u32,
-    input_channels: u16,
-    producer: &RingBufferProducer,
-    system_consumer: &RingBufferConsumer,
-    convert: &F,
-) where
-    T: Copy,
-    F: Fn(&T) -> i16,
-{
-    let call_count = PROCESS_AUDIO_COUNTER.fetch_add(1, Ordering::Relaxed);
-
-    // Convert samples to i16
-    let samples_i16: Vec<i16> = data.iter().map(convert).collect();
-
-    // Resample microphone to target rate (mono)
-    let mic_resampled = resample_to_16khz_mono(&samples_i16, input_sample_rate, input_channels);
-
-    // Get system audio samples from ring buffer (same count as mic samples)
-    let (system_samples, system_read) = if let Ok(mut cons) = system_consumer.lock() {
-        let available = cons.len();
-        let mut buf = vec![0i16; mic_resampled.len()];
-        let read = cons.pop_slice(&mut buf);
-        if read < buf.len() {
-            // Not enough system audio, fill rest with silence
-            buf.truncate(read);
-            buf.resize(mic_resampled.len(), 0);
-        }
-        (buf, (read, available))
-    } else {
-        // If we can't lock, use silence
-        (vec![0i16; mic_resampled.len()], (0, 0))
-    };
-
-    // Log mixing details for first few calls and periodically
-    if call_count < 5 || call_count.is_multiple_of(LOG_INTERVAL_MIXER) {
-        eprintln!(
-            "[DEBUG] Mixer #{}: mic={} samples, system={}/{} samples (read/available)",
-            call_count,
-            mic_resampled.len(),
-            system_read.0,
-            system_read.1
-        );
-    }
-
-    // Mix to stereo (Channel 0 = System, Channel 1 = Mic)
-    let stereo = mix_to_stereo(&system_samples, &mic_resampled);
-
-    // Push to ring buffer (drop samples if buffer is full)
-    if let Ok(mut prod) = producer.lock() {
-        let _ = prod.push_slice(&stereo);
-    }
 }
 
 /// Create output writer (stdout or file)

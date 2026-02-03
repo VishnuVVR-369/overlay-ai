@@ -40,3 +40,13 @@ pub const DEBUG_LOG_INITIAL_COUNT: usize = 5;
 
 /// Extended debug log count for detailed debugging
 pub const DEBUG_LOG_EXTENDED_COUNT: usize = 10;
+
+/// DC blocker pole (closer to 1.0 = more low-frequency preservation)
+pub const DC_BLOCKER_R: f32 = 0.995;
+
+/// Low-pass filter Q (Butterworth-ish)
+pub const LOWPASS_Q: f32 = 0.707;
+
+/// Low-pass cutoff for anti-aliasing when downsampling (Hz)
+/// Keep below Nyquist of target rate (16kHz -> 8kHz). 7.2kHz is conservative.
+pub const LOWPASS_CUTOFF_HZ: f32 = 7200.0;

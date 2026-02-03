@@ -3,14 +3,17 @@
 //! This module provides the handler for ScreenCaptureKit audio stream callbacks.
 
 use crate::config::{
-    DEBUG_LOG_EXTENDED_COUNT, DEBUG_LOG_INITIAL_COUNT, LOG_INTERVAL_DEBUG, STEREO_CHANNELS,
+    DEBUG_LOG_EXTENDED_COUNT, DEBUG_LOG_INITIAL_COUNT, LOG_INTERVAL_DEBUG, LOWPASS_CUTOFF_HZ,
+    STEREO_CHANNELS,
 };
 use crate::logging::DebugLogger;
-use crate::resampling::resample_linear;
+use crate::processing::AudioPreprocessor;
+use crate::resampling::{resample_linear_f32, StreamingResampler};
 use crate::ring_buffer::RingBufferProducer;
 use screencapturekit::prelude::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex;
 
 /// Handler for ScreenCaptureKit stream output
 pub struct SystemAudioHandler {
@@ -24,6 +27,12 @@ pub struct SystemAudioHandler {
     buffer_count: Arc<AtomicUsize>,
     /// Debug logger
     logger: Arc<DebugLogger>,
+    /// Audio preprocessor (DC blocking, low-pass)
+    preprocessor: Mutex<AudioPreprocessor>,
+    /// Resampler (rubato) with buffering
+    resampler: Mutex<Option<StreamingResampler>>,
+    /// Fallback to linear if rubato fails
+    use_linear_resample: AtomicUsize,
 }
 
 impl SystemAudioHandler {
@@ -40,6 +49,23 @@ impl SystemAudioHandler {
             target_sample_rate,
             buffer_count: Arc::new(AtomicUsize::new(0)),
             logger,
+            preprocessor: Mutex::new(AudioPreprocessor::new(
+                source_sample_rate,
+                target_sample_rate,
+                LOWPASS_CUTOFF_HZ,
+            )),
+            resampler: Mutex::new(
+                StreamingResampler::new(source_sample_rate, target_sample_rate)
+                    .map(Some)
+                    .unwrap_or_else(|e| {
+                        eprintln!(
+                            "[WARN] Failed to initialize rubato resampler ({}). Falling back to linear.",
+                            e
+                        );
+                        None
+                    }),
+            ),
+            use_linear_resample: AtomicUsize::new(0),
         }
     }
 
@@ -215,47 +241,86 @@ impl SystemAudioHandler {
 
     /// Process audio samples: convert, mix to mono, resample, and push to buffer
     fn process_audio_samples(&self, audio_data: Vec<f32>, callback_count: usize) {
-        // Convert f32 to i16 (ScreenCaptureKit outputs Float32)
-        let i16_samples: Vec<i16> = audio_data
-            .iter()
-            .map(|&s| {
-                let scaled = s * i16::MAX as f32;
-                scaled.clamp(i16::MIN as f32, i16::MAX as f32) as i16
-            })
-            .collect();
-
+        let input_len = audio_data.len();
         // Mix to mono (assuming stereo input from ScreenCaptureKit)
-        let mono_samples = if i16_samples.len() >= STEREO_CHANNELS {
-            let frame_count = i16_samples.len() / STEREO_CHANNELS;
+        let mono_samples = if audio_data.len() >= STEREO_CHANNELS {
+            let frame_count = audio_data.len() / STEREO_CHANNELS;
             let mut mono = Vec::with_capacity(frame_count);
             for i in 0..frame_count {
-                let mut sum: i32 = 0;
+                let mut sum = 0.0f32;
                 for ch in 0..STEREO_CHANNELS {
-                    if i * STEREO_CHANNELS + ch < i16_samples.len() {
-                        sum += i16_samples[i * STEREO_CHANNELS + ch] as i32;
+                    let idx = i * STEREO_CHANNELS + ch;
+                    if let Some(sample) = audio_data.get(idx) {
+                        sum += *sample;
                     }
                 }
-                mono.push((sum / STEREO_CHANNELS as i32) as i16);
+                mono.push(sum / STEREO_CHANNELS as f32);
             }
             mono
         } else {
-            i16_samples
+            audio_data
         };
 
+        // Preprocess (DC blocking, optional low-pass for downsampling)
+        let mut mono_samples = mono_samples;
+        if let Ok(mut pre) = self.preprocessor.lock() {
+            pre.process_in_place(&mut mono_samples);
+        }
+
         // Resample to target rate if needed
-        let resampled = if self.source_sample_rate != self.target_sample_rate {
-            resample_linear(
+        let resampled = if self.source_sample_rate == self.target_sample_rate {
+            mono_samples
+        } else if self.use_linear_resample.load(Ordering::Relaxed) == 1 {
+            resample_linear_f32(
                 &mono_samples,
                 self.source_sample_rate,
                 self.target_sample_rate,
             )
+        } else if let Ok(mut resampler) = self.resampler.lock() {
+            if let Some(resampler) = resampler.as_mut() {
+                match resampler.process(&mono_samples) {
+                    Ok(out) => out,
+                    Err(e) => {
+                        eprintln!(
+                            "[WARN] rubato resampler error ({}). Falling back to linear.",
+                            e
+                        );
+                        self.use_linear_resample.store(1, Ordering::Relaxed);
+                        resample_linear_f32(
+                            &mono_samples,
+                            self.source_sample_rate,
+                            self.target_sample_rate,
+                        )
+                    }
+                }
+            } else {
+                resample_linear_f32(
+                    &mono_samples,
+                    self.source_sample_rate,
+                    self.target_sample_rate,
+                )
+            }
         } else {
-            mono_samples
+            resample_linear_f32(
+                &mono_samples,
+                self.source_sample_rate,
+                self.target_sample_rate,
+            )
         };
+
+        // Convert to i16 for downstream mixing
+        if resampled.is_empty() {
+            return;
+        }
+        let mut i16_samples = Vec::with_capacity(resampled.len());
+        for &s in &resampled {
+            let scaled = s * i16::MAX as f32;
+            i16_samples.push(scaled.clamp(i16::MIN as f32, i16::MAX as f32) as i16);
+        }
 
         // Push to ring buffer
         let pushed = if let Ok(mut prod) = self.producer.lock() {
-            prod.push_slice(&resampled)
+            prod.push_slice(&i16_samples)
         } else {
             0
         };
@@ -267,9 +332,7 @@ impl SystemAudioHandler {
         {
             eprintln!(
                 "[DEBUG] System audio #{}: extracted {} f32 samples, pushed {} i16 samples",
-                callback_count,
-                audio_data.len(),
-                pushed
+                callback_count, input_len, pushed
             );
         }
     }

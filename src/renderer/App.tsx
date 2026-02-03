@@ -39,7 +39,7 @@ function App(): React.ReactElement {
 
   if (state.isMinimized) {
     return (
-      <div className="glass-container relative flex flex-col h-screen max-h-screen overflow-hidden bg-glass-bg-deep backdrop-blur-glass-xl w-[280px] h-[120px]">
+      <div className="glass-container relative flex flex-col max-h-screen overflow-hidden bg-glass-bg-deep backdrop-blur-glass-xl w-[280px] h-[120px]">
         <MinimizedView
           liveModeState={state.liveMode.state}
           isGenerating={state.answerState === 'generating'}
