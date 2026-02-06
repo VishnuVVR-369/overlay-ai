@@ -17,6 +17,7 @@ mod device;
 mod errors;
 mod logging;
 mod mixing;
+mod processing;
 mod resampling;
 mod ring_buffer;
 mod sample_conversion;
