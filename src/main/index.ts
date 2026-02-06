@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
 import path from 'path';
-import { app, BrowserWindow, globalShortcut } from 'electron';
+import { app, BrowserWindow, globalShortcut, Menu } from 'electron';
 
 if (!app.isPackaged) {
   config({ path: path.join(__dirname, '../../../.env') });
@@ -64,11 +64,21 @@ function createWindow(): void {
     },
   });
 
-  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  mainWindow.setTitle('');
+  mainWindow.on('page-title-updated', (event) => {
+    event.preventDefault();
+    mainWindow?.setTitle('');
+  });
 
-  const allowScreenSharing =
-    !app.isPackaged && process.env.ALLOW_SCREEN_SHARING === 'true';
-  const useContentProtection = !allowScreenSharing;
+  mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  mainWindow.setSkipTaskbar(true);
+  mainWindow.setAutoHideMenuBar(true);
+  mainWindow.setMenuBarVisibility(false);
+  if (process.platform === 'darwin') {
+    mainWindow.setHiddenInMissionControl(true);
+  }
+
+  const useContentProtection = true;
 
   stealthManager = new StealthWindowManager(mainWindow, {
     useContentProtection,
@@ -79,10 +89,6 @@ function createWindow(): void {
   if (app.isPackaged) {
     console.log(
       '[Security] Production build: Content protection always enabled'
-    );
-  } else if (allowScreenSharing) {
-    console.log(
-      '[Security] Development: Screen sharing enabled (visible to screenshots/screen share)'
     );
   } else {
     console.log(
@@ -131,7 +137,9 @@ function registerShortcuts(): void {
 
 app.whenReady().then(() => {
   if (process.platform === 'darwin' && app.dock) {
+    app.setActivationPolicy('accessory');
     app.dock.hide();
+    Menu.setApplicationMenu(null);
   }
   createWindow();
   registerShortcuts();
