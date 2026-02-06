@@ -78,7 +78,8 @@ function createWindow(): void {
     mainWindow.setHiddenInMissionControl(true);
   }
 
-  const useContentProtection = true;
+  const allowScreenSharing = !app.isPackaged && process.env.ALLOW_SCREEN_SHARING === 'true';
+  const useContentProtection = !allowScreenSharing;
 
   stealthManager = new StealthWindowManager(mainWindow, {
     useContentProtection,
@@ -89,6 +90,10 @@ function createWindow(): void {
   if (app.isPackaged) {
     console.log(
       '[Security] Production build: Content protection always enabled'
+    );
+  } else if (allowScreenSharing) {
+    console.log(
+      '[Security] Development: Screen sharing enabled (visible to screenshots/screen share)'
     );
   } else {
     console.log(
