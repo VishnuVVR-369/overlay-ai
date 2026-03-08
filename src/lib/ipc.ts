@@ -1,4 +1,5 @@
 import type { TranscriptSegment, Speaker } from './transcript';
+import type { InterviewMode } from './interviewModes';
 
 export type LiveModeState =
   | 'disconnected'
@@ -48,6 +49,7 @@ export interface AppStatus {
   context: ContextStats;
   isDeepgramConfigured: boolean;
   isGroqConfigured: boolean;
+  interviewMode: InterviewMode;
 }
 
 export interface ApiKeySettings {
@@ -57,6 +59,7 @@ export interface ApiKeySettings {
 
 export interface AppSettings extends ApiKeySettings {
   customSystemPrompt?: string;
+  interviewMode?: InterviewMode;
   isMinimized?: boolean;
 }
 

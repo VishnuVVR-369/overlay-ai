@@ -15,6 +15,7 @@ export type {
   ContextStats,
   IPCEvents,
 } from '../lib/ipc';
+export type { InterviewMode } from '../lib/interviewModes';
 
 export type { TranscriptSegment, Speaker } from '../lib/transcript';
 

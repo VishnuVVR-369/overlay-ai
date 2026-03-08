@@ -35,6 +35,7 @@ import { getSessionStatsManager, SessionStatsManager } from './sessionStats';
 let mainWindow: BrowserWindow | null = null;
 let liveModeManager: LiveModeManager | null = null;
 let sessionStatsManager: SessionStatsManager | null = null;
+let currentAnswerData: AnswerData = { state: 'idle', text: '' };
 
 const WINDOW_DIMENSIONS = {
   minimized: { width: 280, height: 120 },
@@ -73,6 +74,7 @@ function sendAnswerChunk(chunk: string, isComplete: boolean): void {
 }
 
 function updateAnswerData(data: AnswerData): void {
+  currentAnswerData = data;
   setAnswerData(data);
   sendToRenderer<'answerStateChanged'>(IPC_CHANNELS.ANSWER_STATE_CHANGED, data);
 }
@@ -251,7 +253,7 @@ function getAppStatus() {
 
   return {
     liveMode: liveModeManager?.status ?? { state: 'disconnected' as const },
-    answer: { state: 'idle' as const, text: '' },
+    answer: currentAnswerData,
     context: {
       segmentCount: stats.segmentCount,
       wordCount: stats.wordCount,
@@ -260,6 +262,7 @@ function getAppStatus() {
     },
     isDeepgramConfigured: isDeepgramConfiguredFromSettings(),
     isGroqConfigured: isGroqConfiguredFromSettings(),
+    interviewMode: getSettings().interviewMode!,
   };
 }
 
