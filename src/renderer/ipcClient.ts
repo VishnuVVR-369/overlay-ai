@@ -11,6 +11,7 @@ import {
   type ContextStats,
   type IPCEvents,
 } from '../lib/ipc';
+import type { AnswerFormatMode } from '../lib/answerModes';
 
 export const trpc = createTRPCProxyClient<AppRouter>({
   links: [ipcLink()],
@@ -45,9 +46,13 @@ export async function toggleLiveMode(): Promise<LiveModeStatus> {
   }
 }
 
-export async function triggerAnswer(modelId?: string): Promise<AnswerData> {
+export async function triggerAnswer(
+  modelId?: string,
+  mode?: AnswerFormatMode
+): Promise<AnswerData> {
   return window.electronAPI.invoke<AnswerData>(IPC_CHANNELS.TRIGGER_ANSWER, {
     modelId,
+    mode,
   });
 }
 

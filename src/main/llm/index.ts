@@ -15,6 +15,7 @@ export {
 // System prompt
 export {
   DEFAULT_SYSTEM_PROMPT,
+  SYSTEM_PROMPT,
   getSystemPrompt,
   buildUserPrompt,
 } from './systemPrompt';

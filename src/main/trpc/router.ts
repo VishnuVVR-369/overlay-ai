@@ -7,6 +7,8 @@ import type {
   LiveTranscriptData,
   ContextStats,
 } from '../../lib/ipc';
+import { createIdleAnswerData } from '../../lib/ipc';
+import { ANSWER_FORMAT_MODES } from '../../lib/answerModes';
 import { getDefaultContextBuffer } from '../contextBuffer';
 import { isDeepgramConfigured } from '../deepgram';
 import { isGroqConfiguredFromSettings } from '../settingsStore';
@@ -18,7 +20,7 @@ export const publicProcedure = t.procedure;
 type InterimTranscript = { text: string; speaker: 'interviewer' | 'me' } | null;
 
 let liveModeStatus: LiveModeStatus = { state: 'disconnected' };
-let answerData: AnswerData = { state: 'idle', text: '' };
+let answerData: AnswerData = createIdleAnswerData();
 let interimTranscript: InterimTranscript = null;
 
 export function setLiveModeStatus(status: LiveModeStatus): void {
@@ -27,6 +29,10 @@ export function setLiveModeStatus(status: LiveModeStatus): void {
 
 export function setAnswerData(data: AnswerData): void {
   answerData = data;
+}
+
+export function getAnswerData(): AnswerData {
+  return answerData;
 }
 
 export function setInterimTranscript(data: InterimTranscript): void {
@@ -98,6 +104,7 @@ export const appRouter = router({
     .input(
       z.object({
         modelId: z.string().optional(),
+        mode: z.enum(ANSWER_FORMAT_MODES).optional(),
       })
     )
     .mutation((): AnswerData => {
@@ -107,7 +114,7 @@ export const appRouter = router({
   clearOverlay: publicProcedure.mutation((): { success: boolean } => {
     const buffer = getDefaultContextBuffer();
     buffer.clear();
-    answerData = { state: 'idle', text: '' };
+    answerData = createIdleAnswerData();
     interimTranscript = null;
     return { success: true };
   }),

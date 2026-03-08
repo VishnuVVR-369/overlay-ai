@@ -44,7 +44,36 @@ const WINDOW_CONFIG = {
 
 const SHORTCUTS = [
   { key: 'CommandOrControl+Shift+L', action: toggleLiveMode, name: 'Live' },
-  { key: 'CommandOrControl+Shift+X', action: triggerAnswer, name: 'Answer' },
+  {
+    key: 'CommandOrControl+Shift+X',
+    action: () => triggerAnswer(undefined, 'full_answer'),
+    name: 'Full Answer',
+  },
+  {
+    key: 'CommandOrControl+Shift+V',
+    action: () => triggerAnswer(undefined, 'short_hint'),
+    name: 'Short Hint',
+  },
+  {
+    key: 'CommandOrControl+Shift+C',
+    action: () => triggerAnswer(undefined, 'clarifying_questions'),
+    name: 'Clarifying Questions',
+  },
+  {
+    key: 'CommandOrControl+Shift+B',
+    action: () => triggerAnswer(undefined, 'next_best_step'),
+    name: 'Next Best Step',
+  },
+  {
+    key: 'CommandOrControl+Shift+N',
+    action: () => triggerAnswer(undefined, 'follow_up_response'),
+    name: 'Follow-up Response',
+  },
+  {
+    key: 'CommandOrControl+Shift+S',
+    action: () => triggerAnswer(undefined, 'star_version'),
+    name: 'STAR Version',
+  },
   { key: 'CommandOrControl+Shift+Z', action: clearOverlay, name: 'Clear' },
   {
     key: 'CommandOrControl+Shift+M',

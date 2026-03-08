@@ -16,6 +16,14 @@ export type {
   IPCEvents,
 } from '../lib/ipc';
 
+export type { AnswerFormatMode } from '../lib/answerModes';
+
+export {
+  ANSWER_MODE_DEFINITIONS,
+  ANSWER_MODE_MAP,
+  DEFAULT_ANSWER_MODE,
+} from '../lib/answerModes';
+
 export type { TranscriptSegment, Speaker } from '../lib/transcript';
 
 // Renderer-specific types

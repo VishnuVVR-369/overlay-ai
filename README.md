@@ -67,7 +67,7 @@ npm run package:mac
 3. **Start your interview**:
    - Press `Cmd+Shift+L` to start transcription
    - Press `Cmd+Shift+M` to minimize overlay when needed
-   - Press `Cmd+Shift+X` when you need help with a question
+   - Press `Cmd+Shift+X` for a full answer or use the answer mode buttons for faster nudges
 
 4. **Stay hidden**:
    - The overlay is invisible to Zoom, Teams, OBS, and other screen sharing tools
@@ -78,7 +78,12 @@ npm run package:mac
 | Shortcut      | Action                                            |
 | ------------- | ------------------------------------------------- |
 | `Cmd+Shift+L` | Toggle Live Mode (start/stop audio capture)       |
-| `Cmd+Shift+X` | Generate Answer (send context to LLM)             |
+| `Cmd+Shift+X` | Full Answer                                       |
+| `Cmd+Shift+V` | Short Hint                                        |
+| `Cmd+Shift+C` | Clarifying Questions                              |
+| `Cmd+Shift+B` | Next Best Step                                    |
+| `Cmd+Shift+N` | Follow-up Response                                |
+| `Cmd+Shift+S` | STAR Version (behavioral prompts)                 |
 | `Cmd+Shift+Z` | Clear Overlay (clears display, preserves context) |
 | `Cmd+Shift+M` | Toggle Minimize Mode (expand/collapse overlay)    |
 
@@ -165,7 +170,7 @@ You can customize how the AI assistant behaves by editing the system prompt in S
 1. The Rust sidecar captures microphone and system audio, outputting raw PCM data
 2. Electron pipes this audio to Deepgram for real-time transcription with speaker detection
 3. Transcripts are stored in a rolling 20-minute context buffer (~4000 tokens)
-4. When triggered, the full context is sent to Groq's LLM with a system prompt optimized for interview assistance
+4. When triggered, the full context is sent to Groq's LLM with a mode-aware prompt optimized for interview assistance
 5. Streaming responses are rendered with markdown support (code blocks, lists, formatting) in the transparent overlay
 6. The overlay window is flagged to be invisible to screen capture software for privacy
 
@@ -182,6 +187,7 @@ You can customize how the AI assistant behaves by editing the system prompt in S
 
 - Verify your Groq API key is valid in Settings
 - Ensure you have at least a few seconds of transcript before triggering
+- Use `STAR Version` only for behavioral questions
 - Check the status indicator - it may show an error if there are API issues
 
 ### Build errors
