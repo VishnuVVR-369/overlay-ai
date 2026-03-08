@@ -200,6 +200,7 @@ export function SettingsModal({
             onChange={setInterviewMode}
             disabled={isSaving}
             showDescription={true}
+            hint="Choose the preset that should shape the assistant's structure and priorities before you start the interview."
           />
 
           <div className="mb-5">

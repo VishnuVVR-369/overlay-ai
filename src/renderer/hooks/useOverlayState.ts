@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { LiveModeStatus, AnswerData, SessionStats } from '../../lib/ipc';
-import type { InterviewMode } from '../../lib/interviewModes';
 import type { TranscriptSegment, Speaker } from '../../lib/transcript';
 import {
   getStatus,
-  saveSettings,
   subscribeToEvents,
   startLiveMode as ipcStartLiveMode,
   stopLiveMode as ipcStopLiveMode,
@@ -14,7 +12,6 @@ import {
 } from '../ipcClient';
 import {
   INITIAL_OVERLAY_STATE,
-  applySettingsToOverlayState,
   applyStatusToOverlayState,
   getClearedOverlayState,
   type OverlayState,
@@ -28,7 +25,6 @@ export interface OverlayActions {
   clearOverlay: () => Promise<void>;
   refreshStatus: () => Promise<void>;
   toggleMinimizeMode: () => Promise<void>;
-  setInterviewMode: (mode: InterviewMode) => Promise<void>;
 }
 
 export interface UseOverlayStateReturn {
@@ -204,20 +200,6 @@ export function useOverlayState(): UseOverlayStateReturn {
     }
   }, [handleError]);
 
-  const setInterviewMode = useCallback(
-    async (mode: InterviewMode) => {
-      try {
-        await saveSettings({ interviewMode: mode });
-        setState((prev) =>
-          applySettingsToOverlayState(prev, { interviewMode: mode })
-        );
-      } catch (error) {
-        handleError(getErrorMessage(error, 'Failed to update interview mode'));
-      }
-    },
-    [handleError]
-  );
-
   const toggleMinimizeModeAction = useCallback(async () => {
     try {
       const result = await ipcToggleMinimizeMode();
@@ -274,7 +256,6 @@ export function useOverlayState(): UseOverlayStateReturn {
       clearOverlay,
       refreshStatus,
       toggleMinimizeMode: toggleMinimizeModeAction,
-      setInterviewMode,
     }),
     [
       startLiveMode,
@@ -284,7 +265,6 @@ export function useOverlayState(): UseOverlayStateReturn {
       clearOverlay,
       refreshStatus,
       toggleMinimizeModeAction,
-      setInterviewMode,
     ]
   );
 

@@ -9,7 +9,6 @@ import { AnswerCard } from './components/AnswerCard';
 import { SettingsModal } from './components/SettingsModal';
 import { HelpModal } from './components/HelpModal';
 import { SessionStatsFooter } from './components/SessionStatsFooter';
-import { InterviewModeSelector } from './components/InterviewModeSelector';
 import { useOverlayState } from './hooks/useOverlayState';
 
 function App(): React.ReactElement {
@@ -69,12 +68,6 @@ function App(): React.ReactElement {
       <ConfigWarning
         isDeepgramConfigured={state.isDeepgramConfigured}
         isGroqConfigured={state.isGroqConfigured}
-      />
-
-      <InterviewModeSelector
-        compact={true}
-        value={state.interviewMode}
-        onChange={actions.setInterviewMode}
       />
 
       <main className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 p-3 glass-scrollbar">
