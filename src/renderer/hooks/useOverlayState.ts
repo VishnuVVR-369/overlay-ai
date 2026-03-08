@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { LiveModeStatus, AnswerData, SessionStats } from '../../lib/ipc';
 import type { TranscriptSegment, Speaker } from '../../lib/transcript';
 import {
+  DEFAULT_ANSWER_MODE,
+  type AnswerFormatMode,
+} from '../../lib/answerModes';
+import { isStaleAnswerRequest } from './answerStateUtils';
+import {
   getStatus,
   subscribeToEvents,
   startLiveMode as ipcStartLiveMode,
@@ -20,6 +25,8 @@ export interface OverlayState {
   answerText: string;
   answerError: string | null;
   answerModelId: string | null;
+  answerMode: AnswerFormatMode;
+  answerRequestId: number;
   isDeepgramConfigured: boolean;
   isGroqConfigured: boolean;
   isMinimized: boolean;
@@ -31,7 +38,7 @@ export interface OverlayActions {
   startLiveMode: () => Promise<void>;
   stopLiveMode: () => Promise<void>;
   toggleLiveMode: () => Promise<void>;
-  triggerAnswer: (modelId?: string) => Promise<void>;
+  triggerAnswer: (mode?: AnswerFormatMode, modelId?: string) => Promise<void>;
   clearOverlay: () => Promise<void>;
   refreshStatus: () => Promise<void>;
   toggleMinimizeMode: () => Promise<void>;
@@ -52,6 +59,8 @@ const INITIAL_STATE: OverlayState = {
   answerText: '',
   answerError: null,
   answerModelId: null,
+  answerMode: DEFAULT_ANSWER_MODE,
+  answerRequestId: 0,
   isDeepgramConfigured: false,
   isGroqConfigured: false,
   isMinimized: false,
@@ -72,6 +81,7 @@ export function useOverlayState(): UseOverlayStateReturn {
   const [state, setState] = useState<OverlayState>(INITIAL_STATE);
   const [isLoading, setIsLoading] = useState(true);
   const answerTextRef = useRef('');
+  const activeAnswerRequestIdRef = useRef(0);
 
   const updateLiveMode = useCallback((status: LiveModeStatus) => {
     setState((prev) => ({
@@ -102,18 +112,33 @@ export function useOverlayState(): UseOverlayStateReturn {
   );
 
   const handleAnswerChunk = useCallback(
-    (chunk: string, isComplete: boolean) => {
+    (
+      chunk: string,
+      isComplete: boolean,
+      mode: AnswerFormatMode,
+      requestId: number
+    ) => {
+      if (isStaleAnswerRequest(requestId, activeAnswerRequestIdRef.current)) {
+        return;
+      }
+
+      activeAnswerRequestIdRef.current = requestId;
+
       if (isComplete) {
         setState((prev) => ({
           ...prev,
           answerState: 'complete',
           answerText: answerTextRef.current,
+          answerMode: mode,
+          answerRequestId: requestId,
         }));
       } else {
         answerTextRef.current += chunk;
         setState((prev) => ({
           ...prev,
           answerText: answerTextRef.current,
+          answerMode: mode,
+          answerRequestId: requestId,
         }));
       }
     },
@@ -121,16 +146,29 @@ export function useOverlayState(): UseOverlayStateReturn {
   );
 
   const updateAnswerState = useCallback((data: AnswerData) => {
+    if (isStaleAnswerRequest(data.requestId, activeAnswerRequestIdRef.current)) {
+      return;
+    }
+
+    activeAnswerRequestIdRef.current = data.requestId;
     setState((prev) => ({
       ...prev,
       answerState: data.state,
       answerText: data.text,
       answerError: data.error || null,
       answerModelId: data.modelId || null,
+      answerMode: data.mode,
+      answerRequestId: data.requestId,
     }));
 
     if (data.state === 'generating') {
       answerTextRef.current = '';
+    } else {
+      answerTextRef.current = data.text;
+    }
+
+    if (data.state === 'idle') {
+      activeAnswerRequestIdRef.current = 0;
     }
   }, []);
 
@@ -185,7 +223,7 @@ export function useOverlayState(): UseOverlayStateReturn {
   }, [state.liveMode.state, startLiveMode, stopLiveMode]);
 
   const triggerAnswer = useCallback(
-    async (modelId?: string) => {
+    async (mode: AnswerFormatMode = DEFAULT_ANSWER_MODE, modelId?: string) => {
       try {
         answerTextRef.current = '';
         setState((prev) => ({
@@ -193,10 +231,14 @@ export function useOverlayState(): UseOverlayStateReturn {
           answerState: 'generating',
           answerText: '',
           answerError: null,
+          answerMode: mode,
         }));
 
-        const data = await ipcTriggerAnswer(modelId);
-        if (data.state === 'complete' || data.state === 'error') {
+        const data = await ipcTriggerAnswer(modelId, mode);
+        if (
+          (data.state === 'complete' || data.state === 'error') &&
+          !isStaleAnswerRequest(data.requestId, activeAnswerRequestIdRef.current)
+        ) {
           updateAnswerState(data);
         }
       } catch (error) {
@@ -206,6 +248,7 @@ export function useOverlayState(): UseOverlayStateReturn {
           ...prev,
           answerState: 'error',
           answerError: errorMessage,
+          answerMode: mode,
         }));
       }
     },
@@ -223,6 +266,9 @@ export function useOverlayState(): UseOverlayStateReturn {
         answerState: 'idle',
         answerText: '',
         answerError: null,
+        answerModelId: null,
+        answerMode: DEFAULT_ANSWER_MODE,
+        answerRequestId: 0,
         lastError: null,
         sessionStats: {
           sessionStartedAt: null,
@@ -232,6 +278,7 @@ export function useOverlayState(): UseOverlayStateReturn {
         },
       }));
       answerTextRef.current = '';
+      activeAnswerRequestIdRef.current = 0;
     } catch (error) {
       handleError(getErrorMessage(error, 'Failed to clear overlay'));
     }
@@ -246,9 +293,14 @@ export function useOverlayState(): UseOverlayStateReturn {
         answerState: status.answer.state,
         answerText: status.answer.text,
         answerError: status.answer.error || null,
+        answerModelId: status.answer.modelId || null,
+        answerMode: status.answer.mode,
+        answerRequestId: status.answer.requestId,
         isDeepgramConfigured: status.isDeepgramConfigured,
         isGroqConfigured: status.isGroqConfigured,
       }));
+      answerTextRef.current = status.answer.text;
+      activeAnswerRequestIdRef.current = status.answer.requestId;
     } catch (error) {
       handleError(getErrorMessage(error, 'Failed to get status'));
     }
@@ -281,8 +333,8 @@ export function useOverlayState(): UseOverlayStateReturn {
       transcriptSegment: addSegment,
       interimTranscript: ({ text, speaker }) =>
         updateInterimTranscript(text, speaker),
-      answerChunk: ({ chunk, isComplete }) =>
-        handleAnswerChunk(chunk, isComplete),
+      answerChunk: ({ chunk, isComplete, mode, requestId }) =>
+        handleAnswerChunk(chunk, isComplete, mode, requestId),
       answerStateChanged: updateAnswerState,
       error: ({ message }) => handleError(message),
       minimizeModeChanged: handleMinimizeModeChanged,

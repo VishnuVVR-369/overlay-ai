@@ -7,10 +7,16 @@ import {
   type IPCEvents,
   type AppSettings,
   type SessionStats,
+  createIdleAnswerData,
 } from '../lib/ipc';
+import {
+  DEFAULT_ANSWER_MODE,
+  type AnswerFormatMode,
+} from '../lib/answerModes';
 import type { TranscriptSegment, Speaker } from '../lib/transcript';
 import {
   appRouter,
+  getAnswerData,
   setLiveModeStatus,
   setAnswerData,
   setInterimTranscript,
@@ -35,6 +41,7 @@ import { getSessionStatsManager, SessionStatsManager } from './sessionStats';
 let mainWindow: BrowserWindow | null = null;
 let liveModeManager: LiveModeManager | null = null;
 let sessionStatsManager: SessionStatsManager | null = null;
+let activeAnswerRequestId = 0;
 
 const WINDOW_DIMENSIONS = {
   minimized: { width: 280, height: 120 },
@@ -65,10 +72,17 @@ function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function sendAnswerChunk(chunk: string, isComplete: boolean): void {
+function sendAnswerChunk(
+  chunk: string,
+  isComplete: boolean,
+  mode: AnswerFormatMode,
+  requestId: number
+): void {
   sendToRenderer<'answerChunk'>(IPC_CHANNELS.ANSWER_CHUNK, {
     chunk,
     isComplete,
+    mode,
+    requestId,
   });
 }
 
@@ -143,26 +157,38 @@ async function toggleLiveMode(): Promise<LiveModeStatus> {
   return liveModeManager!.toggle();
 }
 
-async function triggerAnswer(modelId?: string): Promise<AnswerData> {
+async function triggerAnswer(
+  modelId?: string,
+  mode: AnswerFormatMode = DEFAULT_ANSWER_MODE
+): Promise<AnswerData> {
   const buffer = getDefaultContextBuffer();
   const context = buffer.getFullContext();
+  const requestId = ++activeAnswerRequestId;
+
+  const buildAnswerData = (
+    data: Omit<AnswerData, 'mode' | 'requestId'>
+  ): AnswerData => ({
+    ...data,
+    mode,
+    requestId,
+  });
 
   if (!context) {
-    const data: AnswerData = {
+    const data = buildAnswerData({
       state: 'error',
       text: '',
       error: 'No transcript context available',
-    };
+    });
     updateAnswerData(data);
     return data;
   }
 
   if (!isGroqConfiguredFromSettings()) {
-    const data: AnswerData = {
+    const data = buildAnswerData({
       state: 'error',
       text: '',
       error: 'GROQ_API_KEY not configured',
-    };
+    });
     updateAnswerData(data);
     return data;
   }
@@ -170,23 +196,32 @@ async function triggerAnswer(modelId?: string): Promise<AnswerData> {
   const provider = getDefaultGroqProvider();
   const effectiveModelId = modelId ?? provider.getDefaultModelId();
 
-  updateAnswerData({
-    state: 'generating',
-    text: '',
-    modelId: effectiveModelId,
-  });
+  updateAnswerData(
+    buildAnswerData({
+      state: 'generating',
+      text: '',
+      modelId: effectiveModelId,
+    })
+  );
 
   try {
     const chunks: string[] = [];
     const { chunks: chunkGenerator, tokenUsage } =
-      provider.streamResponseWithUsage(context, effectiveModelId);
+      provider.streamResponseWithUsage(context, effectiveModelId, mode);
 
     for await (const chunk of chunkGenerator) {
+      if (requestId !== activeAnswerRequestId) {
+        return getAnswerData();
+      }
       chunks.push(chunk);
-      sendAnswerChunk(chunk, false);
+      sendAnswerChunk(chunk, false, mode, requestId);
     }
 
-    sendAnswerChunk('', true);
+    if (requestId !== activeAnswerRequestId) {
+      return getAnswerData();
+    }
+
+    sendAnswerChunk('', true, mode, requestId);
 
     try {
       const usage = await tokenUsage;
@@ -195,12 +230,12 @@ async function triggerAnswer(modelId?: string): Promise<AnswerData> {
       console.warn('[IPC] Failed to get token usage');
     }
 
-    const data: AnswerData = {
+    const data = buildAnswerData({
       state: 'complete',
       text: chunks.join(''),
       modelId: effectiveModelId,
       generatedAt: Date.now(),
-    };
+    });
     updateAnswerData(data);
     return data;
   } catch (error) {
@@ -216,23 +251,28 @@ async function triggerAnswer(modelId?: string): Promise<AnswerData> {
       errorMessage = error.message;
     }
 
-    sendError(errorMessage, errorCode);
-
-    const data: AnswerData = {
+    const data = buildAnswerData({
       state: 'error',
       text: '',
       error: errorMessage,
       modelId: effectiveModelId,
-    };
-    updateAnswerData(data);
-    return data;
+    });
+
+    if (requestId === activeAnswerRequestId) {
+      sendError(errorMessage, errorCode);
+      updateAnswerData(data);
+      return data;
+    }
+
+    return getAnswerData();
   }
 }
 
 function clearOverlay(): { success: boolean } {
   getDefaultContextBuffer().clear();
   setInterimTranscript(null);
-  updateAnswerData({ state: 'idle', text: '' });
+  activeAnswerRequestId = 0;
+  updateAnswerData(createIdleAnswerData());
   sessionStatsManager?.reset();
   return { success: true };
 }
@@ -251,7 +291,7 @@ function getAppStatus() {
 
   return {
     liveMode: liveModeManager?.status ?? { state: 'disconnected' as const },
-    answer: { state: 'idle' as const, text: '' },
+    answer: getAnswerData(),
     context: {
       segmentCount: stats.segmentCount,
       wordCount: stats.wordCount,
@@ -299,7 +339,8 @@ export function initializeIPC(window: BrowserWindow): void {
   ipcMain.handle(IPC_CHANNELS.STOP_LIVE_MODE, () => stopLiveMode());
   ipcMain.handle(
     IPC_CHANNELS.TRIGGER_ANSWER,
-    (_event, { modelId }: { modelId?: string }) => triggerAnswer(modelId)
+    (_event, { modelId, mode }: { modelId?: string; mode?: AnswerFormatMode }) =>
+      triggerAnswer(modelId, mode ?? DEFAULT_ANSWER_MODE)
   );
   ipcMain.handle(IPC_CHANNELS.CLEAR_OVERLAY, () => clearOverlay());
   ipcMain.handle(IPC_CHANNELS.GET_STATUS, () => getAppStatus());
@@ -316,6 +357,7 @@ export function cleanupIPC(): void {
   stopLiveMode();
   disposeLiveModeManager();
   liveModeManager = null;
+  activeAnswerRequestId = 0;
 
   const handlers = [
     IPC_CHANNELS.START_LIVE_MODE,

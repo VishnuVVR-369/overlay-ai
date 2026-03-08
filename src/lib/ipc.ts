@@ -1,4 +1,6 @@
 import type { TranscriptSegment, Speaker } from './transcript';
+import type { AnswerFormatMode } from './answerModes';
+import { DEFAULT_ANSWER_MODE } from './answerModes';
 
 export type LiveModeState =
   | 'disconnected'
@@ -23,6 +25,8 @@ export type AnswerState = 'idle' | 'generating' | 'complete' | 'error';
 export interface AnswerData {
   state: AnswerState;
   text: string;
+  mode: AnswerFormatMode;
+  requestId: number;
   error?: string;
   modelId?: string;
   generatedAt?: number;
@@ -65,6 +69,7 @@ export interface IPCInputs {
   stopLiveMode: void;
   triggerAnswer: {
     modelId?: string;
+    mode?: AnswerFormatMode;
   };
   clearOverlay: void;
   getStatus: void;
@@ -96,7 +101,12 @@ export interface IPCEvents {
   liveModeChanged: LiveModeStatus;
   transcriptSegment: TranscriptSegment;
   interimTranscript: { text: string; speaker: Speaker };
-  answerChunk: { chunk: string; isComplete: boolean };
+  answerChunk: {
+    chunk: string;
+    isComplete: boolean;
+    mode: AnswerFormatMode;
+    requestId: number;
+  };
   answerStateChanged: AnswerData;
   error: { message: string; code?: string };
   minimizeModeChanged: { isMinimized: boolean };
@@ -124,3 +134,12 @@ export const IPC_CHANNELS = {
 } as const;
 
 export type IPCChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
+
+export function createIdleAnswerData(): AnswerData {
+  return {
+    state: 'idle',
+    text: '',
+    mode: DEFAULT_ANSWER_MODE,
+    requestId: 0,
+  };
+}

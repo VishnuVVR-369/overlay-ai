@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal } from './Modal';
 import { KeyboardIcon, InfoIcon } from './Icons';
+import { ANSWER_MODE_DEFINITIONS } from '../../lib/answerModes';
 
 interface HelpModalProps {
   isOpen: boolean;
@@ -53,18 +54,20 @@ function Section({ title, icon, children }: SectionProps): React.ReactElement {
   );
 }
 
+const ANSWER_SHORTCUTS: ShortcutItemProps[] = ANSWER_MODE_DEFINITIONS.map(
+  (mode) => ({
+    title: mode.label,
+    shortcut: mode.hotkeyDisplay,
+    description: mode.description,
+  })
+);
+
 const KEYBOARD_SHORTCUTS: ShortcutItemProps[] = [
   {
     title: 'Toggle Live Mode',
     shortcut: 'Cmd+Shift+L',
     description:
       'Start or stop audio transcription. Connect/disconnect to Deepgram.',
-  },
-  {
-    title: 'Trigger Answer',
-    shortcut: 'Cmd+Shift+X',
-    description:
-      'Generate an AI-powered answer based on last 20 minutes of conversation.',
   },
   {
     title: 'Clear Overlay',
@@ -131,8 +134,8 @@ const GETTING_STARTED_STEPS = [
         <kbd className="inline-flex px-1.5 py-0.5 bg-glass-bg-elevated border border-glass-border-subtle rounded font-mono text-[11px] text-glass-text-secondary">
           Cmd+Shift+X
         </kbd>{' '}
-        and Overlay AI will generate an answer based on the last 20 minutes of
-        your conversation. Answers appear in the bottom panel.
+        for a full answer, or use the mode buttons in the answer panel for a
+        hint, clarification, next step, follow-up, or STAR response.
       </>
     ),
   },
@@ -165,7 +168,7 @@ const HOW_IT_WORKS = [
   {
     title: '🤖 AI-powered answers',
     description:
-      'When triggered, it analyzes your conversation and generates helpful answers optimized for coding and technical interviews.',
+      'When triggered, it analyzes your conversation and can respond as a full answer, short hint, clarifying questions, next best step, follow-up response, or STAR version.',
   },
   {
     title: '👻 Invisible to screen sharing',
@@ -177,7 +180,8 @@ const HOW_IT_WORKS = [
 const TIPS = [
   '💡 Start Live Mode before your interview begins so the AI has context from the start.',
   '💡 Check the green status indicator - it means everything is working properly.',
-  '💡 For coding questions, answers include Python code, time complexity, and explanations.',
+  '💡 Use short hint or next best step when you only need a quick nudge mid-answer.',
+  '💡 STAR mode is meant for behavioral questions, not technical problem-solving.',
   '💡 You can drag the overlay anywhere on your screen to position it comfortably.',
   '💡 Press Cmd+Shift+Z to clear the display (context is preserved).',
 ];
@@ -191,7 +195,7 @@ const TROUBLESHOOTING = [
   {
     title: 'Answers not generating?',
     description:
-      'Verify your Groq API key in Settings. Also make sure you have at least a few seconds of transcript first.',
+      'Verify your Groq API key in Settings. Also make sure you have at least a few seconds of transcript first and that you are using STAR mode only for behavioral prompts.',
   },
   {
     title: 'Status shows error?',
@@ -222,7 +226,7 @@ export function HelpModal({
     >
       <Section title="Keyboard Shortcuts" icon={<KeyboardIcon size={14} />}>
         <div className="flex flex-col gap-3">
-          {KEYBOARD_SHORTCUTS.map((shortcut) => (
+          {[...KEYBOARD_SHORTCUTS, ...ANSWER_SHORTCUTS].map((shortcut) => (
             <ShortcutItem key={shortcut.title} {...shortcut} />
           ))}
         </div>

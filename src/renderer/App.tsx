@@ -10,6 +10,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { HelpModal } from './components/HelpModal';
 import { SessionStatsFooter } from './components/SessionStatsFooter';
 import { useOverlayState } from './hooks/useOverlayState';
+import { ANSWER_MODE_DEFINITIONS } from '../lib/answerModes';
 
 function App(): React.ReactElement {
   const { state, isLoading, actions } = useOverlayState();
@@ -86,6 +87,9 @@ function App(): React.ReactElement {
             text={state.answerText}
             error={state.answerError || undefined}
             modelId={state.answerModelId || undefined}
+            mode={state.answerMode}
+            availableModes={ANSWER_MODE_DEFINITIONS}
+            onTriggerMode={(mode) => actions.triggerAnswer(mode)}
           />
         </section>
       </main>

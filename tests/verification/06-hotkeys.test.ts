@@ -15,6 +15,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { EventEmitter } from 'events';
+import {
+  ANSWER_MODE_DEFINITIONS,
+  DEFAULT_ANSWER_MODE,
+} from '../../src/lib/answerModes';
 
 describe('Hotkeys & Actions - Verification', () => {
   describe('LiveModeManager Module', () => {
@@ -276,9 +280,21 @@ describe('Hotkeys & Actions - Verification', () => {
 
     it('Cmd+Shift+X should trigger answer generation', () => {
       // Shortcut: CommandOrControl+Shift+X
-      // Action: triggerAnswer()
-      // Per PLAN.md: "Trigger Answer (Sends buffer to LLM)"
+      // Action: triggerAnswer(undefined, 'full_answer')
+      // Per PLAN.md: "Full Answer"
       expect(true).toBe(true); // Documentation test
+    });
+
+    it('should document all fast answer shortcuts', () => {
+      expect(ANSWER_MODE_DEFINITIONS.map((mode) => mode.hotkeyDisplay)).toEqual([
+        'Cmd/Ctrl+Shift+X',
+        'Cmd/Ctrl+Shift+V',
+        'Cmd/Ctrl+Shift+C',
+        'Cmd/Ctrl+Shift+B',
+        'Cmd/Ctrl+Shift+N',
+        'Cmd/Ctrl+Shift+S',
+      ]);
+      expect(DEFAULT_ANSWER_MODE).toBe('full_answer');
     });
 
     it('Cmd+Shift+Z should clear overlay', () => {
@@ -286,6 +302,18 @@ describe('Hotkeys & Actions - Verification', () => {
       // Action: clearOverlay()
       // Per PLAN.md: "Clear Overlay"
       expect(true).toBe(true); // Documentation test
+    });
+  });
+
+  describe('Answer IPC Shape', () => {
+    it('should document answer data mode and request tracking', async () => {
+      const { createIdleAnswerData } = await import('../../src/lib/ipc');
+
+      const answer = createIdleAnswerData();
+
+      expect(answer.mode).toBe('full_answer');
+      expect(answer.requestId).toBe(0);
+      expect(answer.state).toBe('idle');
     });
   });
 });

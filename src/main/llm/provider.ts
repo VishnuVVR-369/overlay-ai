@@ -1,8 +1,11 @@
+import type { AnswerFormatMode } from '../../lib/answerModes';
+
 export interface LLMProvider {
   readonly name: string;
   streamResponse(
     context: string,
-    modelId: string
+    modelId: string,
+    mode: AnswerFormatMode
   ): AsyncGenerator<string, void, unknown>;
   isConfigured(): boolean;
   getDefaultModelId(): string;

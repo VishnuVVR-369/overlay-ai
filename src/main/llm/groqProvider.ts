@@ -5,6 +5,10 @@ import Groq from 'groq-sdk';
 import { LLMProvider, LLMError, LLM_ERROR_CODES } from './provider';
 import { getSystemPrompt, buildUserPrompt } from './systemPrompt';
 import {
+  DEFAULT_ANSWER_MODE,
+  type AnswerFormatMode,
+} from '../../lib/answerModes';
+import {
   getGroqApiKeyFromSettings,
   isGroqConfiguredFromSettings,
 } from '../settingsStore';
@@ -69,15 +73,17 @@ export class GroqProvider implements LLMProvider {
 
   async *streamResponse(
     context: string,
-    modelId: string = DEFAULT_MODEL_ID
+    modelId: string = DEFAULT_MODEL_ID,
+    mode: AnswerFormatMode = DEFAULT_ANSWER_MODE
   ): AsyncGenerator<string, void, unknown> {
-    const result = this.streamResponseWithUsage(context, modelId);
+    const result = this.streamResponseWithUsage(context, modelId, mode);
     yield* result.chunks;
   }
 
   streamResponseWithUsage(
     context: string,
-    modelId: string = DEFAULT_MODEL_ID
+    modelId: string = DEFAULT_MODEL_ID,
+    mode: AnswerFormatMode = DEFAULT_ANSWER_MODE
   ): StreamResponseResult {
     const client = this.getClient();
     let resolveTokenUsage: (usage: TokenUsage) => void;
@@ -96,7 +102,7 @@ export class GroqProvider implements LLMProvider {
           model: modelId,
           messages: [
             { role: 'system', content: getSystemPrompt() },
-            { role: 'user', content: buildUserPrompt(context) },
+            { role: 'user', content: buildUserPrompt(context, mode) },
           ],
           stream: true,
           temperature: 0.7,
@@ -167,10 +173,11 @@ export class GroqProvider implements LLMProvider {
 
   async generateResponse(
     context: string,
-    modelId: string = DEFAULT_MODEL_ID
+    modelId: string = DEFAULT_MODEL_ID,
+    mode: AnswerFormatMode = DEFAULT_ANSWER_MODE
   ): Promise<string> {
     const chunks: string[] = [];
-    for await (const chunk of this.streamResponse(context, modelId)) {
+    for await (const chunk of this.streamResponse(context, modelId, mode)) {
       chunks.push(chunk);
     }
     return chunks.join('');

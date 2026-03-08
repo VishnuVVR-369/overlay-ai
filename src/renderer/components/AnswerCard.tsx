@@ -2,14 +2,24 @@ import React from 'react';
 import { Streamdown } from 'streamdown';
 import { CommandIcon, SparkleIcon, AlertIcon } from './Icons';
 import type { AnswerState } from '../../lib/ipc';
+import {
+  ANSWER_MODE_DEFINITIONS,
+  ANSWER_MODE_MAP,
+  DEFAULT_ANSWER_MODE,
+  type AnswerFormatMode,
+  type AnswerModeDefinition,
+} from '../../lib/answerModes';
 
 export interface AnswerCardProps {
   state: AnswerState;
   text: string;
+  mode?: AnswerFormatMode;
+  availableModes?: readonly AnswerModeDefinition[];
   error?: string;
   modelId?: string;
   showModel?: boolean;
   maxHeight?: string;
+  onTriggerMode?: (mode: AnswerFormatMode) => void;
 }
 
 function ModelBadge({ modelId }: { modelId: string }): React.ReactElement {
@@ -19,6 +29,18 @@ function ModelBadge({ modelId }: { modelId: string }): React.ReactElement {
   return (
     <span className="font-mono text-[10px] px-2.5 py-1 bg-glass-bg-primary border border-glass-border-subtle rounded-full text-glass-text-muted">
       {shortName}
+    </span>
+  );
+}
+
+function ModeBadge({
+  mode,
+}: {
+  mode: AnswerFormatMode;
+}): React.ReactElement {
+  return (
+    <span className="font-mono text-[10px] px-2.5 py-1 bg-glass-accent-subtle border border-glass-accent/20 rounded-full text-glass-accent-light">
+      {ANSWER_MODE_MAP[mode].label}
     </span>
   );
 }
@@ -81,11 +103,51 @@ function IdleState(): React.ReactElement {
         <kbd className="inline-flex items-center gap-1 px-2.5 py-1 bg-glass-bg-elevated border border-glass-border-subtle rounded-md font-mono text-[11px] text-glass-text-secondary">
           Cmd+Shift+X
         </kbd>{' '}
-        to generate an answer
+        for a full answer
       </p>
-      <p className="mt-3 text-[10px] text-glass-text-subtle">
-        Based on last 20 minutes of conversation
+      <p className="mt-3 text-[11px] text-glass-text-subtle">
+        Faster actions are available in the mode bar below.
       </p>
+    </div>
+  );
+}
+
+function ModeActions({
+  activeMode,
+  availableModes,
+  onTriggerMode,
+}: {
+  activeMode: AnswerFormatMode;
+  availableModes: readonly AnswerModeDefinition[];
+  onTriggerMode?: (mode: AnswerFormatMode) => void;
+}): React.ReactElement {
+  return (
+    <div className="px-3.5 py-2 border-b border-glass-border-subtle bg-glass-bg-secondary/70">
+      <div className="flex flex-wrap gap-2">
+        {availableModes.map((mode) => {
+          const isActive = mode.id === activeMode;
+
+          return (
+            <button
+              key={mode.id}
+              type="button"
+              onClick={() => onTriggerMode?.(mode.id)}
+              className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full border font-mono text-[10px] transition-all duration-glass-fast ${
+                isActive
+                  ? 'bg-glass-accent-subtle border-glass-accent/30 text-glass-accent-light'
+                  : 'bg-glass-bg-primary border-glass-border-subtle text-glass-text-muted hover:border-glass-accent/20 hover:text-glass-text-primary'
+              }`}
+              title={`${mode.label} (${mode.hotkeyDisplay})`}
+              aria-label={`Generate ${mode.label}`}
+            >
+              <span>{mode.shortLabel}</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-black/10 text-[9px] tracking-wide">
+                {mode.hotkeyLetter}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -130,10 +192,13 @@ const markdownComponents = {
 export function AnswerCard({
   state,
   text,
+  mode = DEFAULT_ANSWER_MODE,
+  availableModes = ANSWER_MODE_DEFINITIONS,
   error,
   modelId,
   showModel = true,
   maxHeight = '200px',
+  onTriggerMode,
 }: AnswerCardProps): React.ReactElement {
   const showContent = state === 'generating' || state === 'complete';
 
@@ -145,6 +210,7 @@ export function AnswerCard({
             <CommandIcon size={14} />
           </span>
           <span>RESPONSE</span>
+          <ModeBadge mode={mode} />
         </div>
 
         <div className="flex items-center gap-3">
@@ -154,6 +220,12 @@ export function AnswerCard({
           )}
         </div>
       </div>
+
+      <ModeActions
+        activeMode={mode}
+        availableModes={availableModes}
+        onTriggerMode={onTriggerMode}
+      />
 
       <div
         className="p-3.5 overflow-y-auto glass-scrollbar"
