@@ -139,6 +139,97 @@ describe('ElevenLabs Streaming Connection - Verification', () => {
       expect(ElevenLabsConnectionState.CONNECTED).toBe('connected');
       expect(ElevenLabsConnectionState.ERROR).toBe('error');
     });
+
+    it('should suppress duplicate committed transcripts across message variants', async () => {
+      const { ElevenLabsClient } = await import('../../src/main/elevenLabs');
+      const client = new ElevenLabsClient();
+      const committedEvents: string[] = [];
+
+      client.on('committedTranscript', (transcript) => {
+        committedEvents.push(transcript.text);
+      });
+
+      const handleMessage = (
+        client as unknown as {
+          handleMessage: (data: string) => boolean;
+        }
+      ).handleMessage.bind(client);
+
+      handleMessage(
+        JSON.stringify({
+          message_type: 'committed_transcript',
+          text: 'Hello there',
+        })
+      );
+
+      handleMessage(
+        JSON.stringify({
+          message_type: 'committed_transcript_with_timestamps',
+          text: 'Hello there',
+          words: [
+            {
+              text: 'Hello',
+              start: 0,
+              end: 100,
+              type: 'word',
+            },
+            {
+              text: 'there',
+              start: 100,
+              end: 200,
+              type: 'word',
+            },
+          ],
+        })
+      );
+
+      expect(committedEvents).toEqual(['Hello there']);
+    });
+
+    it('should suppress stale partial transcripts that repeat the latest commit', async () => {
+      const { ElevenLabsClient } = await import('../../src/main/elevenLabs');
+      const client = new ElevenLabsClient();
+      const partialEvents: string[] = [];
+      const committedEvents: string[] = [];
+
+      client.on('partialTranscript', (transcript) => {
+        partialEvents.push(transcript.text);
+      });
+
+      client.on('committedTranscript', (transcript) => {
+        committedEvents.push(transcript.text);
+      });
+
+      const handleMessage = (
+        client as unknown as {
+          handleMessage: (data: string) => boolean;
+        }
+      ).handleMessage.bind(client);
+
+      handleMessage(
+        JSON.stringify({
+          message_type: 'partial_transcript',
+          text: 'Hello there',
+        })
+      );
+
+      handleMessage(
+        JSON.stringify({
+          message_type: 'committed_transcript',
+          text: 'Hello there',
+        })
+      );
+
+      handleMessage(
+        JSON.stringify({
+          message_type: 'partial_transcript',
+          text: 'Hello there',
+        })
+      );
+
+      expect(committedEvents).toEqual(['Hello there']);
+      expect(partialEvents).toEqual(['Hello there']);
+    });
   });
 
   describe('Integration Test (with real API key)', () => {

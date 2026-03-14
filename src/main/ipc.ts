@@ -15,6 +15,7 @@ import {
   setAnswerData,
   setInterimTranscript,
 } from './trpc/router';
+import { InterimTranscriptTracker } from './answerContext';
 import { getDefaultContextBuffer } from './contextBuffer';
 import { getDefaultGroqProvider, LLMError, resetGroqProvider } from './llm';
 import {
@@ -35,6 +36,7 @@ import { getSessionStatsManager, SessionStatsManager } from './sessionStats';
 let mainWindow: BrowserWindow | null = null;
 let liveModeManager: LiveModeManager | null = null;
 let sessionStatsManager: SessionStatsManager | null = null;
+const interimTranscriptTracker = new InterimTranscriptTracker();
 
 const WINDOW_DIMENSIONS = {
   minimized: { width: 280, height: 120 },
@@ -96,6 +98,8 @@ function initializeLiveModeManager(): void {
   });
 
   liveModeManager.on('segment', (segment: TranscriptSegment) => {
+    interimTranscriptTracker.clear();
+    setInterimTranscript(null);
     sendToRenderer<'transcriptSegment'>(
       IPC_CHANNELS.TRANSCRIPT_SEGMENT,
       segment
@@ -108,6 +112,7 @@ function initializeLiveModeManager(): void {
   });
 
   liveModeManager.on('interim', (text: string, speaker: Speaker) => {
+    interimTranscriptTracker.update(text, speaker);
     setInterimTranscript({ text, speaker });
     sendToRenderer<'interimTranscript'>(IPC_CHANNELS.INTERIM_TRANSCRIPT, {
       text,
@@ -129,9 +134,12 @@ async function startLiveMode(): Promise<LiveModeStatus> {
 
 function stopLiveMode(): LiveModeStatus {
   if (!liveModeManager) {
+    interimTranscriptTracker.clear();
+    setInterimTranscript(null);
     return { state: 'disconnected' };
   }
   const status = liveModeManager.stop();
+  interimTranscriptTracker.clear();
   setInterimTranscript(null);
   return status;
 }
@@ -145,7 +153,7 @@ async function toggleLiveMode(): Promise<LiveModeStatus> {
 
 async function triggerAnswer(modelId?: string): Promise<AnswerData> {
   const buffer = getDefaultContextBuffer();
-  const context = buffer.getFullContext();
+  const context = interimTranscriptTracker.buildAnswerContext(buffer);
 
   if (!context) {
     const data: AnswerData = {
@@ -231,6 +239,7 @@ async function triggerAnswer(modelId?: string): Promise<AnswerData> {
 
 function clearOverlay(): { success: boolean } {
   getDefaultContextBuffer().clear();
+  interimTranscriptTracker.clear();
   setInterimTranscript(null);
   updateAnswerData({ state: 'idle', text: '' });
   sessionStatsManager?.reset();

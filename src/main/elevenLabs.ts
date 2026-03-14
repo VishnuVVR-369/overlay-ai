@@ -120,6 +120,10 @@ function clampToInt16(value: number): number {
   return value;
 }
 
+function normalizeTranscriptText(text: string): string {
+  return text.trim().replace(/\s+/g, ' ');
+}
+
 function analyzeStereoChunk(
   chunk: Buffer,
   silenceThreshold: number,
@@ -375,6 +379,8 @@ export class ElevenLabsClient extends EventEmitter {
 
   disconnect(): void {
     this.clearPendingCommit();
+    this.lastCommittedFingerprint = null;
+    this.lastCommittedAt = 0;
 
     if (!this.ws) {
       this.speakerTracker.reset();
@@ -431,10 +437,7 @@ export class ElevenLabsClient extends EventEmitter {
   }
 
   private shouldEmitCommitted(message: ElevenLabsCommittedTranscript): boolean {
-    const fingerprint = JSON.stringify({
-      text: message.text.trim(),
-      words: message.words?.length ?? 0,
-    });
+    const fingerprint = normalizeTranscriptText(message.text);
     const now = Date.now();
 
     if (
@@ -449,6 +452,21 @@ export class ElevenLabsClient extends EventEmitter {
     return true;
   }
 
+  private shouldEmitPartial(message: ElevenLabsPartialTranscript): boolean {
+    const fingerprint = normalizeTranscriptText(message.text);
+    const now = Date.now();
+
+    if (
+      fingerprint &&
+      fingerprint === this.lastCommittedFingerprint &&
+      now - this.lastCommittedAt < 1500
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
   private handleMessage(data: WebSocket.Data): boolean {
     try {
       const message: ElevenLabsMessage = JSON.parse(data.toString());
@@ -460,7 +478,10 @@ export class ElevenLabsClient extends EventEmitter {
           return true;
         case 'partial_transcript': {
           const transcript = message as ElevenLabsPartialTranscript;
-          if (!transcript.text?.trim()) {
+          if (
+            !transcript.text?.trim() ||
+            !this.shouldEmitPartial(transcript)
+          ) {
             return false;
           }
 
