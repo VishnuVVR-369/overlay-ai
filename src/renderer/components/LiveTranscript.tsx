@@ -92,7 +92,7 @@ function TranscriptGroup({ group }: TranscriptGroupProps): React.ReactElement {
   const hasInterim = group.texts.some((t) => t.isInterim);
 
   return (
-    <div className="flex items-start gap-2.5 leading-relaxed animate-glass-fade-in">
+    <div className="flex items-start gap-2 leading-relaxed animate-glass-fade-in">
       <div className="flex-1 text-[13px] text-glass-text-primary break-words">
         {group.texts.map((item, idx) => (
           <span
@@ -156,8 +156,8 @@ export function LiveTranscript({
 
   return (
     <div className="relative bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md overflow-hidden">
-      <div className="shrink-0 flex items-center justify-between px-3 py-2 bg-glass-bg-secondary border-b border-glass-border-subtle">
-        <span className="flex items-center gap-2.5 font-mono text-[10px] font-semibold tracking-widest uppercase text-glass-text-muted">
+      <div className="shrink-0 flex items-center justify-between px-2.5 py-1.5 bg-glass-bg-secondary">
+        <span className="flex items-center gap-2 font-mono text-[10px] font-semibold tracking-widest uppercase text-glass-text-muted">
           <span className="w-1.5 h-1.5 bg-glass-success rounded-full animate-glass-pulse" />
           LIVE TRANSCRIPT
         </span>
@@ -167,10 +167,10 @@ export function LiveTranscript({
       </div>
       <div
         ref={scrollRef}
-        className="overflow-y-auto px-3 py-2.5 glass-scrollbar"
+        className="overflow-y-auto px-2.5 py-2 glass-scrollbar"
         style={{ maxHeight }}
       >
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1">
           {groupedSegments.map((group) => (
             <TranscriptGroup
               key={`${group.speaker}-${group.startTimestamp}`}

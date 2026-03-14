@@ -72,7 +72,7 @@ export function SessionStatsFooter({
   }
 
   return (
-    <footer className="shrink-0 flex items-center justify-center gap-6 px-4 py-2 bg-glass-bg-secondary border-t border-glass-border-subtle backdrop-blur-glass-md">
+    <footer className="shrink-0 flex items-center justify-center gap-5 px-3 py-1.5 bg-glass-bg-secondary border-t border-glass-border-subtle backdrop-blur-glass-md">
       <div className="flex items-center gap-1.5 font-mono text-[11px] text-glass-text-muted">
         <ClockIcon size={12} className="opacity-70" />
         <span className="text-glass-text-secondary">

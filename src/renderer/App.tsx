@@ -70,7 +70,7 @@ function App(): React.ReactElement {
         isGroqConfigured={state.isGroqConfigured}
       />
 
-      <main className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3 p-3 glass-scrollbar">
+      <main className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 p-2 glass-scrollbar">
         <section className="shrink min-h-[60px] max-h-[35%] overflow-hidden [&>div]:h-full [&>div]:flex [&>div]:flex-col [&>div>div:last-child]:flex-1 [&>div>div:last-child]:min-h-0 [&>div>div:last-child]:overflow-y-auto">
           <LiveTranscript
             segments={state.segments}
