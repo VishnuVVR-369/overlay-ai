@@ -5,7 +5,7 @@ import { app, BrowserWindow, globalShortcut, Menu } from 'electron';
 if (!app.isPackaged) {
   config({ path: path.join(__dirname, '../../../.env') });
 }
-console.log('[ENV] DEEPGRAM_API_KEY set:', !!process.env.DEEPGRAM_API_KEY);
+console.log('[ENV] ELEVENLABS_API_KEY set:', !!process.env.ELEVENLABS_API_KEY);
 console.log('[ENV] GROQ_API_KEY set:', !!process.env.GROQ_API_KEY);
 console.log('[ENV] ALLOW_SCREEN_SHARING:', process.env.ALLOW_SCREEN_SHARING);
 
@@ -78,7 +78,8 @@ function createWindow(): void {
     mainWindow.setHiddenInMissionControl(true);
   }
 
-  const allowScreenSharing = !app.isPackaged && process.env.ALLOW_SCREEN_SHARING === 'true';
+  const allowScreenSharing =
+    !app.isPackaged && process.env.ALLOW_SCREEN_SHARING === 'true';
   const useContentProtection = !allowScreenSharing;
 
   stealthManager = new StealthWindowManager(mainWindow, {

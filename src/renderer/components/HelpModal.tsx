@@ -58,7 +58,7 @@ const KEYBOARD_SHORTCUTS: ShortcutItemProps[] = [
     title: 'Toggle Live Mode',
     shortcut: 'Cmd+Shift+L',
     description:
-      'Start or stop audio transcription. Connect/disconnect to Deepgram.',
+      'Start or stop audio transcription. Connect/disconnect to ElevenLabs.',
   },
   {
     title: 'Trigger Answer',
@@ -90,12 +90,12 @@ const GETTING_STARTED_STEPS = [
         You&apos;ll need:
         <br />
         <a
-          href="https://console.deepgram.com/"
+          href="https://elevenlabs.io/app/settings/api-keys"
           target="_blank"
           rel="noopener noreferrer"
           className="text-glass-accent-light no-underline transition-colors duration-glass-fast hover:text-glass-accent hover:underline"
         >
-          Deepgram
+          ElevenLabs
         </a>{' '}
         for transcription and{' '}
         <a

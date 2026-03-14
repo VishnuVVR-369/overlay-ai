@@ -2,12 +2,12 @@
  * Verification Milestone 4: Transcription events reach transcript pipeline
  *
  * Per tasks.md Phase 11:
- * "Verify transcription events reach transcript pipeline: Confirm Deepgram
- * transcript messages are received and routed into `transcriptIngest` placeholder."
+ * "Verify transcription events reach transcript pipeline: Confirm ElevenLabs
+ * transcript messages are received and routed into `transcriptIngest`."
  *
  * Tests:
  * 1. TranscriptIngest can be instantiated
- * 2. Speaker mapping works correctly (Channel 0 = interviewer, Channel 1 = me)
+ * 2. Speaker assignment is preserved through the ingest pipeline
  * 3. TranscriptIngest emits 'segment' events for final transcripts
  * 4. TranscriptIngest emits 'interim' events for non-final transcripts
  * 5. TranscriptSegment format matches PLAN.md spec
@@ -19,19 +19,22 @@ import { EventEmitter } from 'events';
 describe('Transcript Pipeline - Verification', () => {
   describe('TranscriptIngest Module', () => {
     it('should export TranscriptIngest class', async () => {
-      const { TranscriptIngest } = await import('../../src/main/transcriptIngest');
+      const { TranscriptIngest } =
+        await import('../../src/main/transcriptIngest');
       expect(TranscriptIngest).toBeDefined();
       expect(typeof TranscriptIngest).toBe('function');
     });
 
     it('should export getDefaultTranscriptIngest function', async () => {
-      const { getDefaultTranscriptIngest } = await import('../../src/main/transcriptIngest');
+      const { getDefaultTranscriptIngest } =
+        await import('../../src/main/transcriptIngest');
       expect(getDefaultTranscriptIngest).toBeDefined();
       expect(typeof getDefaultTranscriptIngest).toBe('function');
     });
 
     it('TranscriptIngest should extend EventEmitter', async () => {
-      const { TranscriptIngest } = await import('../../src/main/transcriptIngest');
+      const { TranscriptIngest } =
+        await import('../../src/main/transcriptIngest');
       const ingest = new TranscriptIngest();
       expect(ingest).toBeInstanceOf(EventEmitter);
     });
@@ -47,7 +50,8 @@ describe('Transcript Pipeline - Verification', () => {
     });
 
     it('createTranscriptSegment should create valid segment', async () => {
-      const { createTranscriptSegment } = await import('../../src/lib/transcript');
+      const { createTranscriptSegment } =
+        await import('../../src/lib/transcript');
 
       const segment = createTranscriptSegment('Hello world', 'interviewer');
 
@@ -58,7 +62,8 @@ describe('Transcript Pipeline - Verification', () => {
     });
 
     it('should format segments for LLM context', async () => {
-      const { createTranscriptSegment, formatSegmentsForContext } = await import('../../src/lib/transcript');
+      const { createTranscriptSegment, formatSegmentsForContext } =
+        await import('../../src/lib/transcript');
 
       const segments = [
         createTranscriptSegment('How are you?', 'interviewer'),
@@ -73,8 +78,9 @@ describe('Transcript Pipeline - Verification', () => {
   });
 
   describe('Speaker Mapping', () => {
-    it('should map Channel 0 to "interviewer"', async () => {
-      const { TranscriptIngest } = await import('../../src/main/transcriptIngest');
+    it('should preserve interviewer transcripts', async () => {
+      const { TranscriptIngest } =
+        await import('../../src/main/transcriptIngest');
 
       const ingest = new TranscriptIngest();
       const segments: { speaker: string }[] = [];
@@ -83,27 +89,21 @@ describe('Transcript Pipeline - Verification', () => {
         segments.push(segment);
       });
 
-      // Simulate a Deepgram transcript from Channel 0
-      const mockDeepgram = new EventEmitter();
-      ingest.attachToDeepgram(mockDeepgram as any);
+      const mockClient = new EventEmitter();
+      ingest.attachToTranscriptionClient(mockClient as any);
 
-      mockDeepgram.emit('transcript', {
-        type: 'Results',
-        channel_index: [0],
-        is_final: true,
-        channel: {
-          alternatives: [
-            { transcript: 'Test message', confidence: 0.99, words: [] },
-          ],
-        },
+      mockClient.emit('committedTranscript', {
+        text: 'Test message',
+        speaker: 'interviewer',
       });
 
       expect(segments.length).toBe(1);
       expect(segments[0].speaker).toBe('interviewer');
     });
 
-    it('should map Channel 1 to "me"', async () => {
-      const { TranscriptIngest } = await import('../../src/main/transcriptIngest');
+    it('should preserve user transcripts', async () => {
+      const { TranscriptIngest } =
+        await import('../../src/main/transcriptIngest');
 
       const ingest = new TranscriptIngest();
       const segments: { speaker: string }[] = [];
@@ -112,19 +112,12 @@ describe('Transcript Pipeline - Verification', () => {
         segments.push(segment);
       });
 
-      // Simulate a Deepgram transcript from Channel 1
-      const mockDeepgram = new EventEmitter();
-      ingest.attachToDeepgram(mockDeepgram as any);
+      const mockClient = new EventEmitter();
+      ingest.attachToTranscriptionClient(mockClient as any);
 
-      mockDeepgram.emit('transcript', {
-        type: 'Results',
-        channel_index: [1],
-        is_final: true,
-        channel: {
-          alternatives: [
-            { transcript: 'My response', confidence: 0.99, words: [] },
-          ],
-        },
+      mockClient.emit('committedTranscript', {
+        text: 'My response',
+        speaker: 'me',
       });
 
       expect(segments.length).toBe(1);
@@ -134,7 +127,8 @@ describe('Transcript Pipeline - Verification', () => {
 
   describe('Event Emission', () => {
     it('should emit "segment" for final transcripts', async () => {
-      const { TranscriptIngest } = await import('../../src/main/transcriptIngest');
+      const { TranscriptIngest } =
+        await import('../../src/main/transcriptIngest');
 
       const ingest = new TranscriptIngest();
       const segments: unknown[] = [];
@@ -143,25 +137,20 @@ describe('Transcript Pipeline - Verification', () => {
         segments.push(segment);
       });
 
-      const mockDeepgram = new EventEmitter();
-      ingest.attachToDeepgram(mockDeepgram as any);
+      const mockClient = new EventEmitter();
+      ingest.attachToTranscriptionClient(mockClient as any);
 
-      mockDeepgram.emit('transcript', {
-        type: 'Results',
-        channel_index: [0],
-        is_final: true,
-        channel: {
-          alternatives: [
-            { transcript: 'Final message', confidence: 0.99, words: [] },
-          ],
-        },
+      mockClient.emit('committedTranscript', {
+        text: 'Final message',
+        speaker: 'interviewer',
       });
 
       expect(segments.length).toBe(1);
     });
 
     it('should emit "interim" for non-final transcripts', async () => {
-      const { TranscriptIngest } = await import('../../src/main/transcriptIngest');
+      const { TranscriptIngest } =
+        await import('../../src/main/transcriptIngest');
 
       const ingest = new TranscriptIngest();
       const interims: { text: string; speaker: string }[] = [];
@@ -170,18 +159,12 @@ describe('Transcript Pipeline - Verification', () => {
         interims.push({ text, speaker });
       });
 
-      const mockDeepgram = new EventEmitter();
-      ingest.attachToDeepgram(mockDeepgram as any);
+      const mockClient = new EventEmitter();
+      ingest.attachToTranscriptionClient(mockClient as any);
 
-      mockDeepgram.emit('transcript', {
-        type: 'Results',
-        channel_index: [0],
-        is_final: false,
-        channel: {
-          alternatives: [
-            { transcript: 'Partial message...', confidence: 0.8, words: [] },
-          ],
-        },
+      mockClient.emit('partialTranscript', {
+        text: 'Partial message...',
+        speaker: 'interviewer',
       });
 
       expect(interims.length).toBe(1);
@@ -190,7 +173,8 @@ describe('Transcript Pipeline - Verification', () => {
     });
 
     it('should not emit for empty transcripts', async () => {
-      const { TranscriptIngest } = await import('../../src/main/transcriptIngest');
+      const { TranscriptIngest } =
+        await import('../../src/main/transcriptIngest');
 
       const ingest = new TranscriptIngest();
       const segments: unknown[] = [];
@@ -199,29 +183,17 @@ describe('Transcript Pipeline - Verification', () => {
       ingest.on('segment', (segment) => segments.push(segment));
       ingest.on('interim', (text, speaker) => interims.push({ text, speaker }));
 
-      const mockDeepgram = new EventEmitter();
-      ingest.attachToDeepgram(mockDeepgram as any);
+      const mockClient = new EventEmitter();
+      ingest.attachToTranscriptionClient(mockClient as any);
 
-      mockDeepgram.emit('transcript', {
-        type: 'Results',
-        channel_index: [0],
-        is_final: true,
-        channel: {
-          alternatives: [
-            { transcript: '', confidence: 0.99, words: [] },
-          ],
-        },
+      mockClient.emit('committedTranscript', {
+        text: '',
+        speaker: 'interviewer',
       });
 
-      mockDeepgram.emit('transcript', {
-        type: 'Results',
-        channel_index: [0],
-        is_final: true,
-        channel: {
-          alternatives: [
-            { transcript: '   ', confidence: 0.99, words: [] },
-          ],
-        },
+      mockClient.emit('committedTranscript', {
+        text: '   ',
+        speaker: 'interviewer',
       });
 
       expect(segments.length).toBe(0);
@@ -231,7 +203,8 @@ describe('Transcript Pipeline - Verification', () => {
 
   describe('Manual Ingestion', () => {
     it('should support manual segment injection', async () => {
-      const { TranscriptIngest } = await import('../../src/main/transcriptIngest');
+      const { TranscriptIngest } =
+        await import('../../src/main/transcriptIngest');
 
       const ingest = new TranscriptIngest();
       const segments: { text: string; speaker: string }[] = [];
@@ -249,45 +222,50 @@ describe('Transcript Pipeline - Verification', () => {
   });
 
   describe('Attachment/Detachment', () => {
-    it('should attach to Deepgram client', async () => {
-      const { TranscriptIngest } = await import('../../src/main/transcriptIngest');
+    it('should attach to transcription client', async () => {
+      const { TranscriptIngest } =
+        await import('../../src/main/transcriptIngest');
 
       const ingest = new TranscriptIngest();
-      const mockDeepgram = new EventEmitter();
+      const mockClient = new EventEmitter();
 
-      ingest.attachToDeepgram(mockDeepgram as any);
+      ingest.attachToTranscriptionClient(mockClient as any);
 
-      // Should have listener attached
-      expect(mockDeepgram.listenerCount('transcript')).toBe(1);
+      expect(mockClient.listenerCount('partialTranscript')).toBe(1);
+      expect(mockClient.listenerCount('committedTranscript')).toBe(1);
     });
 
-    it('should detach from Deepgram client', async () => {
-      const { TranscriptIngest } = await import('../../src/main/transcriptIngest');
+    it('should detach from transcription client', async () => {
+      const { TranscriptIngest } =
+        await import('../../src/main/transcriptIngest');
 
       const ingest = new TranscriptIngest();
-      const mockDeepgram = new EventEmitter();
+      const mockClient = new EventEmitter();
 
-      ingest.attachToDeepgram(mockDeepgram as any);
-      expect(mockDeepgram.listenerCount('transcript')).toBe(1);
+      ingest.attachToTranscriptionClient(mockClient as any);
+      expect(mockClient.listenerCount('partialTranscript')).toBe(1);
+      expect(mockClient.listenerCount('committedTranscript')).toBe(1);
 
       ingest.detach();
-      expect(mockDeepgram.listenerCount('transcript')).toBe(0);
+      expect(mockClient.listenerCount('partialTranscript')).toBe(0);
+      expect(mockClient.listenerCount('committedTranscript')).toBe(0);
     });
 
     it('should handle re-attachment', async () => {
-      const { TranscriptIngest } = await import('../../src/main/transcriptIngest');
+      const { TranscriptIngest } =
+        await import('../../src/main/transcriptIngest');
 
       const ingest = new TranscriptIngest();
-      const mockDeepgram1 = new EventEmitter();
-      const mockDeepgram2 = new EventEmitter();
+      const mockClient1 = new EventEmitter();
+      const mockClient2 = new EventEmitter();
 
-      ingest.attachToDeepgram(mockDeepgram1 as any);
-      ingest.attachToDeepgram(mockDeepgram2 as any);
+      ingest.attachToTranscriptionClient(mockClient1 as any);
+      ingest.attachToTranscriptionClient(mockClient2 as any);
 
-      // First should be detached
-      expect(mockDeepgram1.listenerCount('transcript')).toBe(0);
-      // Second should be attached
-      expect(mockDeepgram2.listenerCount('transcript')).toBe(1);
+      expect(mockClient1.listenerCount('partialTranscript')).toBe(0);
+      expect(mockClient1.listenerCount('committedTranscript')).toBe(0);
+      expect(mockClient2.listenerCount('partialTranscript')).toBe(1);
+      expect(mockClient2.listenerCount('committedTranscript')).toBe(1);
     });
   });
 });

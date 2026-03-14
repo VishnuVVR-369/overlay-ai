@@ -46,12 +46,12 @@ export interface AppStatus {
   liveMode: LiveModeStatus;
   answer: AnswerData;
   context: ContextStats;
-  isDeepgramConfigured: boolean;
+  isElevenLabsConfigured: boolean;
   isGroqConfigured: boolean;
 }
 
 export interface ApiKeySettings {
-  deepgramApiKey?: string;
+  elevenLabsApiKey?: string;
   groqApiKey?: string;
 }
 

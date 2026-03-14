@@ -1,7 +1,7 @@
 import Store from 'electron-store';
 
 export interface ApiKeySettings {
-  deepgramApiKey?: string;
+  elevenLabsApiKey?: string;
   groqApiKey?: string;
 }
 
@@ -16,7 +16,7 @@ export interface AppSettings extends ApiKeySettings, MinimizeModeSettings {
 const store = new Store<AppSettings>({
   name: 'overlay-ai-settings',
   defaults: {
-    deepgramApiKey: undefined,
+    elevenLabsApiKey: undefined,
     groqApiKey: undefined,
     customSystemPrompt: undefined,
     isMinimized: false,
@@ -26,7 +26,7 @@ const store = new Store<AppSettings>({
 
 export function getSettings(): AppSettings {
   return {
-    deepgramApiKey: store.get('deepgramApiKey'),
+    elevenLabsApiKey: store.get('elevenLabsApiKey'),
     groqApiKey: store.get('groqApiKey'),
     customSystemPrompt: store.get('customSystemPrompt'),
     isMinimized: store.get('isMinimized'),
@@ -35,7 +35,7 @@ export function getSettings(): AppSettings {
 
 export function saveSettings(settings: Partial<AppSettings>): void {
   const settingKeys: (keyof Omit<AppSettings, 'isMinimized'>)[] = [
-    'deepgramApiKey',
+    'elevenLabsApiKey',
     'groqApiKey',
     'customSystemPrompt',
   ];
@@ -51,9 +51,9 @@ export function saveSettings(settings: Partial<AppSettings>): void {
   }
 }
 
-export function getDeepgramApiKeyFromSettings(): string | undefined {
-  const settingsKey = store.get('deepgramApiKey');
-  return settingsKey?.length ? settingsKey : process.env.DEEPGRAM_API_KEY;
+export function getElevenLabsApiKeyFromSettings(): string | undefined {
+  const settingsKey = store.get('elevenLabsApiKey');
+  return settingsKey?.length ? settingsKey : process.env.ELEVENLABS_API_KEY;
 }
 
 export function getGroqApiKeyFromSettings(): string | undefined {
@@ -61,8 +61,8 @@ export function getGroqApiKeyFromSettings(): string | undefined {
   return settingsKey?.length ? settingsKey : process.env.GROQ_API_KEY;
 }
 
-export function isDeepgramConfiguredFromSettings(): boolean {
-  const key = getDeepgramApiKeyFromSettings();
+export function isElevenLabsConfiguredFromSettings(): boolean {
+  const key = getElevenLabsApiKeyFromSettings();
   return !!key && key.length > 0;
 }
 

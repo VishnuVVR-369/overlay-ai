@@ -8,7 +8,7 @@ import type {
   ContextStats,
 } from '../../lib/ipc';
 import { getDefaultContextBuffer } from '../contextBuffer';
-import { isDeepgramConfigured } from '../deepgram';
+import { isElevenLabsConfigured } from '../elevenLabs';
 import { isGroqConfiguredFromSettings } from '../settingsStore';
 
 const t = initTRPC.create({ isServer: true });
@@ -47,7 +47,7 @@ export const appRouter = router({
         estimatedTokens: stats.estimatedTokens,
         durationMs: stats.durationMs,
       },
-      isDeepgramConfigured: isDeepgramConfigured(),
+      isElevenLabsConfigured: isElevenLabsConfigured(),
       isGroqConfigured: isGroqConfiguredFromSettings(),
     };
   }),

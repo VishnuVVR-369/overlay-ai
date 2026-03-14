@@ -1,21 +1,21 @@
 import React from 'react';
 
 interface ConfigWarningProps {
-  isDeepgramConfigured: boolean;
+  isElevenLabsConfigured: boolean;
   isGroqConfigured: boolean;
 }
 
 export function ConfigWarning({
-  isDeepgramConfigured,
+  isElevenLabsConfigured,
   isGroqConfigured,
 }: ConfigWarningProps): React.ReactElement | null {
-  if (isDeepgramConfigured && isGroqConfigured) {
+  if (isElevenLabsConfigured && isGroqConfigured) {
     return null;
   }
 
   const missingKeys: string[] = [];
-  if (!isDeepgramConfigured) {
-    missingKeys.push('Set DEEPGRAM_API_KEY for transcription');
+  if (!isElevenLabsConfigured) {
+    missingKeys.push('Set ELEVENLABS_API_KEY for transcription');
   }
   if (!isGroqConfigured) {
     missingKeys.push('Set GROQ_API_KEY for LLM answers');

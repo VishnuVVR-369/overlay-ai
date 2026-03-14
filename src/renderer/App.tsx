@@ -66,7 +66,7 @@ function App(): React.ReactElement {
       />
 
       <ConfigWarning
-        isDeepgramConfigured={state.isDeepgramConfigured}
+        isElevenLabsConfigured={state.isElevenLabsConfigured}
         isGroqConfigured={state.isGroqConfigured}
       />
 

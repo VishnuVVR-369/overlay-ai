@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { DeepgramTranscript, DeepgramClient } from './deepgram';
+import type { ElevenLabsClient, ElevenLabsTranscriptEvent } from './elevenLabs';
 import {
   TranscriptSegment,
   Speaker,
@@ -8,55 +8,63 @@ import {
 
 export type { TranscriptSegment, Speaker } from '../lib/transcript';
 
-function channelToSpeaker(channelIndex: number): Speaker {
-  return channelIndex === 0 ? 'interviewer' : 'me';
-}
-
 export interface TranscriptIngestEvents {
   segment: (segment: TranscriptSegment) => void;
   interim: (text: string, speaker: Speaker) => void;
 }
 
 export class TranscriptIngest extends EventEmitter {
-  private deepgram: DeepgramClient | null = null;
-  private boundHandleTranscript: (transcript: DeepgramTranscript) => void;
+  private client: ElevenLabsClient | null = null;
+  private boundHandlePartialTranscript: (
+    transcript: ElevenLabsTranscriptEvent
+  ) => void;
+  private boundHandleCommittedTranscript: (
+    transcript: ElevenLabsTranscriptEvent
+  ) => void;
 
   constructor() {
     super();
-    this.boundHandleTranscript = this.handleTranscript.bind(this);
+    this.boundHandlePartialTranscript = this.handlePartialTranscript.bind(this);
+    this.boundHandleCommittedTranscript =
+      this.handleCommittedTranscript.bind(this);
   }
 
-  attachToDeepgram(client: DeepgramClient): void {
-    if (this.deepgram) {
+  attachToTranscriptionClient(client: ElevenLabsClient): void {
+    if (this.client) {
       this.detach();
     }
-    this.deepgram = client;
-    this.deepgram.on('transcript', this.boundHandleTranscript);
+    this.client = client;
+    this.client.on('partialTranscript', this.boundHandlePartialTranscript);
+    this.client.on('committedTranscript', this.boundHandleCommittedTranscript);
   }
 
   detach(): void {
-    if (this.deepgram) {
-      this.deepgram.removeListener('transcript', this.boundHandleTranscript);
-      this.deepgram = null;
+    if (this.client) {
+      this.client.removeListener(
+        'partialTranscript',
+        this.boundHandlePartialTranscript
+      );
+      this.client.removeListener(
+        'committedTranscript',
+        this.boundHandleCommittedTranscript
+      );
+      this.client = null;
     }
   }
 
-  private handleTranscript(transcript: DeepgramTranscript): void {
-    const channelIndex = transcript.channel_index?.[0] ?? 0;
-    const speaker = channelToSpeaker(channelIndex);
+  private handlePartialTranscript(transcript: ElevenLabsTranscriptEvent): void {
+    const text = transcript.text.trim();
+    if (!text) return;
+    this.emit('interim', text, transcript.speaker);
+  }
 
-    const alternative = transcript.channel?.alternatives?.[0];
-    if (!alternative?.transcript) return;
-
-    const text = alternative.transcript.trim();
+  private handleCommittedTranscript(
+    transcript: ElevenLabsTranscriptEvent
+  ): void {
+    const text = transcript.text.trim();
     if (!text) return;
 
-    if (!transcript.is_final) {
-      this.emit('interim', text, speaker);
-      return;
-    }
-
-    const segment = createTranscriptSegment(text, speaker);
+    const segment = createTranscriptSegment(text, transcript.speaker);
     this.emit('segment', segment);
   }
 

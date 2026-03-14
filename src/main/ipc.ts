@@ -25,7 +25,7 @@ import {
 import {
   getSettings,
   saveSettings,
-  isDeepgramConfiguredFromSettings,
+  isElevenLabsConfiguredFromSettings,
   isGroqConfiguredFromSettings,
   toggleMinimizeMode as toggleMinimizeModeInStore,
   isMinimizedMode as isMinimizedModeFromStore,
@@ -258,7 +258,7 @@ function getAppStatus() {
       estimatedTokens: stats.estimatedTokens,
       durationMs: stats.durationMs,
     },
-    isDeepgramConfigured: isDeepgramConfiguredFromSettings(),
+    isElevenLabsConfigured: isElevenLabsConfiguredFromSettings(),
     isGroqConfigured: isGroqConfiguredFromSettings(),
   };
 }

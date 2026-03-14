@@ -26,6 +26,6 @@ export interface ModalProps {
 }
 
 export interface ConfigWarningState {
-  isDeepgramConfigured: boolean;
+  isElevenLabsConfigured: boolean;
   isGroqConfigured: boolean;
 }
