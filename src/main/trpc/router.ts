@@ -9,7 +9,10 @@ import type {
 } from '../../lib/ipc';
 import { getDefaultContextBuffer } from '../contextBuffer';
 import { isDeepgramConfigured } from '../deepgram';
-import { isGroqConfiguredFromSettings } from '../settingsStore';
+import {
+  getInterviewModeFromSettings,
+  isGroqConfiguredFromSettings,
+} from '../settingsStore';
 
 const t = initTRPC.create({ isServer: true });
 export const router = t.router;
@@ -49,6 +52,7 @@ export const appRouter = router({
       },
       isDeepgramConfigured: isDeepgramConfigured(),
       isGroqConfigured: isGroqConfiguredFromSettings(),
+      interviewMode: getInterviewModeFromSettings(),
     };
   }),
 

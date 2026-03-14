@@ -1,4 +1,9 @@
 import Store from 'electron-store';
+import {
+  DEFAULT_INTERVIEW_MODE,
+  normalizeInterviewMode,
+  type InterviewMode,
+} from '../lib/interviewModes';
 
 export interface ApiKeySettings {
   deepgramApiKey?: string;
@@ -11,6 +16,7 @@ export interface MinimizeModeSettings {
 
 export interface AppSettings extends ApiKeySettings, MinimizeModeSettings {
   customSystemPrompt?: string;
+  interviewMode?: InterviewMode;
 }
 
 const store = new Store<AppSettings>({
@@ -19,6 +25,7 @@ const store = new Store<AppSettings>({
     deepgramApiKey: undefined,
     groqApiKey: undefined,
     customSystemPrompt: undefined,
+    interviewMode: DEFAULT_INTERVIEW_MODE,
     isMinimized: false,
   },
   encryptionKey: 'overlay-ai-encryption-key-v1',
@@ -29,6 +36,7 @@ export function getSettings(): AppSettings {
     deepgramApiKey: store.get('deepgramApiKey'),
     groqApiKey: store.get('groqApiKey'),
     customSystemPrompt: store.get('customSystemPrompt'),
+    interviewMode: normalizeInterviewMode(store.get('interviewMode')),
     isMinimized: store.get('isMinimized'),
   };
 }
@@ -38,11 +46,14 @@ export function saveSettings(settings: Partial<AppSettings>): void {
     'deepgramApiKey',
     'groqApiKey',
     'customSystemPrompt',
+    'interviewMode',
   ];
 
   for (const key of settingKeys) {
     if (settings[key] !== undefined) {
-      if (settings[key] === '') {
+      if (key === 'interviewMode') {
+        store.set(key, normalizeInterviewMode(settings[key]));
+      } else if (settings[key] === '') {
         store.delete(key);
       } else {
         store.set(key, settings[key]!);
@@ -69,6 +80,10 @@ export function isDeepgramConfiguredFromSettings(): boolean {
 export function isGroqConfiguredFromSettings(): boolean {
   const key = getGroqApiKeyFromSettings();
   return !!key && key.length > 0;
+}
+
+export function getInterviewModeFromSettings(): InterviewMode {
+  return normalizeInterviewMode(store.get('interviewMode'));
 }
 
 export function clearSettings(): void {

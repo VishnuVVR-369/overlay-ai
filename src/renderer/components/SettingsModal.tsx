@@ -2,12 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Modal } from './Modal';
 import { KeyIcon, EyeIcon, EyeOffIcon, MessageIcon } from './Icons';
 import { getSettings, saveSettings, getStatus } from '../ipcClient';
-
-const DEFAULT_SYSTEM_PROMPT = `You are a senior staff engineer assisting in a live interview. You have access to last 20 minutes of conversation. The user just asked a specific question or interviewer posed a problem.
-1. Identify the core question.
-2. If it is a Coding question: Provide Python code, time complexity, and brief explanation.
-3. If it is System Design: Outline high-level components and trade-offs.
-4. Ignore small talk in the transcript.`;
+import { InterviewModeSelector } from './InterviewModeSelector';
+import type { InterviewMode } from '../../lib/interviewModes';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -87,6 +83,7 @@ export function SettingsModal({
   const [deepgramKey, setDeepgramKey] = useState('');
   const [groqKey, setGroqKey] = useState('');
   const [customSystemPrompt, setCustomSystemPrompt] = useState('');
+  const [interviewMode, setInterviewMode] = useState<InterviewMode>('general');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -98,9 +95,8 @@ export function SettingsModal({
       .then((settings) => {
         setDeepgramKey(settings.deepgramApiKey || '');
         setGroqKey(settings.groqApiKey || '');
-        setCustomSystemPrompt(
-          settings.customSystemPrompt || DEFAULT_SYSTEM_PROMPT
-        );
+        setCustomSystemPrompt(settings.customSystemPrompt || '');
+        setInterviewMode(settings.interviewMode || 'general');
       })
       .catch((error) => {
         console.error('Failed to load settings:', error);
@@ -116,7 +112,8 @@ export function SettingsModal({
       await saveSettings({
         deepgramApiKey: deepgramKey,
         groqApiKey: groqKey,
-        customSystemPrompt: customSystemPrompt,
+        customSystemPrompt,
+        interviewMode,
       });
       await getStatus();
       onSave?.();
@@ -126,7 +123,7 @@ export function SettingsModal({
     } finally {
       setIsSaving(false);
     }
-  }, [deepgramKey, groqKey, customSystemPrompt, onSave, onClose]);
+  }, [deepgramKey, groqKey, customSystemPrompt, interviewMode, onSave, onClose]);
 
   const footer = (
     <>
@@ -198,6 +195,14 @@ export function SettingsModal({
             }
           />
 
+          <InterviewModeSelector
+            value={interviewMode}
+            onChange={setInterviewMode}
+            disabled={isSaving}
+            showDescription={true}
+            hint="Choose the preset that should shape the assistant's structure and priorities before you start the interview."
+          />
+
           <div className="mb-5">
             <label className="block text-xs font-semibold tracking-wide text-glass-text-secondary mb-2.5">
               <span className="flex items-center gap-2">
@@ -206,13 +211,13 @@ export function SettingsModal({
               </span>
             </label>
             <p className="text-xs text-glass-text-muted mb-2.5">
-              Customize how AI assistant behaves. Leave empty to use default
-              interview assistant prompt.
+              Optional extra instructions appended after the selected interview
+              mode preset. Leave empty to use the built-in preset behavior.
             </p>
             <textarea
               value={customSystemPrompt}
               onChange={(e) => setCustomSystemPrompt(e.target.value)}
-              placeholder="Enter your custom system prompt..."
+              placeholder="Add any extra instructions for answer tone, format, or focus..."
               className="w-full py-3 px-4 bg-glass-bg-primary border border-glass-border-subtle rounded-glass-md font-mono text-[13px] text-glass-text-primary placeholder:text-glass-text-subtle transition-all duration-glass-fast resize-y min-h-[120px] focus:outline-none focus:border-glass-accent focus:shadow-[0_0_0_3px_rgba(155,182,255,0.2)]"
               rows={6}
             />

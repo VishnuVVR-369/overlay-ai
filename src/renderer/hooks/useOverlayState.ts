@@ -10,22 +10,12 @@ import {
   clearOverlay as ipcClearOverlay,
   toggleMinimizeMode as ipcToggleMinimizeMode,
 } from '../ipcClient';
-
-export interface OverlayState {
-  liveMode: LiveModeStatus;
-  segments: TranscriptSegment[];
-  interimText: string;
-  interimSpeaker: Speaker | null;
-  answerState: AnswerData['state'];
-  answerText: string;
-  answerError: string | null;
-  answerModelId: string | null;
-  isDeepgramConfigured: boolean;
-  isGroqConfigured: boolean;
-  isMinimized: boolean;
-  lastError: string | null;
-  sessionStats: SessionStats;
-}
+import {
+  INITIAL_OVERLAY_STATE,
+  applyStatusToOverlayState,
+  getClearedOverlayState,
+  type OverlayState,
+} from '../overlayState';
 
 export interface OverlayActions {
   startLiveMode: () => Promise<void>;
@@ -43,33 +33,12 @@ export interface UseOverlayStateReturn {
   isLoading: boolean;
 }
 
-const INITIAL_STATE: OverlayState = {
-  liveMode: { state: 'disconnected' },
-  segments: [],
-  interimText: '',
-  interimSpeaker: null,
-  answerState: 'idle',
-  answerText: '',
-  answerError: null,
-  answerModelId: null,
-  isDeepgramConfigured: false,
-  isGroqConfigured: false,
-  isMinimized: false,
-  lastError: null,
-  sessionStats: {
-    sessionStartedAt: null,
-    totalWordsTranscribed: 0,
-    totalInputTokens: 0,
-    totalOutputTokens: 0,
-  },
-};
-
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
 export function useOverlayState(): UseOverlayStateReturn {
-  const [state, setState] = useState<OverlayState>(INITIAL_STATE);
+  const [state, setState] = useState<OverlayState>(INITIAL_OVERLAY_STATE);
   const [isLoading, setIsLoading] = useState(true);
   const answerTextRef = useRef('');
 
@@ -215,22 +184,7 @@ export function useOverlayState(): UseOverlayStateReturn {
   const clearOverlay = useCallback(async () => {
     try {
       await ipcClearOverlay();
-      setState((prev) => ({
-        ...prev,
-        segments: [],
-        interimText: '',
-        interimSpeaker: null,
-        answerState: 'idle',
-        answerText: '',
-        answerError: null,
-        lastError: null,
-        sessionStats: {
-          sessionStartedAt: null,
-          totalWordsTranscribed: 0,
-          totalInputTokens: 0,
-          totalOutputTokens: 0,
-        },
-      }));
+      setState((prev) => getClearedOverlayState(prev));
       answerTextRef.current = '';
     } catch (error) {
       handleError(getErrorMessage(error, 'Failed to clear overlay'));
@@ -240,15 +194,7 @@ export function useOverlayState(): UseOverlayStateReturn {
   const refreshStatus = useCallback(async () => {
     try {
       const status = await getStatus();
-      setState((prev) => ({
-        ...prev,
-        liveMode: status.liveMode,
-        answerState: status.answer.state,
-        answerText: status.answer.text,
-        answerError: status.answer.error || null,
-        isDeepgramConfigured: status.isDeepgramConfigured,
-        isGroqConfigured: status.isGroqConfigured,
-      }));
+      setState((prev) => applyStatusToOverlayState(prev, status));
     } catch (error) {
       handleError(getErrorMessage(error, 'Failed to get status'));
     }

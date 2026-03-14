@@ -86,6 +86,7 @@ function App(): React.ReactElement {
             text={state.answerText}
             error={state.answerError || undefined}
             modelId={state.answerModelId || undefined}
+            interviewMode={state.interviewMode}
           />
         </section>
       </main>

@@ -11,6 +11,7 @@ export { Toast } from './Toast';
 export { Modal, type ModalProps } from './Modal';
 export { SettingsModal } from './SettingsModal';
 export { HelpModal } from './HelpModal';
+export { InterviewModeSelector } from './InterviewModeSelector';
 
 export {
   StatusIndicator,

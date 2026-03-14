@@ -4,7 +4,7 @@
 
 export {
   useOverlayState,
-  type OverlayState,
   type OverlayActions,
   type UseOverlayStateReturn,
 } from './useOverlayState';
+export type { OverlayState } from '../overlayState';

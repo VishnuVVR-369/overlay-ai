@@ -2,12 +2,17 @@ import React from 'react';
 import { Streamdown } from 'streamdown';
 import { CommandIcon, SparkleIcon, AlertIcon } from './Icons';
 import type { AnswerState } from '../../lib/ipc';
+import {
+  getInterviewModeLabel,
+  type InterviewMode,
+} from '../../lib/interviewModes';
 
 export interface AnswerCardProps {
   state: AnswerState;
   text: string;
   error?: string;
   modelId?: string;
+  interviewMode?: InterviewMode;
   showModel?: boolean;
   maxHeight?: string;
 }
@@ -63,7 +68,11 @@ function ErrorState({ message }: { message: string }): React.ReactElement {
   );
 }
 
-function IdleState(): React.ReactElement {
+function IdleState({
+  interviewMode = 'general',
+}: {
+  interviewMode?: InterviewMode;
+}): React.ReactElement {
   return (
     <div className="flex flex-col items-center justify-center text-center">
       <div className="w-14 h-14 mb-3 border border-dashed border-glass-border-default rounded-full flex items-center justify-center bg-glass-bg-secondary">
@@ -76,6 +85,9 @@ function IdleState(): React.ReactElement {
       <h3 className="text-[15px] font-medium text-glass-text-secondary mb-1.5">
         Ready to assist
       </h3>
+      <p className="text-[11px] uppercase tracking-wide text-glass-accent-light mb-2">
+        {getInterviewModeLabel(interviewMode)} mode
+      </p>
       <p className="text-[13px] text-glass-text-muted">
         Press{' '}
         <kbd className="inline-flex items-center gap-1 px-2.5 py-1 bg-glass-bg-elevated border border-glass-border-subtle rounded-md font-mono text-[11px] text-glass-text-secondary">
@@ -132,6 +144,7 @@ export function AnswerCard({
   text,
   error,
   modelId,
+  interviewMode,
   showModel = true,
   maxHeight = '200px',
 }: AnswerCardProps): React.ReactElement {
@@ -159,7 +172,7 @@ export function AnswerCard({
         className="p-3 overflow-y-auto glass-scrollbar"
         style={{ maxHeight }}
       >
-        {state === 'idle' && <IdleState />}
+        {state === 'idle' && <IdleState interviewMode={interviewMode} />}
         {state === 'error' && error && <ErrorState message={error} />}
         {state === 'generating' && !text && <LoadingState />}
 

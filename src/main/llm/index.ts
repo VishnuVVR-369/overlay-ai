@@ -14,9 +14,15 @@ export {
 
 // System prompt
 export {
+  BASE_SYSTEM_PROMPT,
+  SYSTEM_PROMPT,
   DEFAULT_SYSTEM_PROMPT,
+  LEGACY_DEFAULT_SYSTEM_PROMPT,
+  buildSystemPrompt,
+  getModeInstructions,
   getSystemPrompt,
   buildUserPrompt,
+  normalizeCustomSystemPrompt,
 } from './systemPrompt';
 
 // Groq provider
