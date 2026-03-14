@@ -3,10 +3,10 @@ import type { LiveModeStatus, LiveModeState } from '../lib/ipc';
 import type { TranscriptSegment, Speaker } from '../lib/transcript';
 import { AudioEngine, getDefaultAudioEngine } from './audioEngine';
 import {
-  DeepgramClient,
-  connectDeepgram,
-  isDeepgramConfigured,
-} from './deepgram';
+  ElevenLabsClient,
+  connectElevenLabs,
+  isElevenLabsConfigured,
+} from './elevenLabs';
 import {
   TranscriptIngest,
   getDefaultTranscriptIngest,
@@ -32,7 +32,7 @@ export class LiveModeManager extends EventEmitter {
   private _error: string | undefined;
   private _connectedAt: number | undefined;
   private audioEngine: AudioEngine | null = null;
-  private deepgramClient: DeepgramClient | null = null;
+  private transcriptionClient: ElevenLabsClient | null = null;
   private transcriptIngest: TranscriptIngest | null = null;
 
   get state(): LiveModeState {
@@ -84,15 +84,15 @@ export class LiveModeManager extends EventEmitter {
       return this.status;
     }
 
-    if (!isDeepgramConfigured()) {
-      this.transition('error', 'DEEPGRAM_API_KEY not configured');
+    if (!isElevenLabsConfigured()) {
+      this.transition('error', 'ELEVENLABS_API_KEY not configured');
       return this.status;
     }
 
     this.transition('connecting');
 
     try {
-      this.deepgramClient = await connectDeepgram();
+      this.transcriptionClient = await connectElevenLabs();
       this.setupTranscriptIngest();
       this.setupAudioEngine();
       this.audioEngine!.start();
@@ -110,7 +110,9 @@ export class LiveModeManager extends EventEmitter {
 
   private setupTranscriptIngest(): void {
     this.transcriptIngest = getDefaultTranscriptIngest();
-    this.transcriptIngest.attachToDeepgram(this.deepgramClient!);
+    this.transcriptIngest.attachToTranscriptionClient(
+      this.transcriptionClient!
+    );
 
     this.transcriptIngest.on('segment', (segment: TranscriptSegment) => {
       getDefaultContextBuffer().add(segment);
@@ -126,8 +128,8 @@ export class LiveModeManager extends EventEmitter {
     this.audioEngine = getDefaultAudioEngine();
 
     this.audioEngine.on('data', (chunk: Buffer) => {
-      if (this.deepgramClient?.isOpen()) {
-        this.deepgramClient.send(chunk);
+      if (this.transcriptionClient?.isOpen()) {
+        this.transcriptionClient.send(chunk);
       }
     });
 
@@ -179,9 +181,9 @@ export class LiveModeManager extends EventEmitter {
       this.audioEngine = null;
     }
 
-    if (this.deepgramClient) {
-      this.deepgramClient.disconnect();
-      this.deepgramClient = null;
+    if (this.transcriptionClient) {
+      this.transcriptionClient.disconnect();
+      this.transcriptionClient = null;
     }
 
     if (this.transcriptIngest) {

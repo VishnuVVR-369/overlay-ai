@@ -20,7 +20,7 @@ export interface OverlayState {
   answerText: string;
   answerError: string | null;
   answerModelId: string | null;
-  isDeepgramConfigured: boolean;
+  isElevenLabsConfigured: boolean;
   isGroqConfigured: boolean;
   isMinimized: boolean;
   lastError: string | null;
@@ -52,7 +52,7 @@ const INITIAL_STATE: OverlayState = {
   answerText: '',
   answerError: null,
   answerModelId: null,
-  isDeepgramConfigured: false,
+  isElevenLabsConfigured: false,
   isGroqConfigured: false,
   isMinimized: false,
   lastError: null,
@@ -246,7 +246,7 @@ export function useOverlayState(): UseOverlayStateReturn {
         answerState: status.answer.state,
         answerText: status.answer.text,
         answerError: status.answer.error || null,
-        isDeepgramConfigured: status.isDeepgramConfigured,
+        isElevenLabsConfigured: status.isElevenLabsConfigured,
         isGroqConfigured: status.isGroqConfigured,
       }));
     } catch (error) {

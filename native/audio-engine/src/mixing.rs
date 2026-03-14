@@ -9,7 +9,8 @@
 /// - Channel 0: System Audio (Interviewer)
 /// - Channel 1: Microphone (You)
 ///
-/// This allows Deepgram to use "Multichannel" diarization for better accuracy.
+/// This preserves the interviewer/microphone channel split for downstream
+/// speaker attribution before the stream is downmixed for ElevenLabs STT.
 ///
 /// # Arguments
 /// * `system` - System audio samples (mono)

@@ -94,7 +94,7 @@ describe('Hotkeys & Actions - Verification', () => {
         stateChanges.push(status.state);
       });
 
-      // Note: start() requires Deepgram API key
+      // Note: start() requires ElevenLabs API key
       // We test the mechanism exists
 
       expect(typeof manager.start).toBe('function');
@@ -148,9 +148,15 @@ describe('Hotkeys & Actions - Verification', () => {
       const ipcTypes = await import('../../src/lib/ipc');
 
       expect(ipcTypes.IPC_CHANNELS).toBeDefined();
-      expect(ipcTypes.IPC_CHANNELS.START_LIVE_MODE).toBe('overlay:start-live-mode');
-      expect(ipcTypes.IPC_CHANNELS.STOP_LIVE_MODE).toBe('overlay:stop-live-mode');
-      expect(ipcTypes.IPC_CHANNELS.TRIGGER_ANSWER).toBe('overlay:trigger-answer');
+      expect(ipcTypes.IPC_CHANNELS.START_LIVE_MODE).toBe(
+        'overlay:start-live-mode'
+      );
+      expect(ipcTypes.IPC_CHANNELS.STOP_LIVE_MODE).toBe(
+        'overlay:stop-live-mode'
+      );
+      expect(ipcTypes.IPC_CHANNELS.TRIGGER_ANSWER).toBe(
+        'overlay:trigger-answer'
+      );
       expect(ipcTypes.IPC_CHANNELS.CLEAR_OVERLAY).toBe('overlay:clear-overlay');
     });
 
@@ -158,10 +164,16 @@ describe('Hotkeys & Actions - Verification', () => {
       const { IPC_CHANNELS } = await import('../../src/lib/ipc');
 
       expect(IPC_CHANNELS.LIVE_MODE_CHANGED).toBe('overlay:live-mode-changed');
-      expect(IPC_CHANNELS.TRANSCRIPT_SEGMENT).toBe('overlay:transcript-segment');
-      expect(IPC_CHANNELS.INTERIM_TRANSCRIPT).toBe('overlay:interim-transcript');
+      expect(IPC_CHANNELS.TRANSCRIPT_SEGMENT).toBe(
+        'overlay:transcript-segment'
+      );
+      expect(IPC_CHANNELS.INTERIM_TRANSCRIPT).toBe(
+        'overlay:interim-transcript'
+      );
       expect(IPC_CHANNELS.ANSWER_CHUNK).toBe('overlay:answer-chunk');
-      expect(IPC_CHANNELS.ANSWER_STATE_CHANGED).toBe('overlay:answer-state-changed');
+      expect(IPC_CHANNELS.ANSWER_STATE_CHANGED).toBe(
+        'overlay:answer-state-changed'
+      );
     });
   });
 
@@ -209,7 +221,8 @@ describe('Hotkeys & Actions - Verification', () => {
   describe('Context Integration', () => {
     it('triggerAnswer should use ContextBuffer.getFullContext', async () => {
       // This tests that the answer generation uses the context buffer
-      const { getDefaultContextBuffer } = await import('../../src/main/contextBuffer');
+      const { getDefaultContextBuffer } =
+        await import('../../src/main/contextBuffer');
 
       const buffer = getDefaultContextBuffer();
       const now = Date.now();
@@ -235,7 +248,8 @@ describe('Hotkeys & Actions - Verification', () => {
 
   describe('Clear Overlay Action', () => {
     it('ContextBuffer can be cleared directly', async () => {
-      const { getDefaultContextBuffer } = await import('../../src/main/contextBuffer');
+      const { getDefaultContextBuffer } =
+        await import('../../src/main/contextBuffer');
 
       const buffer = getDefaultContextBuffer();
 

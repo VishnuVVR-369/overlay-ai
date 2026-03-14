@@ -1,10 +1,10 @@
 # Overlay AI
 
-A stealth overlay assistant for technical interviews. Captures audio in real-time, transcribes it using Deepgram, and generates contextual answers with an LLM.
+A stealth overlay assistant for technical interviews. Captures audio in real-time, transcribes it using ElevenLabs, and generates contextual answers with an LLM.
 
 ## Features
 
-- **🎙️ Real-time transcription** - Captures microphone and system audio via a native Rust sidecar, with speaker identification (interviewer vs you)
+- **🎙️ Real-time transcription** - Captures microphone and system audio via a native Rust sidecar, with live speaker attribution (interviewer vs you)
 - **💾 20-minute rolling context** - Maintains conversation history for accurate, context-aware responses
 - **👻 Stealth mode** - Overlay window is invisible to screen capture software (Zoom, Teams, OBS)
 - **⌨️ Global hotkeys** - Control everything without switching windows or losing focus
@@ -36,7 +36,7 @@ npm run build:native
 Create a `.env` file in the project root:
 
 ```env
-DEEPGRAM_API_KEY=your_deepgram_api_key
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
 GROQ_API_KEY=your_groq_api_key
 ```
 
@@ -56,7 +56,7 @@ npm run package:mac
 ## Quick Start Guide
 
 1. **Get your API keys** (free tiers available):
-   - [Deepgram API Key](https://console.deepgram.com/) - for transcription
+   - [ElevenLabs API Key](https://elevenlabs.io/app/settings/api-keys) - for transcription
    - [Groq API Key](https://console.groq.com/) - for AI answers
 
 2. **Configure the app**:
@@ -85,22 +85,22 @@ npm run package:mac
 ## Architecture
 
 ```
-┌─────────────┐    PCM     ┌─────────────┐   WebSocket   ┌──────────┐
-│ audio-engine│ ─────────► │  Electron   │ ────────────► │ Deepgram │
-│   (Rust)    │   stdout   │   Main      │               │   API    │
-└─────────────┘            └──────┬──────┘               └────┬─────┘
-                                  │                           │
-                                  │ IPC                       │ transcript
-                                  ▼                           ▼
-                           ┌─────────────┐            ┌─────────────┐
-                           │  Renderer   │◄───────────│  Context    │
-                           │  (React)    │            │  Buffer     │
-                           └─────────────┘            └──────┬──────┘
-                                                             │
-                                                             ▼
-                                                      ┌─────────────┐
-                                                      │  LLM (Groq) │
-                                                      └─────────────┘
+┌─────────────┐    PCM     ┌─────────────┐   WebSocket   ┌──────────────┐
+│ audio-engine│ ─────────► │  Electron   │ ────────────► │ ElevenLabs   │
+│   (Rust)    │   stdout   │   Main      │               │ Realtime STT │
+└─────────────┘            └──────┬──────┘               └──────┬───────┘
+                                  │                             │
+                                  │ IPC                         │ transcript
+                                  ▼                             ▼
+                           ┌─────────────┐              ┌─────────────┐
+                           │  Renderer   │◄─────────────│  Context    │
+                           │  (React)    │              │  Buffer     │
+                           └─────────────┘              └──────┬──────┘
+                                                               │
+                                                               ▼
+                                                        ┌─────────────┐
+                                                        │  LLM (Groq) │
+                                                        └─────────────┘
 ```
 
 ## Project Structure
@@ -154,7 +154,7 @@ You can customize how the AI assistant behaves by editing the system prompt in S
 - **Language**: TypeScript 5.4, Rust
 - **UI**: React 18, Tailwind CSS, custom glass morphism design system
 - **Audio**: cpal (Rust), ScreenCaptureKit (macOS)
-- **Transcription**: Deepgram Nova-2 WebSocket API
+- **Transcription**: ElevenLabs Scribe v2 Realtime WebSocket API
 - **LLM**: Groq (GPT OSS 120B, Llama 3.1)
 - **Markdown**: Streamdown (streaming markdown renderer)
 - **State Management**: React Hooks with custom overlay state management
@@ -163,7 +163,7 @@ You can customize how the AI assistant behaves by editing the system prompt in S
 ## How It Works
 
 1. The Rust sidecar captures microphone and system audio, outputting raw PCM data
-2. Electron pipes this audio to Deepgram for real-time transcription with speaker detection
+2. Electron downmixes the stereo capture to mono PCM and streams it to ElevenLabs for real-time transcription
 3. Transcripts are stored in a rolling 20-minute context buffer (~4000 tokens)
 4. When triggered, the full context is sent to Groq's LLM with a system prompt optimized for interview assistance
 5. Streaming responses are rendered with markdown support (code blocks, lists, formatting) in the transparent overlay
@@ -173,7 +173,7 @@ You can customize how the AI assistant behaves by editing the system prompt in S
 
 ### Transcription not working
 
-- Verify your Deepgram API key is correct in Settings
+- Verify your ElevenLabs API key is correct in Settings
 - Make sure Live Mode is active (green indicator in header)
 - Check that your microphone is not muted in system settings
 - Try restarting the app

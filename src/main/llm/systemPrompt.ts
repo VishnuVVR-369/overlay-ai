@@ -18,3 +18,4 @@ ${context}
 
 Based on the above conversation, identify the most recent question or problem and provide a helpful response.`;
 }
+export const SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT;

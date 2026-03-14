@@ -84,7 +84,7 @@ export function SettingsModal({
   onClose,
   onSave,
 }: SettingsModalProps): React.ReactElement | null {
-  const [deepgramKey, setDeepgramKey] = useState('');
+  const [elevenLabsKey, setElevenLabsKey] = useState('');
   const [groqKey, setGroqKey] = useState('');
   const [customSystemPrompt, setCustomSystemPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -96,7 +96,7 @@ export function SettingsModal({
     setIsLoading(true);
     getSettings()
       .then((settings) => {
-        setDeepgramKey(settings.deepgramApiKey || '');
+        setElevenLabsKey(settings.elevenLabsApiKey || '');
         setGroqKey(settings.groqApiKey || '');
         setCustomSystemPrompt(
           settings.customSystemPrompt || DEFAULT_SYSTEM_PROMPT
@@ -114,7 +114,7 @@ export function SettingsModal({
     setIsSaving(true);
     try {
       await saveSettings({
-        deepgramApiKey: deepgramKey,
+        elevenLabsApiKey: elevenLabsKey,
         groqApiKey: groqKey,
         customSystemPrompt: customSystemPrompt,
       });
@@ -126,7 +126,7 @@ export function SettingsModal({
     } finally {
       setIsSaving(false);
     }
-  }, [deepgramKey, groqKey, customSystemPrompt, onSave, onClose]);
+  }, [elevenLabsKey, groqKey, customSystemPrompt, onSave, onClose]);
 
   const footer = (
     <>
@@ -159,16 +159,17 @@ export function SettingsModal({
       ) : (
         <>
           <PasswordInput
-            label="Deepgram API Key"
-            value={deepgramKey}
-            onChange={setDeepgramKey}
-            placeholder="Enter your Deepgram API key"
+            label="ElevenLabs API Key"
+            value={elevenLabsKey}
+            onChange={setElevenLabsKey}
+            placeholder="Enter your ElevenLabs API key"
             icon={<KeyIcon size={14} />}
             hint={
               <>
-                Used for real-time speech transcription.{' '}
+                Used for real-time speech transcription over WebSocket
+                streaming.{' '}
                 <a
-                  href="https://console.deepgram.com/"
+                  href="https://elevenlabs.io/app/settings/api-keys"
                   target="_blank"
                   rel="noopener noreferrer"
                 >

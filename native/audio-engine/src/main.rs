@@ -39,7 +39,7 @@ use device::list_audio_devices;
 #[command(name = "audio-engine")]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Target sample rate in Hz (default: 16000 for Deepgram)
+    /// Target sample rate in Hz (default: 16000 for ElevenLabs STT)
     #[arg(long, default_value_t = TARGET_SAMPLE_RATE)]
     sample_rate: u32,
 
