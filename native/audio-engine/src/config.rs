@@ -3,7 +3,7 @@
 //! This module contains all configuration constants used throughout the audio engine,
 //! including sample rates, buffer sizes, and logging intervals.
 
-/// Target sample rate for Deepgram (16kHz as per PLAN.md)
+/// Target sample rate for realtime STT (16kHz as per PLAN.md)
 pub const TARGET_SAMPLE_RATE: u32 = 16000;
 
 /// Output channels: Stereo (Channel 0 = System, Channel 1 = Mic)
