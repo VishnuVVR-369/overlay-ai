@@ -175,6 +175,78 @@ export class GroqProvider implements LLMProvider {
     }
     return chunks.join('');
   }
+
+  /**
+   * Stream a chat response with custom messages
+   *
+   * This method allows sending custom message arrays for chat interactions,
+   * which is useful for maintaining conversation history.
+   *
+   * @param messages - Array of message objects with role and content
+   * @param systemPrompt - Optional system prompt (overrides default)
+   * @param modelId - The model to use
+   * @yields Token chunks as they are generated
+   */
+  async *streamChatResponse(
+    messages: Array<{ role: string; content: string }>,
+    systemPrompt: string | undefined = undefined,
+    modelId: string = DEFAULT_MODEL_ID
+  ): AsyncGenerator<string, void, unknown> {
+    const client = this.getClient();
+
+    const effectiveSystemPrompt = systemPrompt ?? getSystemPrompt();
+
+    const fullMessages = [
+      { role: 'system', content: effectiveSystemPrompt },
+      ...messages,
+    ];
+
+    try {
+      const stream = await client.chat.completions.create({
+        model: modelId,
+        messages: fullMessages as Array<{
+          role: 'system' | 'user' | 'assistant';
+          content: string;
+        }>,
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 2048,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content;
+        if (content) {
+          yield content;
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message.includes('rate limit')) {
+          throw new LLMError(
+            'Rate limit exceeded',
+            LLM_ERROR_CODES.RATE_LIMITED,
+            this.name,
+            error
+          );
+        }
+        if (error.message.includes('context length')) {
+          throw new LLMError(
+            'Context too long for model',
+            LLM_ERROR_CODES.CONTEXT_TOO_LONG,
+            this.name,
+            error
+          );
+        }
+        throw new LLMError(
+          error.message,
+          LLM_ERROR_CODES.API_ERROR,
+          this.name,
+          error
+        );
+      }
+      throw new LLMError('Unknown error', LLM_ERROR_CODES.API_ERROR, this.name);
+    }
+  }
 }
 
 let defaultProvider: GroqProvider | null = null;

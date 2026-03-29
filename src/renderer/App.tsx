@@ -10,6 +10,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { HelpModal } from './components/HelpModal';
 import { SessionStatsFooter } from './components/SessionStatsFooter';
 import { useOverlayState } from './hooks/useOverlayState';
+import { openChatWindow } from './ipcClient';
 
 function App(): React.ReactElement {
   const { state, isLoading, actions } = useOverlayState();
@@ -32,6 +33,10 @@ function App(): React.ReactElement {
   );
 
   const handleClose = useCallback(() => window.close(), []);
+
+  const handleOpenChat = useCallback(async () => {
+    await openChatWindow();
+  }, []);
 
   if (isLoading) {
     return <LoadingOverlay />;
@@ -63,6 +68,7 @@ function App(): React.ReactElement {
         onOpenSettings={handleOpenSettings}
         onMinimize={handleToggleMinimize}
         onClose={handleClose}
+        onOpenChat={handleOpenChat}
       />
 
       <ConfigWarning

@@ -212,3 +212,31 @@ export const TokenIcon = createIcon(
     <path d="m4.24 7.76 2.83 2.83" />
   </>
 );
+
+export const ChatIcon = createIcon(
+  <>
+    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+  </>
+);
+
+export const TrashIcon = createIcon(
+  <>
+    <path d="M3 6h18" />
+    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+  </>
+);
+
+export const SendIcon = createIcon(
+  <>
+    <line x1="22" y1="2" x2="11" y2="13" />
+    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+  </>
+);
+
+export const PinIcon = createIcon(
+  <>
+    <path d="M12 19l7-7 3 3-7 7-3-3z" />
+    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+    <path d="M2 2l7.586 7.586" />
+  </>
+);

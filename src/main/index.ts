@@ -17,8 +17,10 @@ import {
   clearOverlay,
   toggleMinimizeMode,
   applyMinimizeMode,
+  openChatWindow,
 } from './ipc';
 import { StealthWindowManager, getNativeWindowHandle } from './macos';
+import { destroyChatWindowManager } from './chatWindow';
 
 try {
   if (require('electron-squirrel-startup')) {
@@ -46,6 +48,7 @@ const SHORTCUTS = [
   { key: 'CommandOrControl+Shift+L', action: toggleLiveMode, name: 'Live' },
   { key: 'CommandOrControl+Shift+X', action: triggerAnswer, name: 'Answer' },
   { key: 'CommandOrControl+Shift+Z', action: clearOverlay, name: 'Clear' },
+  { key: 'CommandOrControl+Shift+C', action: openChatWindow, name: 'Chat' },
   {
     key: 'CommandOrControl+Shift+M',
     action: toggleMinimizeMode,
@@ -157,4 +160,5 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   cleanupIPC();
+  destroyChatWindowManager();
 });

@@ -11,6 +11,7 @@ import {
   type ContextStats,
   type IPCEvents,
 } from '../lib/ipc';
+import { ChatState } from '../lib/chat';
 
 export const trpc = createTRPCProxyClient<AppRouter>({
   links: [ipcLink()],
@@ -172,6 +173,60 @@ export function onMinimizeModeChanged(
   );
   return () =>
     window.electronAPI.removeAllListeners(IPC_CHANNELS.MINIMIZE_MODE_CHANGED);
+}
+
+export async function openChatWindow(): Promise<{ success: boolean }> {
+  return window.electronAPI.invoke<{ success: boolean }>(
+    IPC_CHANNELS.OPEN_CHAT_WINDOW
+  );
+}
+
+export async function closeChatWindow(): Promise<{ success: boolean }> {
+  return window.electronAPI.invoke<{ success: boolean }>(
+    IPC_CHANNELS.CLOSE_CHAT_WINDOW
+  );
+}
+
+export async function sendChatMessage(
+  message: string,
+  includeTranscript: boolean
+): Promise<{ success: boolean }> {
+  return window.electronAPI.invoke<{ success: boolean }>(
+    IPC_CHANNELS.SEND_CHAT_MESSAGE,
+    { message, includeTranscript }
+  );
+}
+
+export async function getChatHistory(): Promise<ChatState> {
+  return window.electronAPI.invoke<ChatState>(IPC_CHANNELS.GET_CHAT_HISTORY);
+}
+
+export async function clearChatHistory(): Promise<{ success: boolean }> {
+  return window.electronAPI.invoke<{ success: boolean }>(
+    IPC_CHANNELS.CLEAR_CHAT_HISTORY
+  );
+}
+
+export function onChatResponseChunk(
+  callback: EventCallback<'chatResponseChunk'>
+): () => void {
+  window.electronAPI.on(
+    IPC_CHANNELS.CHAT_RESPONSE_CHUNK,
+    callback as (...args: unknown[]) => void
+  );
+  return () =>
+    window.electronAPI.removeAllListeners(IPC_CHANNELS.CHAT_RESPONSE_CHUNK);
+}
+
+export function onChatStateChanged(
+  callback: EventCallback<'chatStateChanged'>
+): () => void {
+  window.electronAPI.on(
+    IPC_CHANNELS.CHAT_STATE_CHANGED,
+    callback as (...args: unknown[]) => void
+  );
+  return () =>
+    window.electronAPI.removeAllListeners(IPC_CHANNELS.CHAT_STATE_CHANGED);
 }
 
 export function onSessionStatsUpdated(
