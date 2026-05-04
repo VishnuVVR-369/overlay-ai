@@ -1,5 +1,6 @@
-import type { SocketState } from '@shared/types'
+import type { PresetId, SocketState } from '@shared/types'
 import { useStatusStore } from '../state/status-store'
+import { usePresetStore } from '../state/preset-store'
 
 interface Props {
   compact: boolean
@@ -35,6 +36,7 @@ export function StatusBar(props: Props): JSX.Element {
       </button>
       <SocketDot label="You" state={micState} />
       <SocketDot label="Them" state={systemState} />
+      <PresetSelect />
       <div className="status-spacer" />
       <button onClick={props.onClearTranscript} className="ghost-btn" title="Clear transcript">Clear</button>
       <button onClick={props.onOpenHelp} className="ghost-btn" title="Help" aria-label="Help">?</button>
@@ -42,6 +44,34 @@ export function StatusBar(props: Props): JSX.Element {
       <button onClick={props.onToggleCompact} className="ghost-btn" title="Minimize" aria-label="Minimize">-</button>
       <button onClick={props.onQuit} className="ghost-btn danger" title="Quit" aria-label="Quit">×</button>
     </div>
+  )
+}
+
+function PresetSelect(): JSX.Element | null {
+  const active = usePresetStore((s) => s.active)
+  const presets = usePresetStore((s) => s.presets)
+  const hydrated = usePresetStore((s) => s.hydrated)
+
+  if (!hydrated || presets.length === 0) return null
+
+  const onChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
+    void window.api.presets.setActive(e.target.value as PresetId)
+  }
+
+  return (
+    <select
+      className="preset-select"
+      value={active}
+      onChange={onChange}
+      title="Interview mode"
+      aria-label="Interview mode"
+    >
+      {presets.map((p) => (
+        <option key={p.id} value={p.id}>
+          {p.label}{p.overridden ? ' •' : ''}
+        </option>
+      ))}
+    </select>
   )
 }
 

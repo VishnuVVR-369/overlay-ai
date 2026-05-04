@@ -23,6 +23,10 @@ export const IPC = {
   windowQuit: 'window:quit',
   toast: 'ui:toast',
   socketStatus: 'socket:status',
+  presetsGet: 'presets:get',
+  presetsSetActive: 'presets:set-active',
+  presetsSetOverride: 'presets:set-override',
+  presetsChanged: 'presets:changed',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

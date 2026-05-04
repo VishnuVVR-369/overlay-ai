@@ -36,6 +36,32 @@ export interface SettingsUpdate {
   groqKey?: string
 }
 
+export type PresetId = 'behavioral' | 'coding' | 'system-design' | 'negotiation'
+
+export interface PresetDef {
+  id: PresetId
+  label: string
+  defaultPrompt: string
+}
+
+export interface PresetEntry {
+  id: PresetId
+  label: string
+  defaultPrompt: string
+  effectivePrompt: string
+  overridden: boolean
+}
+
+export interface PresetState {
+  active: PresetId
+  presets: PresetEntry[]
+}
+
+export interface PresetOverrideUpdate {
+  id: PresetId
+  prompt: string | null
+}
+
 export interface PermissionStatus {
   mic: 'granted' | 'denied' | 'not-determined' | 'restricted' | 'unknown'
   screen: 'granted' | 'denied' | 'not-determined' | 'restricted' | 'unknown'
@@ -113,6 +139,12 @@ export interface OverlayApi {
     onToken(handler: (event: LlmTokenEvent) => void): () => void
     onDone(handler: (event: LlmDoneEvent) => void): () => void
     onError(handler: (event: LlmErrorEvent) => void): () => void
+  }
+  presets: {
+    get(): Promise<PresetState>
+    setActive(id: PresetId): Promise<void>
+    setOverride(update: PresetOverrideUpdate): Promise<void>
+    onChanged(handler: (state: PresetState) => void): () => void
   }
   ui: {
     onToast(handler: (event: ToastEvent) => void): () => void

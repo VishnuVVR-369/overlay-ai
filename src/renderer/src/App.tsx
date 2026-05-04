@@ -10,6 +10,7 @@ import { useTranscriptStore } from './state/transcript-store'
 import { useLlmStore } from './state/llm-store'
 import { useStatusStore } from './state/status-store'
 import { useUiStore } from './state/ui-store'
+import { usePresetStore } from './state/preset-store'
 
 export function App(): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -27,6 +28,7 @@ export function App(): JSX.Element {
   const setCompact = useUiStore((s) => s.setCompact)
   const helpOpen = useUiStore((s) => s.helpOpen)
   const setHelpOpen = useUiStore((s) => s.setHelpOpen)
+  const setPresetState = usePresetStore((s) => s.setState)
 
   const triggerLlm = useCallback(async () => {
     const { requestId } = await window.api.llm.start()
@@ -159,7 +161,8 @@ export function App(): JSX.Element {
       if (!status.elevenlabsKeySet || !status.groqKeySet) setSettingsOpen(true)
       setBootChecked(true)
     })
-  }, [])
+    void window.api.presets.get().then(setPresetState)
+  }, [setPresetState])
 
   useEffect(() => {
     const subs = [
@@ -169,9 +172,10 @@ export function App(): JSX.Element {
       window.api.llm.onToken((evt) => appendToken(evt.requestId, evt.delta)),
       window.api.llm.onDone((evt) => finishEntry(evt.requestId, evt.full)),
       window.api.llm.onError((evt) => errorEntry(evt.requestId, evt.message)),
+      window.api.presets.onChanged(setPresetState),
     ]
     return () => subs.forEach((unsub) => unsub())
-  }, [applyTranscript, appendToken, errorEntry, finishEntry, setSocket, triggerLlm])
+  }, [applyTranscript, appendToken, errorEntry, finishEntry, setPresetState, setSocket, triggerLlm])
 
   return (
     <div className={`app-root ${compact ? 'app-compact' : ''}`}>

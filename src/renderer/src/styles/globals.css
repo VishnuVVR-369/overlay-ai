@@ -298,6 +298,95 @@ kbd {
   cursor: default;
 }
 
+.modal-section textarea.preset-textarea {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 140px;
+}
+
+.modal-section textarea.preset-textarea:focus { border-color: var(--accent); outline: 0; }
+
+.preset-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  position: relative;
+}
+
+.preset-tab:hover { color: var(--fg); border-color: var(--fg); }
+
+.preset-tab.editing {
+  color: var(--fg);
+  border-color: var(--accent);
+  background: rgba(110, 231, 183, 0.08);
+}
+
+.preset-tab.active {
+  color: var(--fg);
+}
+
+.preset-tab .preset-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.preset-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--warn);
+  background: rgba(250, 204, 21, 0.12);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  border-radius: 3px;
+  padding: 0 4px;
+  line-height: 1.4;
+}
+
+.preset-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preset-select {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 11.5px;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  max-width: 140px;
+}
+
+.preset-select:hover { border-color: var(--fg); }
+.preset-select:focus { border-color: var(--accent); outline: 0; }
+
 .modal-section button {
   background: transparent;
   color: var(--fg);

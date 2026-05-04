@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import Groq from 'groq-sdk'
-import { SYSTEM_PROMPT } from '@shared/prompt'
 
 export interface StreamCallbacks {
   onToken: (delta: string) => void
@@ -18,7 +17,12 @@ export class GroqClient {
     }
   }
 
-  async streamAnswer(apiKey: string, transcript: string, callbacks: StreamCallbacks): Promise<string> {
+  async streamAnswer(
+    apiKey: string,
+    systemPrompt: string,
+    transcript: string,
+    callbacks: StreamCallbacks,
+  ): Promise<string> {
     this.abort()
     const requestId = randomUUID()
     const controller = new AbortController()
@@ -36,7 +40,7 @@ export class GroqClient {
           temperature: 0.6,
           max_tokens: 600,
           messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: userMessage },
           ],
         },

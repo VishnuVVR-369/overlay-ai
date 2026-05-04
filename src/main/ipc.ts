@@ -4,9 +4,12 @@ import { IPC } from '@shared/ipc-channels'
 import type {
   AudioChunkMessage,
   LlmStartResponse,
+  PresetId,
+  PresetOverrideUpdate,
   SettingsUpdate,
   ToastEvent,
 } from '@shared/types'
+import { isPresetId } from '@shared/prompt'
 import { settings } from './settings'
 import { getPermissionStatus, openScreenRecordingPrefs, requestMicAccess } from './permissions'
 import { transcription } from './transcription/transcription-service'
@@ -56,9 +59,11 @@ export function registerIpc(win: BrowserWindow): void {
       win.webContents.send(IPC.llmError, { requestId, message: 'Groq API key not set' })
       return { requestId }
     }
+    const activeId = settings.getActivePresetId()
+    const systemPrompt = settings.getEffectivePrompt(activeId)
     const transcript = transcription.flattenForPrompt()
     const requestId = randomUUID()
-    void groq.streamAnswer(key, transcript, {
+    void groq.streamAnswer(key, systemPrompt, transcript, {
       onToken: (delta) => win.webContents.send(IPC.llmToken, { requestId, delta }),
       onDone: (full, finishReason) => win.webContents.send(IPC.llmDone, { requestId, full, finishReason }),
       onError: (message) => win.webContents.send(IPC.llmError, { requestId, message }),
@@ -67,6 +72,23 @@ export function registerIpc(win: BrowserWindow): void {
   })
 
   ipcMain.handle(IPC.llmAbort, () => groq.abort())
+
+  ipcMain.handle(IPC.presetsGet, () => settings.getPresetState())
+
+  ipcMain.handle(IPC.presetsSetActive, async (_evt, id: PresetId) => {
+    if (!isPresetId(id)) return { ok: false }
+    await settings.setActivePresetId(id)
+    if (!win.isDestroyed()) win.webContents.send(IPC.presetsChanged, settings.getPresetState())
+    return { ok: true }
+  })
+
+  ipcMain.handle(IPC.presetsSetOverride, async (_evt, update: PresetOverrideUpdate) => {
+    if (!update || !isPresetId(update.id)) return { ok: false }
+    const prompt = update.prompt === null ? null : String(update.prompt)
+    await settings.setPresetOverride(update.id, prompt)
+    if (!win.isDestroyed()) win.webContents.send(IPC.presetsChanged, settings.getPresetState())
+    return { ok: true }
+  })
 
   ipcMain.handle(IPC.windowCompact, () => setCompact(win))
   ipcMain.handle(IPC.windowExpand, () => setExpanded(win))

@@ -8,6 +8,9 @@ import type {
   LlmTokenEvent,
   OverlayApi,
   PermissionStatus,
+  PresetId,
+  PresetOverrideUpdate,
+  PresetState,
   SettingsStatus,
   SettingsUpdate,
   SocketStatusEvent,
@@ -57,6 +60,13 @@ const api: OverlayApi = {
   },
   ui: {
     onToast: (h) => subscribe<ToastEvent>(IPC.toast, h),
+  },
+  presets: {
+    get: () => ipcRenderer.invoke(IPC.presetsGet) as Promise<PresetState>,
+    setActive: (id: PresetId) => ipcRenderer.invoke(IPC.presetsSetActive, id) as Promise<void>,
+    setOverride: (update: PresetOverrideUpdate) =>
+      ipcRenderer.invoke(IPC.presetsSetOverride, update) as Promise<void>,
+    onChanged: (h) => subscribe<PresetState>(IPC.presetsChanged, h),
   },
   loopback: {
     enable: () => ipcRenderer.invoke('enable-loopback-audio') as Promise<void>,
