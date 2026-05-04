@@ -1,0 +1,135 @@
+export type Speaker = 'you' | 'them'
+export type StreamTag = 'mic' | 'system'
+
+export const speakerForStream = (s: StreamTag): Speaker => (s === 'mic' ? 'you' : 'them')
+
+export interface TranscriptSegment {
+  id: string
+  speaker: Speaker
+  status: 'partial' | 'committed'
+  text: string
+  startedAt: number
+  committedAt?: number
+}
+
+export interface TranscriptUpdate {
+  speaker: Speaker
+  kind: 'partial' | 'committed'
+  segmentId: string
+  text: string
+  startedAt: number
+  committedAt?: number
+}
+
+export interface TranscriptSnapshot {
+  segments: TranscriptSegment[]
+  partials: { you?: TranscriptSegment; them?: TranscriptSegment }
+}
+
+export interface SettingsStatus {
+  elevenlabsKeySet: boolean
+  groqKeySet: boolean
+}
+
+export interface SettingsUpdate {
+  elevenlabsKey?: string
+  groqKey?: string
+}
+
+export interface PermissionStatus {
+  mic: 'granted' | 'denied' | 'not-determined' | 'restricted' | 'unknown'
+  screen: 'granted' | 'denied' | 'not-determined' | 'restricted' | 'unknown'
+}
+
+export interface AudioChunkMessage {
+  stream: StreamTag
+  audioBase64: string
+  sampleRate: number
+}
+
+export type SocketState = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'auth_error' | 'error' | 'closed'
+
+export interface SocketStatusEvent {
+  stream: StreamTag
+  state: SocketState
+  message?: string
+}
+
+export interface TranscriptionStatus {
+  running: boolean
+  micState: SocketState
+  systemState: SocketState
+}
+
+export interface LlmTokenEvent {
+  requestId: string
+  delta: string
+}
+
+export interface LlmDoneEvent {
+  requestId: string
+  full: string
+  finishReason?: string | null
+}
+
+export interface LlmErrorEvent {
+  requestId: string
+  message: string
+}
+
+export interface LlmStartResponse {
+  requestId: string
+}
+
+export interface ToastEvent {
+  level: 'info' | 'warn' | 'error'
+  message: string
+}
+
+export interface OverlayApi {
+  settings: {
+    get(): Promise<SettingsStatus>
+    set(update: SettingsUpdate): Promise<{ ok: boolean }>
+  }
+  permissions: {
+    status(): Promise<PermissionStatus>
+    requestMic(): Promise<boolean>
+    openScreenPrefs(): Promise<void>
+  }
+  transcription: {
+    start(): Promise<{ ok: boolean; reason?: string }>
+    stop(): Promise<{ ok: boolean }>
+    status(): Promise<TranscriptionStatus>
+    sendAudio(chunk: AudioChunkMessage): void
+    snapshot(): Promise<TranscriptSnapshot>
+    clear(): Promise<void>
+    onUpdate(handler: (event: TranscriptUpdate) => void): () => void
+    onSocketStatus(handler: (event: SocketStatusEvent) => void): () => void
+  }
+  llm: {
+    start(): Promise<LlmStartResponse>
+    abort(): Promise<void>
+    onTrigger(handler: () => void): () => void
+    onToken(handler: (event: LlmTokenEvent) => void): () => void
+    onDone(handler: (event: LlmDoneEvent) => void): () => void
+    onError(handler: (event: LlmErrorEvent) => void): () => void
+  }
+  ui: {
+    onToast(handler: (event: ToastEvent) => void): () => void
+  }
+  loopback: {
+    enable(): Promise<void>
+    disable(): Promise<void>
+  }
+  window: {
+    compact(): Promise<void>
+    expand(): Promise<void>
+    quit(): Promise<void>
+  }
+}
+
+declare global {
+  interface Window {
+    api: OverlayApi
+  }
+}

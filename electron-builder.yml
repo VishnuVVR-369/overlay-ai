@@ -1,0 +1,40 @@
+appId: ai.overlay.app
+productName: Overlay AI
+directories:
+  buildResources: build
+  output: release
+files:
+  - "out/**/*"
+  - "package.json"
+  - "!**/*.{md,markdown}"
+asar: true
+asarUnpack:
+  - "**/electron-audio-loopback/**"
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  minimumSystemVersion: "14.4"
+  notarize: false
+  extendInfo:
+    LSUIElement: true
+    NSMicrophoneUsageDescription: "Overlay AI transcribes your microphone audio."
+    NSCameraUsageDescription: "Not used."
+    NSScreenCaptureDescription: "Overlay AI captures system audio for transcription."
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - arm64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false

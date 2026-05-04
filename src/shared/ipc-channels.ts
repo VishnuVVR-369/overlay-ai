@@ -1,0 +1,28 @@
+export const IPC = {
+  settingsGet: 'settings:get',
+  settingsSet: 'settings:set',
+  permStatus: 'perm:status',
+  permRequestMic: 'perm:request-mic',
+  permOpenScreenPrefs: 'perm:open-screen-prefs',
+  transcriptionStart: 'transcription:start',
+  transcriptionStop: 'transcription:stop',
+  transcriptionStatus: 'transcription:status',
+  audioChunk: 'audio:chunk',
+  transcriptUpdate: 'transcript:update',
+  transcriptSnapshot: 'transcript:snapshot',
+  transcriptClear: 'transcript:clear',
+  llmTrigger: 'llm:trigger',
+  llmStart: 'llm:start',
+  llmAbort: 'llm:abort',
+  llmToken: 'llm:token',
+  llmDone: 'llm:done',
+  llmError: 'llm:error',
+  windowToggle: 'window:toggle',
+  windowCompact: 'window:compact',
+  windowExpand: 'window:expand',
+  windowQuit: 'window:quit',
+  toast: 'ui:toast',
+  socketStatus: 'socket:status',
+} as const
+
+export type IpcChannel = (typeof IPC)[keyof typeof IPC]
