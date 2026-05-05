@@ -1,17 +1,25 @@
 import { BrowserWindow, app, screen } from 'electron'
 import { join } from 'node:path'
+import { IPC } from '@shared/ipc-channels'
+import type { WindowMode } from '@shared/types'
 
 const isDev = !app.isPackaged
 const RENDERER_DEV_URL = process.env['ELECTRON_RENDERER_URL']
+
+export const COMPACT_SIZE = { width: 360, height: 120 }
+export const NORMAL_SIZE = { width: 460, height: 620 }
+export const WIDE_SIZE = { width: 760, height: 620 }
+
+let currentMode: WindowMode = 'normal'
 
 export function createOverlayWindow(): BrowserWindow {
   const display = screen.getPrimaryDisplay()
   const { width } = display.workAreaSize
 
   const win = new BrowserWindow({
-    width: 480,
-    height: 720,
-    x: width - 500,
+    width: NORMAL_SIZE.width,
+    height: NORMAL_SIZE.height,
+    x: width - NORMAL_SIZE.width - 24,
     y: 60,
     show: false,
     frame: false,
@@ -47,6 +55,13 @@ export function createOverlayWindow(): BrowserWindow {
     }
   }
 
+  win.on('blur', () => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.windowFocusState, { focused: false })
+  })
+  win.on('focus', () => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.windowFocusState, { focused: true })
+  })
+
   win.once('ready-to-show', () => win.showInactive())
 
   if (isDev && RENDERER_DEV_URL) {
@@ -60,23 +75,37 @@ export function createOverlayWindow(): BrowserWindow {
 
 export function toggleWindowVisibility(win: BrowserWindow): void {
   if (win.isDestroyed()) return
-  if (win.isVisible()) win.hide()
-  else win.showInactive()
+  if (win.isVisible()) {
+    win.webContents.send(IPC.windowVisibilityChanged, { visible: false })
+    win.hide()
+  } else {
+    win.showInactive()
+    win.webContents.send(IPC.windowVisibilityChanged, { visible: true })
+  }
 }
 
-export const COMPACT_SIZE = { width: 260, height: 44 }
-export const EXPANDED_SIZE = { width: 480, height: 720 }
-
-export function setCompact(win: BrowserWindow): void {
-  if (win.isDestroyed()) return
-  win.setMinimumSize(COMPACT_SIZE.width, COMPACT_SIZE.height)
-  win.setResizable(false)
-  win.setSize(COMPACT_SIZE.width, COMPACT_SIZE.height, process.platform === 'darwin')
+export function getMode(): WindowMode {
+  return currentMode
 }
 
-export function setExpanded(win: BrowserWindow): void {
+export function setMode(win: BrowserWindow, mode: WindowMode): void {
   if (win.isDestroyed()) return
-  win.setResizable(true)
-  win.setMinimumSize(360, 320)
-  win.setSize(EXPANDED_SIZE.width, EXPANDED_SIZE.height, process.platform === 'darwin')
+  currentMode = mode
+  const animate = process.platform === 'darwin'
+  if (mode === 'compact') {
+    win.setMinimumSize(COMPACT_SIZE.width, COMPACT_SIZE.height)
+    win.setResizable(false)
+    win.setSize(COMPACT_SIZE.width, COMPACT_SIZE.height, animate)
+  } else {
+    win.setResizable(true)
+    win.setMinimumSize(360, 320)
+    const size = mode === 'wide' ? WIDE_SIZE : NORMAL_SIZE
+    win.setSize(size.width, size.height, animate)
+  }
+  win.webContents.send(IPC.windowModeChanged, { mode })
+}
+
+export function toggleWide(win: BrowserWindow): void {
+  if (currentMode === 'compact') return
+  setMode(win, currentMode === 'wide' ? 'normal' : 'wide')
 }

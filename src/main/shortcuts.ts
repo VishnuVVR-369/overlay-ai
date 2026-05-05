@@ -1,13 +1,17 @@
 import { BrowserWindow, app, globalShortcut } from 'electron'
 import { IPC } from '@shared/ipc-channels'
-import { toggleWindowVisibility } from './window'
+import { toggleWindowVisibility, toggleWide } from './window'
 
 const ASK_ACCEL = process.platform === 'darwin' ? 'Cmd+\\' : 'Ctrl+\\'
+const SCREEN_ASK_ACCEL = process.platform === 'darwin' ? 'Cmd+Shift+\\' : 'Ctrl+Shift+\\'
 const TOGGLE_ACCEL = process.platform === 'darwin' ? 'Cmd+B' : 'Ctrl+B'
+const WIDE_ACCEL = process.platform === 'darwin' ? 'Cmd+W' : 'Ctrl+W'
 
 export interface ShortcutRegistration {
   ask: { ok: boolean; accelerator: string }
+  screenAsk: { ok: boolean; accelerator: string }
   toggle: { ok: boolean; accelerator: string }
+  wide: { ok: boolean; accelerator: string }
 }
 
 export function registerShortcuts(win: BrowserWindow): ShortcutRegistration {
@@ -16,12 +20,20 @@ export function registerShortcuts(win: BrowserWindow): ShortcutRegistration {
       win.webContents.send(IPC.llmTrigger)
     }
   })
+  const screenAskOk = globalShortcut.register(SCREEN_ASK_ACCEL, () => {
+    if (!win.isDestroyed()) {
+      win.webContents.send(IPC.visionTrigger)
+    }
+  })
   const toggleOk = globalShortcut.register(TOGGLE_ACCEL, () => toggleWindowVisibility(win))
+  const wideOk = globalShortcut.register(WIDE_ACCEL, () => toggleWide(win))
 
   app.on('will-quit', () => globalShortcut.unregisterAll())
 
   return {
     ask: { ok: askOk, accelerator: ASK_ACCEL },
+    screenAsk: { ok: screenAskOk, accelerator: SCREEN_ASK_ACCEL },
     toggle: { ok: toggleOk, accelerator: TOGGLE_ACCEL },
+    wide: { ok: wideOk, accelerator: WIDE_ACCEL },
   }
 }

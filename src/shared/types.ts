@@ -29,12 +29,20 @@ export interface TranscriptSnapshot {
 export interface SettingsStatus {
   elevenlabsKeySet: boolean
   groqKeySet: boolean
+  openaiKeySet: boolean
+  visionProvider: VisionProvider
+  visionModel: string
 }
 
 export interface SettingsUpdate {
   elevenlabsKey?: string
   groqKey?: string
+  openaiKey?: string
+  visionProvider?: VisionProvider
+  visionModel?: string
 }
+
+export type VisionProvider = 'openai'
 
 export type PresetId = 'behavioral' | 'coding' | 'system-design' | 'negotiation'
 
@@ -105,11 +113,29 @@ export interface LlmErrorEvent {
 
 export interface LlmStartResponse {
   requestId: string
+  mode?: LlmEntryMode
+  imageDataUrl?: string
 }
+
+export type LlmEntryMode = 'transcript' | 'screen'
 
 export interface ToastEvent {
   level: 'info' | 'warn' | 'error'
   message: string
+}
+
+export type WindowMode = 'compact' | 'normal' | 'wide'
+
+export interface WindowFocusState {
+  focused: boolean
+}
+
+export interface WindowModeChangedEvent {
+  mode: WindowMode
+}
+
+export interface WindowVisibilityChangedEvent {
+  visible: boolean
 }
 
 export interface OverlayApi {
@@ -140,6 +166,11 @@ export interface OverlayApi {
     onDone(handler: (event: LlmDoneEvent) => void): () => void
     onError(handler: (event: LlmErrorEvent) => void): () => void
   }
+  vision: {
+    start(): Promise<LlmStartResponse>
+    abort(): Promise<void>
+    onTrigger(handler: () => void): () => void
+  }
   presets: {
     get(): Promise<PresetState>
     setActive(id: PresetId): Promise<void>
@@ -148,14 +179,18 @@ export interface OverlayApi {
   }
   ui: {
     onToast(handler: (event: ToastEvent) => void): () => void
+    onOpenSettings(handler: () => void): () => void
   }
   loopback: {
     enable(): Promise<void>
     disable(): Promise<void>
   }
   window: {
-    compact(): Promise<void>
-    expand(): Promise<void>
+    setMode(mode: WindowMode): Promise<void>
+    notifyUserActive(): void
+    onFocusState(handler: (event: WindowFocusState) => void): () => void
+    onModeChanged(handler: (event: WindowModeChangedEvent) => void): () => void
+    onVisibilityChanged(handler: (event: WindowVisibilityChangedEvent) => void): () => void
     quit(): Promise<void>
   }
 }

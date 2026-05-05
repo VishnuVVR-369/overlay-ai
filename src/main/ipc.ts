@@ -8,13 +8,16 @@ import type {
   PresetOverrideUpdate,
   SettingsUpdate,
   ToastEvent,
+  WindowMode,
 } from '@shared/types'
 import { isPresetId } from '@shared/prompt'
 import { settings } from './settings'
 import { getPermissionStatus, openScreenRecordingPrefs, requestMicAccess } from './permissions'
 import { transcription } from './transcription/transcription-service'
 import { groq } from './llm/groq-client'
-import { setCompact, setExpanded } from './window'
+import { openaiVision } from './llm/openai-vision-client'
+import { captureActiveDisplay } from './vision/screen-capture'
+import { setMode } from './window'
 
 export function registerIpc(win: BrowserWindow): void {
   ipcMain.handle(IPC.settingsGet, () => settings.status())
@@ -56,8 +59,9 @@ export function registerIpc(win: BrowserWindow): void {
     if (!key) {
       const requestId = randomUUID()
       sendToast(win, { level: 'error', message: 'Groq API key not set. Open Settings to add it.' })
-      win.webContents.send(IPC.llmError, { requestId, message: 'Groq API key not set' })
-      return { requestId }
+      openSettings(win)
+      deferSend(win, IPC.llmError, { requestId, message: 'Groq API key not set' })
+      return { requestId, mode: 'transcript' }
     }
     const activeId = settings.getActivePresetId()
     const systemPrompt = settings.getEffectivePrompt(activeId)
@@ -68,10 +72,52 @@ export function registerIpc(win: BrowserWindow): void {
       onDone: (full, finishReason) => win.webContents.send(IPC.llmDone, { requestId, full, finishReason }),
       onError: (message) => win.webContents.send(IPC.llmError, { requestId, message }),
     })
-    return { requestId }
+    return { requestId, mode: 'transcript' }
   })
 
   ipcMain.handle(IPC.llmAbort, () => groq.abort())
+
+  ipcMain.handle(IPC.visionStart, async (): Promise<LlmStartResponse> => {
+    const requestId = randomUUID()
+    const key = settings.getOpenAIKey()
+    if (!key) {
+      sendToast(win, { level: 'error', message: 'OpenAI API key not set. Open Settings to add it.' })
+      openSettings(win)
+      deferSend(win, IPC.llmError, { requestId, message: 'OpenAI API key not set' })
+      return { requestId, mode: 'screen' }
+    }
+
+    const perms = getPermissionStatus()
+    if (perms.screen !== 'granted') {
+      sendToast(win, { level: 'error', message: 'Screen Recording permission is required for screen ask.' })
+      openSettings(win)
+      deferSend(win, IPC.llmError, { requestId, message: 'Screen Recording permission is required for screen ask' })
+      return { requestId, mode: 'screen' }
+    }
+
+    let imageDataUrl = ''
+    try {
+      imageDataUrl = (await captureActiveDisplay()).dataUrl
+    } catch (err: unknown) {
+      const message = (err as Error).message ?? 'Screen capture failed'
+      sendToast(win, { level: 'error', message })
+      deferSend(win, IPC.llmError, { requestId, message })
+      return { requestId, mode: 'screen' }
+    }
+
+    const activeId = settings.getActivePresetId()
+    const systemPrompt = settings.getEffectivePrompt(activeId)
+    const transcript = transcription.flattenForPrompt()
+    const model = settings.getVisionModel()
+    void openaiVision.streamScreenAnswer(key, model, systemPrompt, transcript, imageDataUrl, {
+      onToken: (delta) => win.webContents.send(IPC.llmToken, { requestId, delta }),
+      onDone: (full, finishReason) => win.webContents.send(IPC.llmDone, { requestId, full, finishReason }),
+      onError: (message) => win.webContents.send(IPC.llmError, { requestId, message }),
+    })
+    return { requestId, mode: 'screen', imageDataUrl }
+  })
+
+  ipcMain.handle(IPC.visionAbort, () => openaiVision.abort())
 
   ipcMain.handle(IPC.presetsGet, () => settings.getPresetState())
 
@@ -90,8 +136,10 @@ export function registerIpc(win: BrowserWindow): void {
     return { ok: true }
   })
 
-  ipcMain.handle(IPC.windowCompact, () => setCompact(win))
-  ipcMain.handle(IPC.windowExpand, () => setExpanded(win))
+  ipcMain.handle(IPC.windowSetMode, (_evt, mode: WindowMode) => setMode(win, mode))
+  ipcMain.on(IPC.windowUserActive, () => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.windowFocusState, { focused: true })
+  })
   ipcMain.handle(IPC.windowQuit, () => app.quit())
 
   transcription.on('update', (event) => {
@@ -104,4 +152,14 @@ export function registerIpc(win: BrowserWindow): void {
 
 export function sendToast(win: BrowserWindow, toast: ToastEvent): void {
   if (!win.isDestroyed()) win.webContents.send(IPC.toast, toast)
+}
+
+function openSettings(win: BrowserWindow): void {
+  if (!win.isDestroyed()) win.webContents.send(IPC.settingsOpen)
+}
+
+function deferSend(win: BrowserWindow, channel: string, payload: unknown): void {
+  setTimeout(() => {
+    if (!win.isDestroyed()) win.webContents.send(channel, payload)
+  }, 50)
 }

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { PermissionStatus, PresetId, SettingsStatus } from '@shared/types'
+import { X } from 'lucide-react'
+import type { PresetId, SettingsStatus } from '@shared/types'
 import { usePresetStore, findPreset } from '../state/preset-store'
+import { useUiStore } from '../state/ui-store'
 
 interface Props {
   open: boolean
@@ -8,10 +10,19 @@ interface Props {
 }
 
 export function SettingsModal({ open, onClose }: Props): JSX.Element | null {
-  const [status, setStatus] = useState<SettingsStatus>({ elevenlabsKeySet: false, groqKeySet: false })
-  const [perms, setPerms] = useState<PermissionStatus>({ mic: 'unknown', screen: 'unknown' })
+  const [status, setStatus] = useState<SettingsStatus>({
+    elevenlabsKeySet: false,
+    groqKeySet: false,
+    openaiKeySet: false,
+    visionProvider: 'openai',
+    visionModel: 'gpt-5.1',
+  })
+  const perms = useUiStore((s) => s.permStatus)
+  const setPermStatus = useUiStore((s) => s.setPermStatus)
   const [elevenlabsKey, setElevenlabsKey] = useState('')
   const [groqKey, setGroqKey] = useState('')
+  const [openaiKey, setOpenaiKey] = useState('')
+  const [visionModel, setVisionModel] = useState('gpt-5.1')
   const [saving, setSaving] = useState(false)
 
   const activePresetId = usePresetStore((s) => s.active)
@@ -25,31 +36,36 @@ export function SettingsModal({ open, onClose }: Props): JSX.Element | null {
 
   useEffect(() => {
     if (!open) return
-    void window.api.settings.get().then(setStatus)
-    void window.api.permissions.status().then(setPerms)
-  }, [open])
+    void window.api.settings.get().then((next) => {
+      setStatus(next)
+      setVisionModel(next.visionModel)
+    })
+    void window.api.permissions.status().then(setPermStatus)
+  }, [open, setPermStatus])
 
   useEffect(() => {
     if (!selectedPreset) return
     setDraft(selectedPreset.effectivePrompt)
   }, [selectedPreset?.id, selectedPreset?.effectivePrompt])
 
-  if (!open) return null
-
   const save = async (): Promise<void> => {
     setSaving(true)
-    const update: { elevenlabsKey?: string; groqKey?: string } = {}
+    const update: { elevenlabsKey?: string; groqKey?: string; openaiKey?: string; visionModel?: string } = {}
     if (elevenlabsKey.trim()) update.elevenlabsKey = elevenlabsKey.trim()
     if (groqKey.trim()) update.groqKey = groqKey.trim()
+    if (openaiKey.trim()) update.openaiKey = openaiKey.trim()
+    if (visionModel.trim() && visionModel.trim() !== status.visionModel) update.visionModel = visionModel.trim()
     await window.api.settings.set(update)
     const next = await window.api.settings.get()
     setStatus(next)
     setElevenlabsKey('')
     setGroqKey('')
+    setOpenaiKey('')
+    setVisionModel(next.visionModel)
     setSaving(false)
   }
 
-  const recheckPerms = async (): Promise<void> => setPerms(await window.api.permissions.status())
+  const recheckPerms = async (): Promise<void> => setPermStatus(await window.api.permissions.status())
 
   const draftDirty = !!selectedPreset && draft !== selectedPreset.effectivePrompt
   const draftMatchesDefault = !!selectedPreset && draft.trim() === selectedPreset.defaultPrompt.trim()
@@ -74,115 +90,170 @@ export function SettingsModal({ open, onClose }: Props): JSX.Element | null {
     await window.api.presets.setActive(id)
   }
 
+  if (!open) return null
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+    <>
+      <div className="slide-over-catcher" onClick={onClose} />
+      <aside className="slide-over open" aria-hidden={false}>
+        <header className="slide-over-header">
           <h2>Settings</h2>
-          <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
-        </div>
-
-        <section className="modal-section">
-          <h3>API Keys</h3>
-          <label>
-            <span>ElevenLabs API key {status.elevenlabsKeySet && <em className="set">(saved)</em>}</span>
-            <input
-              type="password"
-              placeholder={status.elevenlabsKeySet ? '•••••••• (paste to replace)' : 'sk_...'}
-              value={elevenlabsKey}
-              onChange={(e) => setElevenlabsKey(e.target.value)}
-            />
-          </label>
-          <label>
-            <span>Groq API key {status.groqKeySet && <em className="set">(saved)</em>}</span>
-            <input
-              type="password"
-              placeholder={status.groqKeySet ? '•••••••• (paste to replace)' : 'gsk_...'}
-              value={groqKey}
-              onChange={(e) => setGroqKey(e.target.value)}
-            />
-          </label>
-          <button onClick={save} disabled={saving || (!elevenlabsKey && !groqKey)} className="primary">
-            {saving ? 'Saving…' : 'Save'}
+          <button className="icon-btn" onClick={onClose} aria-label="Close">
+            <X size={14} strokeWidth={1.75} />
           </button>
-        </section>
+        </header>
+        <div className="slide-over-body">
+          <section className="so-section">
+            <h3>API Keys</h3>
+            <label>
+              <span>
+                ElevenLabs
+                {status.elevenlabsKeySet && <em className="so-set">saved</em>}
+              </span>
+              <input
+                type="password"
+                placeholder={status.elevenlabsKeySet ? '•••••• (paste to replace)' : 'sk_…'}
+                value={elevenlabsKey}
+                onChange={(e) => setElevenlabsKey(e.target.value)}
+              />
+            </label>
+            <label>
+              <span>
+                Groq
+                {status.groqKeySet && <em className="so-set">saved</em>}
+              </span>
+              <input
+                type="password"
+                placeholder={status.groqKeySet ? '•••••• (paste to replace)' : 'gsk_…'}
+                value={groqKey}
+                onChange={(e) => setGroqKey(e.target.value)}
+              />
+            </label>
+            <label>
+              <span>
+                OpenAI
+                {status.openaiKeySet && <em className="so-set">saved</em>}
+              </span>
+              <input
+                type="password"
+                placeholder={status.openaiKeySet ? '•••••• (paste to replace)' : 'sk-…'}
+                value={openaiKey}
+                onChange={(e) => setOpenaiKey(e.target.value)}
+              />
+            </label>
+            <label>
+              <span>Vision model</span>
+              <input
+                type="text"
+                value={visionModel}
+                onChange={(e) => setVisionModel(e.target.value)}
+                placeholder="gpt-5.1"
+                spellCheck={false}
+              />
+            </label>
+            <button
+              onClick={save}
+              disabled={
+                saving ||
+                (!elevenlabsKey && !groqKey && !openaiKey && visionModel.trim() === status.visionModel)
+              }
+              className="so-button-primary"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </section>
 
-        <section className="modal-section">
-          <h3>Interview Mode</h3>
-          <div className="preset-tabs">
-            {presets.map((p) => {
-              const isActive = p.id === activePresetId
-              const isEditing = p.id === selectedId
-              return (
-                <button
-                  key={p.id}
-                  className={`preset-tab ${isEditing ? 'editing' : ''} ${isActive ? 'active' : ''}`}
-                  onClick={() => { void setActive(p.id) }}
-                  title={isActive ? 'Active preset' : 'Make active'}
-                >
-                  {p.label}
-                  {p.overridden && <span className="preset-badge" title="Custom prompt">custom</span>}
-                  {isActive && <span className="preset-active-dot" aria-hidden />}
-                </button>
-              )
-            })}
-          </div>
-          {selectedPreset && (
-            <>
-              <label>
-                <span>System prompt for {selectedPreset.label}</span>
-                <textarea
-                  className="preset-textarea"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  rows={10}
-                  spellCheck={false}
-                />
-              </label>
-              <div className="preset-actions">
-                <button
-                  className="primary"
-                  onClick={saveOverride}
-                  disabled={presetSaving || !draftDirty}
-                >
-                  {presetSaving ? 'Saving…' : draftMatchesDefault ? 'Save (clears override)' : 'Save override'}
-                </button>
-                <button
-                  onClick={resetOverride}
-                  disabled={presetSaving || !selectedPreset.overridden}
-                  title="Replace your override with the built-in default prompt"
-                >
-                  Reset to default
-                </button>
-              </div>
-            </>
-          )}
-        </section>
-
-        <section className="modal-section">
-          <h3>Permissions</h3>
-          <div className="perm-row">
-            <span>Microphone</span>
-            <span className={`perm-state perm-${perms.mic}`}>{perms.mic}</span>
-            {perms.mic !== 'granted' && (
-              <button onClick={() => window.api.permissions.requestMic().then(recheckPerms)}>Request</button>
+          <section className="so-section">
+            <h3>Interview Mode</h3>
+            <div className="preset-tabs">
+              {presets.map((p) => {
+                const isActive = p.id === activePresetId
+                const isEditing = p.id === selectedId
+                return (
+                  <button
+                    key={p.id}
+                    className={`preset-tab ${isEditing ? 'editing' : ''} ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      void setActive(p.id)
+                    }}
+                    title={isActive ? 'Active preset' : 'Make active'}
+                  >
+                    {p.label}
+                    {p.overridden && <span className="preset-badge">custom</span>}
+                    {isActive && <span className="preset-active-dot" aria-hidden />}
+                  </button>
+                )
+              })}
+            </div>
+            {selectedPreset && (
+              <>
+                <label>
+                  <span>System prompt for {selectedPreset.label}</span>
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    rows={10}
+                    spellCheck={false}
+                  />
+                </label>
+                <div className="preset-actions">
+                  <button
+                    className="so-button-primary"
+                    onClick={saveOverride}
+                    disabled={presetSaving || !draftDirty}
+                  >
+                    {presetSaving ? 'Saving…' : draftMatchesDefault ? 'Save (clears override)' : 'Save override'}
+                  </button>
+                  <button
+                    className="so-button"
+                    onClick={resetOverride}
+                    disabled={presetSaving || !selectedPreset.overridden}
+                    title="Replace override with built-in default"
+                  >
+                    Reset to default
+                  </button>
+                </div>
+              </>
             )}
-          </div>
-          <div className="perm-row">
-            <span>Screen Recording (system audio)</span>
-            <span className={`perm-state perm-${perms.screen}`}>{perms.screen}</span>
-            {perms.screen !== 'granted' && (
-              <button onClick={() => window.api.permissions.openScreenPrefs()}>Open System Settings</button>
-            )}
-          </div>
-          <button onClick={recheckPerms}>Recheck</button>
-        </section>
+          </section>
 
-        <section className="modal-section modal-tip">
-          Use headphones. Without them, your microphone picks up the interviewer's audio and pollutes the
-          "You" stream.
-        </section>
-      </div>
-    </div>
+          <section className="so-section">
+            <h3>Permissions</h3>
+            <div className="perm-row">
+              <span>Microphone</span>
+              <span className={`perm-state perm-${perms.mic}`}>{perms.mic}</span>
+              {perms.mic !== 'granted' && (
+                <button
+                  className="so-button"
+                  onClick={() => window.api.permissions.requestMic().then(recheckPerms)}
+                >
+                  Request
+                </button>
+              )}
+            </div>
+            <div className="perm-row">
+              <span>Screen Recording</span>
+              <span className={`perm-state perm-${perms.screen}`}>{perms.screen}</span>
+              {perms.screen !== 'granted' && (
+                <button
+                  className="so-button"
+                  onClick={() => window.api.permissions.openScreenPrefs()}
+                >
+                  Open System Settings
+                </button>
+              )}
+            </div>
+            <button className="so-button" onClick={recheckPerms}>
+              Recheck
+            </button>
+          </section>
+
+          <section className="so-tip">
+            Use headphones. Without them, your microphone picks up the interviewer's audio
+            and pollutes the “You” stream.
+          </section>
+        </div>
+      </aside>
+    </>
   )
 }

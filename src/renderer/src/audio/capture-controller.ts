@@ -1,13 +1,18 @@
 import type { StreamTag } from '@shared/types'
 import { PCM16_WORKLET_SOURCE } from './pcm16-worklet'
 import { arrayBufferToBase64 } from './encode'
+import { useAudioLevelsStore } from '../state/audio-levels-store'
 
 const TARGET_RATE = 16000
 const FRAME_SIZE = 4000 // 250 ms @ 16 kHz
+const ANALYSER_FFT = 256
+const LEVEL_TICK_MS = 33 // ~30 Hz
 
 interface StreamHandle {
   source: MediaStreamAudioSourceNode
   node: AudioWorkletNode
+  analyser: AnalyserNode
+  buf: Float32Array
   stream: MediaStream
 }
 
@@ -17,6 +22,7 @@ export class CaptureController {
   private mic: StreamHandle | null = null
   private system: StreamHandle | null = null
   private workletUrl: string | null = null
+  private levelTimer: number | null = null
 
   async start(): Promise<{ micStarted: boolean; systemStarted: boolean; warnings: string[] }> {
     const warnings: string[] = []
@@ -61,14 +67,20 @@ export class CaptureController {
       warnings.push(`System audio capture failed: ${(err as Error).message}`)
     }
 
+    if (micStarted || systemStarted) {
+      this.startLevelLoop()
+    }
+
     return { micStarted, systemStarted, warnings }
   }
 
   stop(): void {
+    this.stopLevelLoop()
     this.detach(this.mic)
     this.detach(this.system)
     this.mic = null
     this.system = null
+    useAudioLevelsStore.getState().resetAll()
   }
 
   private attachStream(stream: MediaStream, tag: StreamTag): StreamHandle {
@@ -85,17 +97,53 @@ export class CaptureController {
       const audioBase64 = arrayBufferToBase64(buf)
       window.api.transcription.sendAudio({ stream: tag, audioBase64, sampleRate: TARGET_RATE })
     }
+    const analyser = ctx.createAnalyser()
+    analyser.fftSize = ANALYSER_FFT
+    analyser.smoothingTimeConstant = 0.55
+    const buf = new Float32Array(analyser.fftSize)
     source.connect(node)
-    return { source, node, stream }
+    source.connect(analyser)
+    return { source, node, analyser, buf, stream }
   }
 
   private detach(handle: StreamHandle | null): void {
     if (!handle) return
     try { handle.source.disconnect() } catch { /* ignore */ }
     try { handle.node.disconnect() } catch { /* ignore */ }
+    try { handle.analyser.disconnect() } catch { /* ignore */ }
     try { handle.node.port.close() } catch { /* ignore */ }
     handle.stream.getTracks().forEach((t) => t.stop())
   }
+
+  private startLevelLoop(): void {
+    if (this.levelTimer !== null) return
+    const push = useAudioLevelsStore.getState().push
+    const tick = (): void => {
+      if (this.mic) push('mic', readRms(this.mic))
+      else push('mic', 0)
+      if (this.system) push('system', readRms(this.system))
+      else push('system', 0)
+    }
+    this.levelTimer = window.setInterval(tick, LEVEL_TICK_MS)
+  }
+
+  private stopLevelLoop(): void {
+    if (this.levelTimer !== null) {
+      window.clearInterval(this.levelTimer)
+      this.levelTimer = null
+    }
+  }
+}
+
+function readRms(handle: StreamHandle): number {
+  // Cast: TS lib type expects Float32Array<ArrayBuffer>, our buffer satisfies it but
+  // narrows to ArrayBufferLike under strict mode.
+  handle.analyser.getFloatTimeDomainData(handle.buf as Float32Array<ArrayBuffer>)
+  let sum = 0
+  for (let i = 0; i < handle.buf.length; i++) sum += handle.buf[i] * handle.buf[i]
+  const rms = Math.sqrt(sum / handle.buf.length)
+  // soft compress: emphasise speech-band amplitude, clamp to [0,1]
+  return Math.min(1, rms * 2.4)
 }
 
 export const capture = new CaptureController()

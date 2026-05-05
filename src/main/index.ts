@@ -35,8 +35,14 @@ void app.whenReady().then(async () => {
   if (!reg.ask.ok) {
     sendToast(mainWindow, { level: 'warn', message: `Could not register ${reg.ask.accelerator} (already in use).` })
   }
+  if (!reg.screenAsk.ok) {
+    sendToast(mainWindow, { level: 'warn', message: `Could not register ${reg.screenAsk.accelerator} (already in use).` })
+  }
   if (!reg.toggle.ok) {
     sendToast(mainWindow, { level: 'warn', message: `Could not register ${reg.toggle.accelerator} (already in use).` })
+  }
+  if (!reg.wide.ok) {
+    sendToast(mainWindow, { level: 'warn', message: `Could not register ${reg.wide.accelerator} (already in use).` })
   }
 
   app.on('activate', () => {

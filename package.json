@@ -18,8 +18,16 @@
     "dist:win": "electron-vite build && electron-builder --win --publish never"
   },
   "dependencies": {
+    "@fontsource-variable/ibm-plex-sans": "^5.2.8",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@shikijs/rehype": "^1.29.2",
     "electron-audio-loopback": "^1.0.4",
     "groq-sdk": "^0.7.0",
+    "lucide-react": "^0.460.0",
+    "openai": "^6.35.0",
+    "react-markdown": "^9.1.0",
+    "remark-gfm": "^4.0.1",
+    "shiki": "^1.29.2",
     "ws": "^8.18.0",
     "zustand": "^4.5.5"
   },

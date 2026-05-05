@@ -6,18 +6,24 @@ import type {
   PresetState,
   SettingsStatus,
   SettingsUpdate,
+  VisionProvider,
 } from '@shared/types'
 import { DEFAULT_PRESET_ID, PRESETS, getPresetDef, isPresetId } from '@shared/prompt'
 
 interface SettingsFile {
-  version: 2
+  version: 3
   elevenlabsKeyEnc?: string
   groqKeyEnc?: string
+  openaiKeyEnc?: string
   activePresetId?: PresetId
   presetOverrides?: Partial<Record<PresetId, string>>
+  visionProvider?: VisionProvider
+  visionModel?: string
 }
 
-const FILE_VERSION = 2
+const FILE_VERSION = 3
+export const DEFAULT_VISION_PROVIDER: VisionProvider = 'openai'
+export const DEFAULT_VISION_MODEL = 'gpt-5.1'
 
 class SettingsStore {
   private cache: SettingsFile = { version: FILE_VERSION }
@@ -36,16 +42,22 @@ class SettingsStore {
         version?: number
         elevenlabsKeyEnc?: string
         groqKeyEnc?: string
+        openaiKeyEnc?: string
         activePresetId?: unknown
         presetOverrides?: unknown
+        visionProvider?: unknown
+        visionModel?: unknown
       }
-      if (parsed && typeof parsed === 'object' && (parsed.version === 1 || parsed.version === 2)) {
+      if (parsed && typeof parsed === 'object' && [1, 2, 3].includes(parsed.version ?? 0)) {
         this.cache = {
           version: FILE_VERSION,
           elevenlabsKeyEnc: parsed.elevenlabsKeyEnc,
           groqKeyEnc: parsed.groqKeyEnc,
+          openaiKeyEnc: parsed.openaiKeyEnc,
           activePresetId: isPresetId(parsed.activePresetId) ? parsed.activePresetId : undefined,
           presetOverrides: this.sanitizeOverrides(parsed.presetOverrides),
+          visionProvider: this.sanitizeVisionProvider(parsed.visionProvider),
+          visionModel: this.sanitizeVisionModel(parsed.visionModel),
         }
       }
     } catch (err: unknown) {
@@ -58,6 +70,9 @@ class SettingsStore {
     return {
       elevenlabsKeySet: !!this.cache.elevenlabsKeyEnc,
       groqKeySet: !!this.cache.groqKeyEnc,
+      openaiKeySet: !!this.cache.openaiKeyEnc,
+      visionProvider: this.getVisionProvider(),
+      visionModel: this.getVisionModel(),
     }
   }
 
@@ -69,12 +84,33 @@ class SettingsStore {
     return this.decrypt(this.cache.groqKeyEnc)
   }
 
+  getOpenAIKey(): string | null {
+    return this.decrypt(this.cache.openaiKeyEnc)
+  }
+
+  getVisionProvider(): VisionProvider {
+    return this.cache.visionProvider ?? DEFAULT_VISION_PROVIDER
+  }
+
+  getVisionModel(): string {
+    return this.cache.visionModel ?? DEFAULT_VISION_MODEL
+  }
+
   async update(update: SettingsUpdate): Promise<void> {
     if (update.elevenlabsKey !== undefined) {
       this.cache.elevenlabsKeyEnc = this.encrypt(update.elevenlabsKey)
     }
     if (update.groqKey !== undefined) {
       this.cache.groqKeyEnc = this.encrypt(update.groqKey)
+    }
+    if (update.openaiKey !== undefined) {
+      this.cache.openaiKeyEnc = this.encrypt(update.openaiKey)
+    }
+    if (update.visionProvider !== undefined) {
+      this.cache.visionProvider = this.sanitizeVisionProvider(update.visionProvider)
+    }
+    if (update.visionModel !== undefined) {
+      this.cache.visionModel = this.sanitizeVisionModel(update.visionModel)
     }
     await this.persist()
   }
@@ -130,6 +166,16 @@ class SettingsStore {
       }
     }
     return Object.keys(out).length > 0 ? out : undefined
+  }
+
+  private sanitizeVisionProvider(input: unknown): VisionProvider | undefined {
+    return input === 'openai' ? 'openai' : undefined
+  }
+
+  private sanitizeVisionModel(input: unknown): string | undefined {
+    if (typeof input !== 'string') return undefined
+    const trimmed = input.trim()
+    return trimmed.length > 0 ? trimmed : undefined
   }
 
   private encrypt(value: string): string {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AlertTriangle, AlertOctagon, Info } from 'lucide-react'
 import type { ToastEvent } from '@shared/types'
 
 interface ToastInstance extends ToastEvent {
@@ -20,8 +21,17 @@ export function Toaster(): JSX.Element {
   return (
     <div className="toaster">
       {toasts.map((t) => (
-        <div key={t.id} className={`toast toast-${t.level}`}>{t.message}</div>
+        <div key={t.id} className={`toast toast-${t.level}`}>
+          <span className="toast-icon">{iconFor(t.level)}</span>
+          <span>{t.message}</span>
+        </div>
       ))}
     </div>
   )
+}
+
+function iconFor(level: ToastEvent['level']): JSX.Element {
+  if (level === 'error') return <AlertOctagon size={13} strokeWidth={1.75} />
+  if (level === 'warn') return <AlertTriangle size={13} strokeWidth={1.75} />
+  return <Info size={13} strokeWidth={1.75} />
 }

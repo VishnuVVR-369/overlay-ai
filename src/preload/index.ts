@@ -18,6 +18,10 @@ import type {
   TranscriptionStatus,
   TranscriptSnapshot,
   TranscriptUpdate,
+  WindowFocusState,
+  WindowMode,
+  WindowModeChangedEvent,
+  WindowVisibilityChangedEvent,
 } from '@shared/types'
 
 function subscribe<T>(channel: string, handler: (event: T) => void): () => void {
@@ -58,8 +62,22 @@ const api: OverlayApi = {
     onDone: (h) => subscribe<LlmDoneEvent>(IPC.llmDone, h),
     onError: (h) => subscribe<LlmErrorEvent>(IPC.llmError, h),
   },
+  vision: {
+    start: () => ipcRenderer.invoke(IPC.visionStart) as Promise<LlmStartResponse>,
+    abort: () => ipcRenderer.invoke(IPC.visionAbort) as Promise<void>,
+    onTrigger: (h) => {
+      const listener = (): void => h()
+      ipcRenderer.on(IPC.visionTrigger, listener)
+      return () => ipcRenderer.removeListener(IPC.visionTrigger, listener)
+    },
+  },
   ui: {
     onToast: (h) => subscribe<ToastEvent>(IPC.toast, h),
+    onOpenSettings: (h) => {
+      const listener = (): void => h()
+      ipcRenderer.on(IPC.settingsOpen, listener)
+      return () => ipcRenderer.removeListener(IPC.settingsOpen, listener)
+    },
   },
   presets: {
     get: () => ipcRenderer.invoke(IPC.presetsGet) as Promise<PresetState>,
@@ -73,8 +91,11 @@ const api: OverlayApi = {
     disable: () => ipcRenderer.invoke('disable-loopback-audio') as Promise<void>,
   },
   window: {
-    compact: () => ipcRenderer.invoke(IPC.windowCompact) as Promise<void>,
-    expand: () => ipcRenderer.invoke(IPC.windowExpand) as Promise<void>,
+    setMode: (mode: WindowMode) => ipcRenderer.invoke(IPC.windowSetMode, mode) as Promise<void>,
+    notifyUserActive: () => ipcRenderer.send(IPC.windowUserActive),
+    onFocusState: (h) => subscribe<WindowFocusState>(IPC.windowFocusState, h),
+    onModeChanged: (h) => subscribe<WindowModeChangedEvent>(IPC.windowModeChanged, h),
+    onVisibilityChanged: (h) => subscribe<WindowVisibilityChangedEvent>(IPC.windowVisibilityChanged, h),
     quit: () => ipcRenderer.invoke(IPC.windowQuit) as Promise<void>,
   },
 }

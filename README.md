@@ -8,6 +8,7 @@ A stealth live-interview assistant overlay built with Electron.
 - Hidden from dock (macOS), taskbar, and Alt-Tab (Windows).
 - Continuously transcribes your microphone ("You") and system audio ("Them") via ElevenLabs Scribe v2 Realtime (~150 ms latency).
 - On `Cmd/Ctrl+\`, sends the full session transcript to Groq's `openai/gpt-oss-120b` and streams the answer back.
+- On `Cmd/Ctrl+Shift+\`, captures the active display, sends the screenshot plus transcript context to OpenAI's vision model, and streams the answer back.
 - On `Cmd/Ctrl+B`, toggles window visibility.
 
 ## Setup
@@ -22,12 +23,12 @@ A stealth live-interview assistant overlay built with Electron.
    npm run dev
    ```
 
-3. On first launch, paste your ElevenLabs and Groq API keys in the Settings panel.
+3. On first launch, paste your ElevenLabs, Groq, and OpenAI API keys in the Settings panel.
 
 ## Permissions (macOS)
 
 - **Microphone**: granted via the standard `getUserMedia` prompt on first capture.
-- **Screen Recording**: required for system audio capture. Grant in System Settings → Privacy & Security → Screen Recording → Overlay AI, then relaunch.
+- **Screen Recording**: required for system audio capture and screen ask. Grant in System Settings → Privacy & Security → Screen Recording → Overlay AI, then relaunch.
 
 ## Use headphones
 
