@@ -79,6 +79,22 @@ describe('SettingsModal', () => {
     expect(saveButton.disabled).toBe(true)
   })
 
+  it('Save sends a vision-model-only update when only the model changes', async () => {
+    api.__state.settings = {
+      elevenlabsKeySet: true,
+      groqKeySet: true,
+      openaiKeySet: true,
+      visionProvider: 'openai',
+      visionModel: 'gpt-5.1',
+    }
+    const { container } = render(<SettingsModal open={true} onClose={() => {}} />)
+    await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
+    const modelInput = container.querySelector('input[type=text]') as HTMLInputElement
+    fireEvent.change(modelInput, { target: { value: 'gpt-5.2' } })
+    fireEvent.click(screen.getByText('Save'))
+    await waitFor(() => expect(api.settings.set).toHaveBeenCalledWith({ visionModel: 'gpt-5.2' }))
+  })
+
   it('selecting a different preset tab calls setActive', async () => {
     render(<SettingsModal open={true} onClose={() => {}} />)
     await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
@@ -122,6 +138,20 @@ describe('SettingsModal', () => {
     expect(reset.disabled).toBe(true)
   })
 
+  it('Reset to default clears an existing preset override', async () => {
+    usePresetStore.setState({
+      active: 'coding',
+      presets: [
+        { id: 'coding', label: 'Coding', defaultPrompt: 'COD-DEFAULT', effectivePrompt: 'CUSTOM', overridden: true },
+      ],
+      hydrated: true,
+    })
+    render(<SettingsModal open={true} onClose={() => {}} />)
+    await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
+    fireEvent.click(screen.getByText('Reset to default'))
+    await waitFor(() => expect(api.presets.setOverride).toHaveBeenCalledWith({ id: 'coding', prompt: null }))
+  })
+
   it('renders mic/screen permission rows and "Recheck" button', async () => {
     api.__state.perms = { mic: 'denied', screen: 'denied' }
     useUiStore.setState({ permStatus: { mic: 'denied', screen: 'denied' } })
@@ -132,6 +162,23 @@ describe('SettingsModal', () => {
     expect(screen.getByText('Screen Recording')).toBeTruthy()
     expect(screen.getByText('Open System Settings')).toBeTruthy()
     expect(screen.getByText('Recheck')).toBeTruthy()
+  })
+
+  it('permission actions request mic, open screen settings, and recheck status', async () => {
+    api.__state.perms = { mic: 'denied', screen: 'denied' }
+    useUiStore.setState({ permStatus: { mic: 'denied', screen: 'denied' } })
+    render(<SettingsModal open={true} onClose={() => {}} />)
+    await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByText('Request'))
+    await waitFor(() => expect(api.permissions.requestMic).toHaveBeenCalled())
+    await waitFor(() => expect(api.permissions.status).toHaveBeenCalledTimes(2))
+
+    fireEvent.click(screen.getByText('Open System Settings'))
+    expect(api.permissions.openScreenPrefs).toHaveBeenCalled()
+
+    fireEvent.click(screen.getByText('Recheck'))
+    await waitFor(() => expect(api.permissions.status).toHaveBeenCalledTimes(3))
   })
 
   it('clicking Close calls onClose, clicking the catcher backdrop also calls onClose', async () => {

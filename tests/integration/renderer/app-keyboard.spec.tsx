@@ -57,12 +57,13 @@ beforeEach(() => {
   }))
 })
 
-async function bootApp(): Promise<void> {
-  render(<App />)
+async function bootApp(): Promise<ReturnType<typeof render>> {
+  const utils = render(<App />)
   await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
   await waitFor(() => expect(api.presets.get).toHaveBeenCalled())
   await waitFor(() => expect(api.answerStyles.get).toHaveBeenCalled())
   await waitFor(() => expect(api.permissions.status).toHaveBeenCalled())
+  return utils
 }
 
 const press = (key: string, init: KeyboardEventInit = {}): void => {
@@ -97,11 +98,55 @@ describe('App keyboard shortcuts', () => {
     expect(useUiStore.getState().settingsOpen).toBe(true)
   })
 
+  it('Escape closes help before settings when both are open', async () => {
+    const { container } = await bootApp()
+    act(() => useUiStore.setState({ helpOpen: true, settingsOpen: true }))
+    await waitFor(() => expect(container.querySelectorAll('.slide-over').length).toBe(2))
+    press('Escape')
+    await waitFor(() => expect(useUiStore.getState().helpOpen).toBe(false))
+    expect(useUiStore.getState().settingsOpen).toBe(true)
+    press('Escape')
+    await waitFor(() => expect(useUiStore.getState().settingsOpen).toBe(false))
+  })
+
   it('"-" calls window.api.window.setMode("compact") and updates store mode', async () => {
     await bootApp()
     press('-')
     await waitFor(() => expect(api.window.setMode).toHaveBeenCalledWith('compact'))
     expect(useUiStore.getState().mode).toBe('compact')
+  })
+
+  it('"-" toggles compact mode in both directions', async () => {
+    await bootApp()
+    press('-')
+    await waitFor(() => expect(api.window.setMode).toHaveBeenLastCalledWith('compact'))
+    expect(useUiStore.getState().mode).toBe('compact')
+
+    press('-')
+    await waitFor(() => expect(api.window.setMode).toHaveBeenLastCalledWith('normal'))
+    expect(useUiStore.getState().mode).toBe('normal')
+  })
+
+  it('compact mode blocks normal-only shortcuts but still allows "-" to expand', async () => {
+    const { container } = await bootApp()
+    act(() => api.__emit.modeChanged({ mode: 'compact' }))
+    await waitFor(() => expect(container.querySelector('.app-compact')).toBeTruthy())
+
+    press('?')
+    press('s')
+    press(' ')
+    press('c')
+    press('q')
+
+    expect(useUiStore.getState().helpOpen).toBe(false)
+    expect(useUiStore.getState().settingsOpen).toBe(false)
+    expect(api.transcription.start).not.toHaveBeenCalled()
+    expect(api.transcription.clear).not.toHaveBeenCalled()
+    expect(api.window.quit).not.toHaveBeenCalled()
+
+    press('-')
+    await waitFor(() => expect(api.window.setMode).toHaveBeenCalledWith('normal'))
+    expect(useUiStore.getState().mode).toBe('normal')
   })
 
   it('"Q" triggers window.api.window.quit', async () => {
@@ -137,6 +182,31 @@ describe('App keyboard shortcuts', () => {
     document.body.appendChild(input)
     input.focus()
     fireEvent.keyDown(input, { key: 's' })
+    expect(useUiStore.getState().settingsOpen).toBe(false)
+  })
+
+  it('shortcuts are skipped while focus is in textarea, select, or contenteditable targets', async () => {
+    const { container } = await bootApp()
+    press('s')
+    await waitFor(() => expect(useUiStore.getState().settingsOpen).toBe(true))
+
+    const textarea = await waitFor(() => container.querySelector('textarea') as HTMLTextAreaElement)
+    fireEvent.keyDown(textarea, { key: 's' })
+    expect(useUiStore.getState().settingsOpen).toBe(true)
+
+    const select = await waitFor(() => container.querySelector('select') as HTMLSelectElement)
+    fireEvent.keyDown(select, { key: 's' })
+    expect(useUiStore.getState().settingsOpen).toBe(true)
+
+    press('Escape')
+    await waitFor(() => expect(useUiStore.getState().settingsOpen).toBe(false))
+    await waitFor(() => expect(container.querySelector('.slide-over')).toBeNull())
+
+    const editable = document.createElement('div')
+    editable.setAttribute('contenteditable', 'true')
+    document.body.append(editable)
+    editable.focus()
+    editable.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true, cancelable: true }))
     expect(useUiStore.getState().settingsOpen).toBe(false)
   })
 
@@ -176,5 +246,21 @@ describe('App keyboard shortcuts', () => {
     act(() => api.__emit.llmDone({ requestId: 'rid-1', full: 'hi there', finishReason: 'stop' }))
     await waitFor(() => expect(useLlmStore.getState().entries[0].status).toBe('done'))
     expect(useLlmStore.getState().entries[0].text).toBe('hi there')
+  })
+
+  it('user-active pulse notifies main and throttles repeated activity', async () => {
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(2_000)
+    await bootApp()
+
+    fireEvent.keyDown(window, { key: 'a' })
+    expect(api.window.notifyUserActive).toHaveBeenCalledTimes(1)
+
+    fireEvent.mouseMove(window)
+    expect(api.window.notifyUserActive).toHaveBeenCalledTimes(1)
+
+    nowSpy.mockReturnValue(3_501)
+    fireEvent.mouseDown(window)
+    expect(api.window.notifyUserActive).toHaveBeenCalledTimes(2)
+    nowSpy.mockRestore()
   })
 })

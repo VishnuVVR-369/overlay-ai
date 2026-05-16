@@ -94,6 +94,43 @@ describe('global shortcuts', () => {
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.visionTrigger)
   })
 
+  it('Cmd+B callback toggles window visibility', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    const { registerShortcuts } = await load()
+    const win = makeFakeWindow()
+    registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    callbacks.get('Cmd+B')!()
+    expect(win.hide).toHaveBeenCalled()
+    expect(win.webContents.send).toHaveBeenCalledWith(IPC.windowVisibilityChanged, { visible: false })
+  })
+
+  it('Cmd+W callback toggles wide mode', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    const { registerShortcuts } = await load()
+    const win = makeFakeWindow()
+    registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    callbacks.get('Cmd+W')!()
+    expect(win.webContents.send).toHaveBeenCalledWith(IPC.windowModeChanged, { mode: 'wide' })
+  })
+
+  it('ask and screen callbacks are no-ops when the window is destroyed', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    const { registerShortcuts } = await load()
+    const win = makeFakeWindow()
+    win.isDestroyed.mockReturnValue(true)
+    registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    callbacks.get('Cmd+\\')!()
+    callbacks.get('Cmd+Shift+\\')!()
+    expect(win.webContents.send).not.toHaveBeenCalled()
+  })
+
+  it('getShortcutRegistration returns the last registration', async () => {
+    const { registerShortcuts, getShortcutRegistration } = await load()
+    const win = makeFakeWindow()
+    const reg = registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    expect(getShortcutRegistration()).toBe(reg)
+  })
+
   it('hooks app "will-quit" to unregister all shortcuts', async () => {
     const { registerShortcuts } = await load()
     const win = makeFakeWindow()

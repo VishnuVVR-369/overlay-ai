@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, beforeEach, vi } from 'vitest'
-import { render, waitFor, act } from '@testing-library/react'
+import { render, waitFor, act, fireEvent } from '@testing-library/react'
 import { App } from '@/App'
 import { useUiStore } from '@/state/ui-store'
 import { useStatusStore } from '@/state/status-store'
@@ -113,6 +113,59 @@ describe('App boot', () => {
     await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
     act(() => api.__emit.modeChanged({ mode: 'compact' }))
     await waitFor(() => expect(container.querySelector('.app-compact')).toBeTruthy())
+  })
+
+  it('window:mode-changed closes slide-overs for normal, wide, and compact modes', async () => {
+    api = installFakeApi(createFakeApi({
+      settings: { elevenlabsKeySet: true, groqKeySet: true, openaiKeySet: true, visionProvider: 'openai', visionModel: 'gpt-5.1' },
+    }))
+    render(<App />)
+    await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
+
+    for (const mode of ['normal', 'wide', 'compact'] as const) {
+      useUiStore.setState({ helpOpen: true, settingsOpen: true })
+      act(() => api.__emit.modeChanged({ mode }))
+      await waitFor(() => {
+        expect(useUiStore.getState().helpOpen).toBe(false)
+        expect(useUiStore.getState().settingsOpen).toBe(false)
+      })
+    }
+  })
+
+  it('closed help and settings slide-overs are unmounted from the DOM', async () => {
+    api = installFakeApi(createFakeApi({
+      settings: { elevenlabsKeySet: true, groqKeySet: true, openaiKeySet: true, visionProvider: 'openai', visionModel: 'gpt-5.1' },
+    }))
+    const { container } = render(<App />)
+    await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
+
+    act(() => useUiStore.setState({ helpOpen: true, settingsOpen: false }))
+    await waitFor(() => expect(container.querySelector('.slide-over')).toBeTruthy())
+    act(() => useUiStore.setState({ helpOpen: false }))
+    await waitFor(() => expect(container.querySelector('.slide-over')).toBeNull())
+
+    act(() => useUiStore.setState({ settingsOpen: true, helpOpen: false }))
+    await waitFor(() => expect(container.querySelector('.slide-over')).toBeTruthy())
+    act(() => useUiStore.setState({ settingsOpen: false }))
+    await waitFor(() => expect(container.querySelector('.slide-over')).toBeNull())
+  })
+
+  it('compact AnswerCard expand and quit callbacks route through window API', async () => {
+    api = installFakeApi(createFakeApi({
+      settings: { elevenlabsKeySet: true, groqKeySet: true, openaiKeySet: true, visionProvider: 'openai', visionModel: 'gpt-5.1' },
+    }))
+    const { container, getByLabelText } = render(<App />)
+    await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
+    act(() => api.__emit.modeChanged({ mode: 'compact' }))
+    await waitFor(() => expect(container.querySelector('.app-compact')).toBeTruthy())
+
+    fireEvent.click(getByLabelText('Expand'))
+    await waitFor(() => expect(api.window.setMode).toHaveBeenCalledWith('normal'))
+
+    act(() => api.__emit.modeChanged({ mode: 'compact' }))
+    await waitFor(() => expect(container.querySelector('.app-compact')).toBeTruthy())
+    fireEvent.click(getByLabelText('Quit'))
+    await waitFor(() => expect(api.window.quit).toHaveBeenCalled())
   })
 
   it('transcript update events are applied to the renderer transcript store', async () => {

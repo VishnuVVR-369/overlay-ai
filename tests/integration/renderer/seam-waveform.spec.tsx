@@ -30,4 +30,13 @@ describe('SeamWaveform', () => {
     const svg = container.querySelector('svg.seam-waveform') as SVGElement
     expect(svg.getAttribute('height')).toBe('50')
   })
+
+  it('passes through custom class names while preserving SVG sizing attributes', () => {
+    const { container } = render(<SeamWaveform className="compact-wave" height={36} />)
+    const svg = container.querySelector('svg.seam-waveform.compact-wave') as SVGElement
+    expect(svg).toBeTruthy()
+    expect(svg.getAttribute('width')).toBe('100%')
+    expect(svg.getAttribute('height')).toBe('36')
+    expect(svg.getAttribute('preserveAspectRatio')).toBe('none')
+  })
 })

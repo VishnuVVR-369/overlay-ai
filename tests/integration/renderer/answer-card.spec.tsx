@@ -55,6 +55,18 @@ describe('AnswerCard', () => {
     expect(screen.getByText(/newer partial/)).toBeTruthy()
   })
 
+  it('shows the latest completed answer text', () => {
+    useLlmStore.setState({
+      entries: [
+        { requestId: 'r2', mode: 'screen', imageDataUrl: 'data:image/png;base64,xxx', text: 'Use a two-pointer scan.', chunks: [], status: 'done', startedAt: 2 },
+        { requestId: 'r1', mode: 'transcript', text: 'older answer', chunks: [], status: 'done', startedAt: 1 },
+      ],
+    })
+    render(<AnswerCard onExpand={() => {}} onQuit={() => {}} />)
+    expect(screen.getByText('Use a two-pointer scan.')).toBeTruthy()
+    expect(screen.queryByText('older answer')).toBeNull()
+  })
+
   it('expand and quit buttons fire their callbacks', () => {
     const onExpand = vi.fn()
     const onQuit = vi.fn()

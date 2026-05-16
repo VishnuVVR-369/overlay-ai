@@ -348,6 +348,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
   const tagName = target.tagName.toLowerCase()
   return (
     target.isContentEditable ||
+    target.closest('[contenteditable]:not([contenteditable="false"])') !== null ||
     tagName === 'input' ||
     tagName === 'textarea' ||
     tagName === 'select'
