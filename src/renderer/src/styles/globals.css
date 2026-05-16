@@ -1035,6 +1035,62 @@ body {
 .so-button:hover { color: var(--fg-primary); border-color: var(--hairline-strong); }
 .so-button:disabled { opacity: 0.4; cursor: default; }
 
+.toggle-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: var(--space-2) !important;
+  color: var(--fg-secondary);
+}
+
+.toggle-row input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  -webkit-app-region: no-drag;
+}
+
+.vault-stories {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.vault-stories-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--fg-secondary);
+  font-size: var(--text-sm);
+}
+
+.vault-stories-empty {
+  border: 1px dashed var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  color: var(--fg-tertiary);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.vault-story {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2);
+  background: var(--bg-card);
+}
+
+.vault-story textarea {
+  min-height: 92px;
+}
+
+.vault-story .so-button {
+  align-self: flex-start;
+}
+
 .so-set {
   font-family: var(--font-mono);
   font-size: var(--text-xs);

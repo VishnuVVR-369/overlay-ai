@@ -9,6 +9,7 @@ const registerSpy = vi.fn((accel: string, cb: () => void) => {
   return true
 })
 const willQuitListeners: Array<() => void> = []
+const triggerPanicSpy = vi.fn()
 
 vi.mock('electron', () => ({
   app: {
@@ -22,9 +23,14 @@ vi.mock('electron', () => ({
   },
 }))
 
+vi.mock('@main/panic', () => ({
+  triggerPanic: (...args: unknown[]) => triggerPanicSpy(...args),
+}))
+
 beforeEach(() => {
   callbacks.clear()
   willQuitListeners.length = 0
+  triggerPanicSpy.mockClear()
   registerSpy.mockClear().mockImplementation((accel: string, cb: () => void) => {
     callbacks.set(accel, cb)
     return true
@@ -38,7 +44,7 @@ async function load(): Promise<typeof import('@main/shortcuts')> {
 }
 
 describe('global shortcuts', () => {
-  it('registers all four expected accelerators on macOS', async () => {
+  it('registers all five expected accelerators on macOS', async () => {
     Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
     const { registerShortcuts } = await load()
     const win = makeFakeWindow()
@@ -47,7 +53,8 @@ describe('global shortcuts', () => {
     expect(reg.screenAsk.accelerator).toBe('Cmd+Shift+\\')
     expect(reg.toggle.accelerator).toBe('Cmd+B')
     expect(reg.wide.accelerator).toBe('Cmd+W')
-    expect(reg.ask.ok && reg.screenAsk.ok && reg.toggle.ok && reg.wide.ok).toBe(true)
+    expect(reg.panic.accelerator).toBe('Cmd+Shift+Escape')
+    expect(reg.ask.ok && reg.screenAsk.ok && reg.toggle.ok && reg.wide.ok && reg.panic.ok).toBe(true)
   })
 
   it('uses Ctrl-prefixed accelerators on non-mac', async () => {
@@ -59,6 +66,7 @@ describe('global shortcuts', () => {
     expect(reg.screenAsk.accelerator).toBe('Ctrl+Shift+\\')
     expect(reg.toggle.accelerator).toBe('Ctrl+B')
     expect(reg.wide.accelerator).toBe('Ctrl+W')
+    expect(reg.panic.accelerator).toBe('Ctrl+Shift+Escape')
   })
 
   it('reports {ok:false} for any individual registration that fails', async () => {
@@ -136,5 +144,42 @@ describe('global shortcuts', () => {
     const win = makeFakeWindow()
     registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
     expect(willQuitListeners.length).toBe(1)
+  })
+
+  it('Cmd+Shift+Escape callback invokes triggerPanic with the window', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    const { registerShortcuts } = await load()
+    const win = makeFakeWindow()
+    registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    callbacks.get('Cmd+Shift+Escape')!()
+    expect(triggerPanicSpy).toHaveBeenCalledTimes(1)
+    expect(triggerPanicSpy.mock.calls[0][0]).toBe(win)
+  })
+
+  it('panic registration failure surfaces ok:false (so the UI can toast)', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    registerSpy.mockImplementation((accel: string, cb: () => void) => {
+      callbacks.set(accel, cb)
+      return accel !== 'Cmd+Shift+Escape'
+    })
+    const { registerShortcuts } = await load()
+    const win = makeFakeWindow()
+    const reg = registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    expect(reg.panic.ok).toBe(false)
+    expect(reg.ask.ok).toBe(true)
+  })
+
+  it('panic registration that throws synchronously is caught and reports ok:false', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+    registerSpy.mockImplementation((accel: string, cb: () => void) => {
+      if (accel === 'Cmd+Shift+Escape') throw new Error('OS reserves this shortcut')
+      callbacks.set(accel, cb)
+      return true
+    })
+    const { registerShortcuts } = await load()
+    const win = makeFakeWindow()
+    const reg = registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    expect(reg.panic.ok).toBe(false)
+    expect(reg.ask.ok).toBe(true)
   })
 })

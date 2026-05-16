@@ -8,12 +8,16 @@ import type {
   PresetState,
   SettingsStatus,
   SettingsUpdate,
+  VaultData,
+  VaultStatus,
+  VaultStory,
   VisionProvider,
 } from '@shared/types'
 import {
   ANSWER_STYLES,
   DEFAULT_ANSWER_STYLE_ID,
   DEFAULT_PRESET_ID,
+  EMPTY_VAULT,
   PRESETS,
   getPresetDef,
   isAnswerStyleId,
@@ -21,7 +25,7 @@ import {
 } from '@shared/prompt'
 
 interface SettingsFile {
-  version: 4
+  version: 5
   elevenlabsKeyEnc?: string
   groqKeyEnc?: string
   openaiKeyEnc?: string
@@ -30,20 +34,30 @@ interface SettingsFile {
   presetOverrides?: Partial<Record<PresetId, string>>
   visionProvider?: VisionProvider
   visionModel?: string
+  vaultEnc?: string
+  headlineFirst?: boolean
 }
 
-const FILE_VERSION = 4
+const FILE_VERSION = 5
+const ACCEPTED_VERSIONS = [1, 2, 3, 4, 5]
+const VAULT_FIELD_CAP = 8000
+const VAULT_STORY_TITLE_CAP = 120
+const VAULT_STORY_BODY_CAP = 2000
+const VAULT_STORIES_MAX = 25
 export const DEFAULT_VISION_PROVIDER: VisionProvider = 'openai'
 export const DEFAULT_VISION_MODEL = 'gpt-5.1'
+export const DEFAULT_HEADLINE_FIRST = true
 
 class SettingsStore {
   private cache: SettingsFile = { version: FILE_VERSION }
   private filePath = ''
   private encryptionAvailable = false
+  private vaultCache: VaultData | null = null
 
   async load(): Promise<void> {
     this.filePath = join(app.getPath('userData'), 'settings.json')
     this.encryptionAvailable = safeStorage.isEncryptionAvailable()
+    this.vaultCache = null
     if (!this.encryptionAvailable) {
       console.warn('[settings] safeStorage encryption not available; keys will be stored unencrypted base64.')
     }
@@ -59,8 +73,10 @@ class SettingsStore {
         presetOverrides?: unknown
         visionProvider?: unknown
         visionModel?: unknown
+        vaultEnc?: unknown
+        headlineFirst?: unknown
       }
-      if (parsed && typeof parsed === 'object' && [1, 2, 3, 4].includes(parsed.version ?? 0)) {
+      if (parsed && typeof parsed === 'object' && ACCEPTED_VERSIONS.includes(parsed.version ?? 0)) {
         this.cache = {
           version: FILE_VERSION,
           elevenlabsKeyEnc: parsed.elevenlabsKeyEnc,
@@ -71,6 +87,8 @@ class SettingsStore {
           presetOverrides: this.sanitizeOverrides(parsed.presetOverrides),
           visionProvider: this.sanitizeVisionProvider(parsed.visionProvider),
           visionModel: this.sanitizeVisionModel(parsed.visionModel),
+          vaultEnc: typeof parsed.vaultEnc === 'string' ? parsed.vaultEnc : undefined,
+          headlineFirst: typeof parsed.headlineFirst === 'boolean' ? parsed.headlineFirst : undefined,
         }
       }
     } catch (err: unknown) {
@@ -86,6 +104,8 @@ class SettingsStore {
       openaiKeySet: !!this.cache.openaiKeyEnc,
       visionProvider: this.getVisionProvider(),
       visionModel: this.getVisionModel(),
+      headlineFirst: this.getHeadlineFirst(),
+      vault: this.getVaultStatus(),
     }
   }
 
@@ -125,7 +145,63 @@ class SettingsStore {
     if (update.visionModel !== undefined) {
       this.cache.visionModel = this.sanitizeVisionModel(update.visionModel)
     }
+    if (update.headlineFirst !== undefined) {
+      this.cache.headlineFirst = !!update.headlineFirst
+    }
     await this.persist()
+  }
+
+  getHeadlineFirst(): boolean {
+    return this.cache.headlineFirst ?? DEFAULT_HEADLINE_FIRST
+  }
+
+  async setHeadlineFirst(value: boolean): Promise<void> {
+    this.cache.headlineFirst = !!value
+    await this.persist()
+  }
+
+  getVault(): VaultData {
+    if (this.vaultCache) return this.vaultCache
+    if (!this.cache.vaultEnc) {
+      this.vaultCache = cloneEmptyVault()
+      return this.vaultCache
+    }
+    try {
+      const buf = Buffer.from(this.cache.vaultEnc, 'base64')
+      const json = this.encryptionAvailable
+        ? safeStorage.decryptString(buf)
+        : buf.toString('utf-8')
+      const parsed = JSON.parse(json) as unknown
+      this.vaultCache = sanitizeVault(parsed)
+      return this.vaultCache
+    } catch (err) {
+      console.warn('[settings] vault decrypt failed', err)
+      this.vaultCache = cloneEmptyVault()
+      return this.vaultCache
+    }
+  }
+
+  async setVault(value: VaultData): Promise<void> {
+    const sanitized = sanitizeVault(value)
+    const json = JSON.stringify(sanitized)
+    if (this.encryptionAvailable) {
+      this.cache.vaultEnc = safeStorage.encryptString(json).toString('base64')
+    } else {
+      this.cache.vaultEnc = Buffer.from(json, 'utf-8').toString('base64')
+    }
+    this.vaultCache = sanitized
+    await this.persist()
+  }
+
+  getVaultStatus(): VaultStatus {
+    const v = this.getVault()
+    return {
+      hasResume: v.resume.trim().length > 0,
+      hasJobDescription: v.jobDescription.trim().length > 0,
+      hasCompanyValues: v.companyValues.trim().length > 0,
+      hasInterviewerNotes: v.interviewerNotes.trim().length > 0,
+      storiesCount: v.stories.length,
+    }
   }
 
   getActivePresetId(): PresetId {
@@ -234,3 +310,36 @@ class SettingsStore {
 }
 
 export const settings = new SettingsStore()
+
+function cloneEmptyVault(): VaultData {
+  return { ...EMPTY_VAULT, stories: [] }
+}
+
+export function sanitizeVault(input: unknown): VaultData {
+  const v = cloneEmptyVault()
+  if (!input || typeof input !== 'object') return v
+  const o = input as Record<string, unknown>
+  const str = (val: unknown, cap = VAULT_FIELD_CAP): string => {
+    if (typeof val !== 'string') return ''
+    const trimmed = val.trim()
+    return trimmed.length > cap ? trimmed.slice(0, cap) : trimmed
+  }
+  v.resume = str(o['resume'])
+  v.jobDescription = str(o['jobDescription'])
+  v.companyValues = str(o['companyValues'])
+  v.interviewerNotes = str(o['interviewerNotes'])
+  const rawStories = Array.isArray(o['stories']) ? (o['stories'] as unknown[]) : []
+  const sanitizedStories: VaultStory[] = []
+  for (const item of rawStories) {
+    if (sanitizedStories.length >= VAULT_STORIES_MAX) break
+    if (!item || typeof item !== 'object') continue
+    const s = item as Record<string, unknown>
+    const title = str(s['title'], VAULT_STORY_TITLE_CAP)
+    const body = str(s['body'], VAULT_STORY_BODY_CAP)
+    if (!title || !body) continue
+    const id = typeof s['id'] === 'string' && (s['id'] as string).length > 0 ? (s['id'] as string) : `story-${sanitizedStories.length + 1}`
+    sanitizedStories.push({ id, title, body })
+  }
+  v.stories = sanitizedStories
+  return v
+}

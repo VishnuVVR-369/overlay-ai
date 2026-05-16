@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
-import type { AnswerStyleId, PresetId, ReadinessStatus, SettingsStatus } from '@shared/types'
+import type { AnswerStyleId, PresetId, ReadinessStatus, SettingsStatus, VaultData, VaultStory } from '@shared/types'
 import { usePresetStore, findPreset } from '../state/preset-store'
 import { useUiStore } from '../state/ui-store'
 import { useAnswerStyleStore } from '../state/answer-style-store'
+import { useVaultStore, emptyVault } from '../state/vault-store'
 
 interface Props {
   open: boolean
@@ -17,9 +18,19 @@ export function SettingsModal({ open, onClose }: Props): JSX.Element | null {
     openaiKeySet: false,
     visionProvider: 'openai',
     visionModel: 'gpt-5.1',
+    headlineFirst: true,
+    vault: {
+      hasResume: false,
+      hasJobDescription: false,
+      hasCompanyValues: false,
+      hasInterviewerNotes: false,
+      storiesCount: 0,
+    },
   })
   const perms = useUiStore((s) => s.permStatus)
   const setPermStatus = useUiStore((s) => s.setPermStatus)
+  const headlineFirst = useUiStore((s) => s.headlineFirst)
+  const setHeadlineFirst = useUiStore((s) => s.setHeadlineFirst)
   const [elevenlabsKey, setElevenlabsKey] = useState('')
   const [groqKey, setGroqKey] = useState('')
   const [openaiKey, setOpenaiKey] = useState('')
@@ -36,6 +47,11 @@ export function SettingsModal({ open, onClose }: Props): JSX.Element | null {
   const [draft, setDraft] = useState('')
   const [presetSaving, setPresetSaving] = useState(false)
 
+  const hydratedVault = useVaultStore((s) => s.data)
+  const setVaultState = useVaultStore((s) => s.setState)
+  const [vaultDraft, setVaultDraft] = useState<VaultData>(emptyVault())
+  const [vaultSaving, setVaultSaving] = useState(false)
+
   const selectedId = editingId ?? activePresetId
   const selectedPreset = useMemo(() => findPreset(presets, selectedId), [presets, selectedId])
 
@@ -44,10 +60,20 @@ export function SettingsModal({ open, onClose }: Props): JSX.Element | null {
     void window.api.settings.get().then((next) => {
       setStatus(next)
       setVisionModel(next.visionModel)
+      setHeadlineFirst(next.headlineFirst)
+    })
+    void window.api.vault.get().then((v) => {
+      setVaultDraft(v)
+      setVaultState(v)
     })
     void window.api.permissions.status().then(setPermStatus)
     void runReadiness()
-  }, [open, setPermStatus])
+  }, [open, setPermStatus, setHeadlineFirst, setVaultState])
+
+  useEffect(() => {
+    if (!open) return
+    setVaultDraft(hydratedVault)
+  }, [open, hydratedVault])
 
   useEffect(() => {
     if (!selectedPreset) return
@@ -108,6 +134,45 @@ export function SettingsModal({ open, onClose }: Props): JSX.Element | null {
 
   const setAnswerStyle = async (id: AnswerStyleId): Promise<void> => {
     await window.api.answerStyles.setActive(id)
+  }
+
+  const toggleHeadlineFirst = async (next: boolean): Promise<void> => {
+    setHeadlineFirst(next)
+    setStatus((s) => ({ ...s, headlineFirst: next }))
+    await window.api.settings.set({ headlineFirst: next })
+  }
+
+  const updateVaultField = (key: keyof Omit<VaultData, 'stories'>, value: string): void => {
+    setVaultDraft((v) => ({ ...v, [key]: value }))
+  }
+
+  const updateStory = (index: number, patch: Partial<VaultStory>): void => {
+    setVaultDraft((v) => {
+      const next = v.stories.map((s, i) => (i === index ? { ...s, ...patch } : s))
+      return { ...v, stories: next }
+    })
+  }
+
+  const addStory = (): void => {
+    setVaultDraft((v) => ({
+      ...v,
+      stories: [...v.stories, { id: makeStoryId(), title: '', body: '' }],
+    }))
+  }
+
+  const removeStory = (index: number): void => {
+    setVaultDraft((v) => ({ ...v, stories: v.stories.filter((_, i) => i !== index) }))
+  }
+
+  const vaultDirty = useMemo(() => vaultEquals(vaultDraft, hydratedVault) === false, [vaultDraft, hydratedVault])
+
+  const saveVault = async (): Promise<void> => {
+    setVaultSaving(true)
+    try {
+      await window.api.vault.set(vaultDraft)
+    } finally {
+      setVaultSaving(false)
+    }
   }
 
   if (!open) return null
@@ -206,7 +271,110 @@ export function SettingsModal({ open, onClose }: Props): JSX.Element | null {
           </section>
 
           <section className="so-section">
+            <h3>Personal Context</h3>
+            <p className="so-hint">
+              Pasted here so the model never has to invent details about you. Stored locally,
+              encrypted at rest, and injected into every transcript and screen ask.
+            </p>
+            <label>
+              <span>Resume / background</span>
+              <textarea
+                value={vaultDraft.resume}
+                onChange={(e) => updateVaultField('resume', e.target.value)}
+                rows={4}
+                spellCheck={false}
+                placeholder="Paste a short resume summary or the highest-signal bullets."
+              />
+            </label>
+            <label>
+              <span>Role / job description</span>
+              <textarea
+                value={vaultDraft.jobDescription}
+                onChange={(e) => updateVaultField('jobDescription', e.target.value)}
+                rows={4}
+                spellCheck={false}
+                placeholder="Paste the JD or your understanding of the role."
+              />
+            </label>
+            <label>
+              <span>Company values</span>
+              <textarea
+                value={vaultDraft.companyValues}
+                onChange={(e) => updateVaultField('companyValues', e.target.value)}
+                rows={3}
+                spellCheck={false}
+                placeholder="Leadership principles, mission, recent news, customer focus."
+              />
+            </label>
+            <label>
+              <span>Interviewer notes</span>
+              <textarea
+                value={vaultDraft.interviewerNotes}
+                onChange={(e) => updateVaultField('interviewerNotes', e.target.value)}
+                rows={3}
+                spellCheck={false}
+                placeholder="Names, backgrounds, what they usually ask."
+              />
+            </label>
+            <div className="vault-stories">
+              <div className="vault-stories-header">
+                <span>STAR stories</span>
+                <button className="so-button" type="button" onClick={addStory}>+ Add story</button>
+              </div>
+              {vaultDraft.stories.length === 0 && (
+                <div className="vault-stories-empty">
+                  No stories yet. Add the 4–6 stories you reach for most often.
+                </div>
+              )}
+              {vaultDraft.stories.map((story, idx) => (
+                <div key={story.id} className="vault-story">
+                  <input
+                    type="text"
+                    value={story.title}
+                    onChange={(e) => updateStory(idx, { title: e.target.value })}
+                    placeholder="Short title (e.g. Stripe payments migration)"
+                    aria-label={`Story ${idx + 1} title`}
+                  />
+                  <textarea
+                    value={story.body}
+                    onChange={(e) => updateStory(idx, { body: e.target.value })}
+                    rows={3}
+                    spellCheck={false}
+                    placeholder="Situation, task, action, result — terse bullets are fine."
+                    aria-label={`Story ${idx + 1} body`}
+                  />
+                  <button
+                    className="so-button"
+                    type="button"
+                    onClick={() => removeStory(idx)}
+                    aria-label={`Remove story ${idx + 1}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="so-button-primary"
+              onClick={saveVault}
+              disabled={vaultSaving || !vaultDirty}
+            >
+              {vaultSaving ? 'Saving…' : 'Save personal context'}
+            </button>
+          </section>
+
+          <section className="so-section">
             <h3>Interview Mode</h3>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={headlineFirst}
+                onChange={(e) => { void toggleHeadlineFirst(e.target.checked) }}
+                aria-label="Headline-first answers"
+              />
+              <span>Headline-first answers (lead with one bold speakable sentence)</span>
+            </label>
             {answerStyles.length > 0 && (
               <label>
                 <span>Answer style</span>
@@ -323,4 +491,23 @@ function formatReadinessTime(ts: number): string {
   const mm = String(d.getMinutes()).padStart(2, '0')
   const ss = String(d.getSeconds()).padStart(2, '0')
   return `${hh}:${mm}:${ss}`
+}
+
+function makeStoryId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  return `story-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function vaultEquals(a: VaultData, b: VaultData): boolean {
+  if (a.resume !== b.resume) return false
+  if (a.jobDescription !== b.jobDescription) return false
+  if (a.companyValues !== b.companyValues) return false
+  if (a.interviewerNotes !== b.interviewerNotes) return false
+  if (a.stories.length !== b.stories.length) return false
+  for (let i = 0; i < a.stories.length; i++) {
+    const x = a.stories[i]
+    const y = b.stories[i]
+    if (x.id !== y.id || x.title !== y.title || x.body !== y.body) return false
+  }
+  return true
 }

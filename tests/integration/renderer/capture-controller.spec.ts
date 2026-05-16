@@ -150,4 +150,19 @@ describe('CaptureController', () => {
     expect(useAudioLevelsStore.getState().micLatest).toBe(0)
     expect(useAudioLevelsStore.getState().systemLatest).toBe(0)
   })
+
+  it('stop() is idempotent — calling it twice does not throw and leaves levels at zero', async () => {
+    const { capture } = await loadCapture()
+    await capture.start()
+    capture.stop()
+    expect(() => capture.stop()).not.toThrow()
+    expect(useAudioLevelsStore.getState().micLatest).toBe(0)
+    expect(useAudioLevelsStore.getState().systemLatest).toBe(0)
+  })
+
+  it('stop() before start() is a no-op (panic-during-idle is safe)', async () => {
+    const { capture } = await loadCapture()
+    expect(() => capture.stop()).not.toThrow()
+    expect(useAudioLevelsStore.getState().micLatest).toBe(0)
+  })
 })

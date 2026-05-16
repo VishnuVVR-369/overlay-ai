@@ -5,6 +5,7 @@ import { SettingsModal } from '@/components/SettingsModal'
 import { useUiStore } from '@/state/ui-store'
 import { usePresetStore } from '@/state/preset-store'
 import { useAnswerStyleStore } from '@/state/answer-style-store'
+import { useVaultStore, emptyVault } from '@/state/vault-store'
 import { installFakeApi, createFakeApi, type FakeApi } from '../../helpers/fake-window-api'
 
 let api: FakeApi
@@ -34,6 +35,8 @@ beforeEach(() => {
     ],
     hydrated: true,
   })
+  useVaultStore.setState({ data: emptyVault(), hydrated: false })
+  useUiStore.setState({ headlineFirst: true })
   api = installFakeApi(createFakeApi())
 })
 
@@ -86,12 +89,14 @@ describe('SettingsModal', () => {
       openaiKeySet: true,
       visionProvider: 'openai',
       visionModel: 'gpt-5.1',
+      headlineFirst: true,
+      vault: { hasResume: false, hasJobDescription: false, hasCompanyValues: false, hasInterviewerNotes: false, storiesCount: 0 },
     }
-    const { container } = render(<SettingsModal open={true} onClose={() => {}} />)
+    render(<SettingsModal open={true} onClose={() => {}} />)
     await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
-    const modelInput = container.querySelector('input[type=text]') as HTMLInputElement
+    const modelInput = screen.getByPlaceholderText('gpt-5.1') as HTMLInputElement
     fireEvent.change(modelInput, { target: { value: 'gpt-5.2' } })
-    fireEvent.click(screen.getByText('Save'))
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(api.settings.set).toHaveBeenCalledWith({ visionModel: 'gpt-5.2' }))
   })
 
@@ -114,7 +119,7 @@ describe('SettingsModal', () => {
   it('typing into the system prompt textarea enables Save override', async () => {
     render(<SettingsModal open={true} onClose={() => {}} />)
     await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
-    const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+    const textarea = screen.getByLabelText('System prompt for Behavioral') as HTMLTextAreaElement
     expect(textarea.value).toBe('BEH-DEFAULT')
     fireEvent.change(textarea, { target: { value: 'CUSTOM' } })
     const saveOverride = screen.getByText('Save override') as HTMLButtonElement
@@ -124,7 +129,7 @@ describe('SettingsModal', () => {
   it('clicking Save override sends a non-null prompt', async () => {
     render(<SettingsModal open={true} onClose={() => {}} />)
     await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
-    const textarea = document.querySelector('textarea') as HTMLTextAreaElement
+    const textarea = screen.getByLabelText('System prompt for Behavioral') as HTMLTextAreaElement
     fireEvent.change(textarea, { target: { value: 'CUSTOM' } })
     fireEvent.click(screen.getByText('Save override'))
     await waitFor(() => expect(api.presets.setOverride).toHaveBeenCalled())
@@ -188,5 +193,79 @@ describe('SettingsModal', () => {
     fireEvent.click(container.querySelector('.slide-over-catcher')!)
     fireEvent.click(screen.getByLabelText('Close'))
     expect(onClose).toHaveBeenCalledTimes(2)
+  })
+
+  it('renders the Personal Context section with four labelled fields', async () => {
+    render(<SettingsModal open={true} onClose={() => {}} />)
+    await waitFor(() => expect(api.vault.get).toHaveBeenCalled())
+    expect(screen.getByText('Personal Context')).toBeTruthy()
+    expect(screen.getByLabelText('Resume / background')).toBeTruthy()
+    expect(screen.getByLabelText('Role / job description')).toBeTruthy()
+    expect(screen.getByLabelText('Company values')).toBeTruthy()
+    expect(screen.getByLabelText('Interviewer notes')).toBeTruthy()
+  })
+
+  it('Save personal context is disabled until the draft differs from the hydrated vault', async () => {
+    render(<SettingsModal open={true} onClose={() => {}} />)
+    await waitFor(() => expect(api.vault.get).toHaveBeenCalled())
+    const save = screen.getByRole('button', { name: 'Save personal context' }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText('Resume / background'), { target: { value: 'My resume bullets' } })
+    expect((screen.getByRole('button', { name: 'Save personal context' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('Saving personal context calls window.api.vault.set with the full draft', async () => {
+    render(<SettingsModal open={true} onClose={() => {}} />)
+    await waitFor(() => expect(api.vault.get).toHaveBeenCalled())
+    fireEvent.change(screen.getByLabelText('Resume / background'), { target: { value: 'r' } })
+    fireEvent.change(screen.getByLabelText('Role / job description'), { target: { value: 'j' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save personal context' }))
+    await waitFor(() => expect(api.vault.set).toHaveBeenCalled())
+    const last = api.__state.vaultUpdates[api.__state.vaultUpdates.length - 1]
+    expect(last.resume).toBe('r')
+    expect(last.jobDescription).toBe('j')
+  })
+
+  it('+ Add story appends a card and Remove deletes it', async () => {
+    const { container } = render(<SettingsModal open={true} onClose={() => {}} />)
+    await waitFor(() => expect(api.vault.get).toHaveBeenCalled())
+    expect(container.querySelectorAll('.vault-story').length).toBe(0)
+    fireEvent.click(screen.getByText('+ Add story'))
+    expect(container.querySelectorAll('.vault-story').length).toBe(1)
+    fireEvent.change(screen.getByLabelText('Story 1 title'), { target: { value: 'Stripe migration' } })
+    fireEvent.change(screen.getByLabelText('Story 1 body'), { target: { value: 'Cut latency 40%' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save personal context' }))
+    await waitFor(() => expect(api.vault.set).toHaveBeenCalled())
+    const last = api.__state.vaultUpdates[api.__state.vaultUpdates.length - 1]
+    expect(last.stories[0]).toMatchObject({ title: 'Stripe migration', body: 'Cut latency 40%' })
+
+    fireEvent.click(screen.getByLabelText('Remove story 1'))
+    expect(container.querySelectorAll('.vault-story').length).toBe(0)
+  })
+
+  it('headline-first checkbox starts from the hydrated status and toggles via settings.set', async () => {
+    api.__state.settings.headlineFirst = false
+    render(<SettingsModal open={true} onClose={() => {}} />)
+    await waitFor(() => expect(api.settings.get).toHaveBeenCalled())
+    const checkbox = screen.getByLabelText('Headline-first answers') as HTMLInputElement
+    await waitFor(() => expect(checkbox.checked).toBe(false))
+    fireEvent.click(checkbox)
+    await waitFor(() => expect(api.settings.set).toHaveBeenCalledWith({ headlineFirst: true }))
+    expect(useUiStore.getState().headlineFirst).toBe(true)
+  })
+
+  it('Save personal context becomes disabled again once the vault store reflects the new value', async () => {
+    render(<SettingsModal open={true} onClose={() => {}} />)
+    await waitFor(() => expect(api.vault.get).toHaveBeenCalled())
+    fireEvent.change(screen.getByLabelText('Resume / background'), { target: { value: 'r' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save personal context' }))
+    await waitFor(() => expect(api.vault.set).toHaveBeenCalled())
+    // App is the one that subscribes to vault.onChanged + writes to the store.
+    // Simulate that downstream effect here.
+    useVaultStore.setState({ data: { ...emptyVault(), resume: 'r' }, hydrated: true })
+    await waitFor(() => {
+      const save = screen.getByRole('button', { name: 'Save personal context' }) as HTMLButtonElement
+      expect(save.disabled).toBe(true)
+    })
   })
 })

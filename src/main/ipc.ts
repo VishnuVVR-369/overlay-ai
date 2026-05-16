@@ -11,9 +11,10 @@ import type {
   ReadinessStatus,
   SettingsUpdate,
   ToastEvent,
+  VaultData,
   WindowMode,
 } from '@shared/types'
-import { composePromptForAnswerStyle, isAnswerStyleId, isPresetId } from '@shared/prompt'
+import { composeSystemPrompt, isAnswerStyleId, isPresetId } from '@shared/prompt'
 import { settings } from './settings'
 import { getPermissionStatus, openScreenRecordingPrefs, requestMicAccess } from './permissions'
 import { transcription } from './transcription/transcription-service'
@@ -22,6 +23,7 @@ import { openaiVision } from './llm/openai-vision-client'
 import { captureActiveDisplay } from './vision/screen-capture'
 import { setMode } from './window'
 import { getShortcutRegistration } from './shortcuts'
+import { triggerPanic } from './panic'
 
 export function registerIpc(win: BrowserWindow): void {
   ipcMain.handle(IPC.settingsGet, () => settings.status())
@@ -71,7 +73,10 @@ export function registerIpc(win: BrowserWindow): void {
     }
     const activeId = settings.getActivePresetId()
     const styleId = settings.getActiveAnswerStyleId()
-    const systemPrompt = composePromptForAnswerStyle(settings.getEffectivePrompt(activeId), styleId)
+    const systemPrompt = composeSystemPrompt(settings.getEffectivePrompt(activeId), styleId, {
+      vault: settings.getVault(),
+      headlineFirst: settings.getHeadlineFirst(),
+    })
     const transcript = transcription.flattenForPrompt()
     const requestId = randomUUID()
     void groq.streamAnswer(key, systemPrompt, transcript, {
@@ -114,7 +119,10 @@ export function registerIpc(win: BrowserWindow): void {
 
     const activeId = settings.getActivePresetId()
     const styleId = settings.getActiveAnswerStyleId()
-    const systemPrompt = composePromptForAnswerStyle(settings.getEffectivePrompt(activeId), styleId)
+    const systemPrompt = composeSystemPrompt(settings.getEffectivePrompt(activeId), styleId, {
+      vault: settings.getVault(),
+      headlineFirst: settings.getHeadlineFirst(),
+    })
     const transcript = transcription.flattenForPrompt()
     const model = settings.getVisionModel()
     void openaiVision.streamScreenAnswer(key, model, systemPrompt, transcript, imageDataUrl, {
@@ -158,6 +166,16 @@ export function registerIpc(win: BrowserWindow): void {
     if (!win.isDestroyed()) win.webContents.send(IPC.windowFocusState, { focused: true })
   })
   ipcMain.handle(IPC.windowQuit, () => app.quit())
+
+  ipcMain.handle(IPC.vaultGet, () => settings.getVault())
+  ipcMain.handle(IPC.vaultSet, async (_evt, payload: VaultData) => {
+    await settings.setVault(payload)
+    const next = settings.getVault()
+    if (!win.isDestroyed()) win.webContents.send(IPC.vaultChanged, next)
+    return { ok: true }
+  })
+
+  ipcMain.handle(IPC.panicRequest, () => triggerPanic(win))
 
   transcription.on('update', (event) => {
     if (!win.isDestroyed()) win.webContents.send(IPC.transcriptUpdate, event)

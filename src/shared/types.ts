@@ -46,6 +46,8 @@ export interface SettingsStatus {
   openaiKeySet: boolean
   visionProvider: VisionProvider
   visionModel: string
+  headlineFirst: boolean
+  vault: VaultStatus
 }
 
 export interface SettingsUpdate {
@@ -54,6 +56,29 @@ export interface SettingsUpdate {
   openaiKey?: string
   visionProvider?: VisionProvider
   visionModel?: string
+  headlineFirst?: boolean
+}
+
+export interface VaultStory {
+  id: string
+  title: string
+  body: string
+}
+
+export interface VaultData {
+  resume: string
+  jobDescription: string
+  companyValues: string
+  interviewerNotes: string
+  stories: VaultStory[]
+}
+
+export interface VaultStatus {
+  hasResume: boolean
+  hasJobDescription: boolean
+  hasCompanyValues: boolean
+  hasInterviewerNotes: boolean
+  storiesCount: number
 }
 
 export type VisionProvider = 'openai'
@@ -168,6 +193,15 @@ export interface OverlayApi {
   settings: {
     get(): Promise<SettingsStatus>
     set(update: SettingsUpdate): Promise<{ ok: boolean }>
+  }
+  vault: {
+    get(): Promise<VaultData>
+    set(value: VaultData): Promise<{ ok: boolean }>
+    onChanged(handler: (value: VaultData) => void): () => void
+  }
+  panic: {
+    request(): Promise<void>
+    onTrigger(handler: () => void): () => void
   }
   readiness: {
     check(): Promise<ReadinessStatus>

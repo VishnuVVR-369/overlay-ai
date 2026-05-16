@@ -15,6 +15,7 @@ import { useStatusStore } from './state/status-store'
 import { useUiStore } from './state/ui-store'
 import { usePresetStore } from './state/preset-store'
 import { useAnswerStyleStore } from './state/answer-style-store'
+import { useVaultStore } from './state/vault-store'
 
 export function App(): JSX.Element {
   const [bootChecked, setBootChecked] = useState(false)
@@ -37,8 +38,10 @@ export function App(): JSX.Element {
   const focused = useUiStore((s) => s.focused)
   const setFocused = useUiStore((s) => s.setFocused)
   const setPermStatus = useUiStore((s) => s.setPermStatus)
+  const setHeadlineFirst = useUiStore((s) => s.setHeadlineFirst)
   const setPresetState = usePresetStore((s) => s.setState)
   const setAnswerStyleState = useAnswerStyleStore((s) => s.setState)
+  const setVaultState = useVaultStore((s) => s.setState)
   const heroStreaming = useLlmStore((s) => s.entries[0]?.status === 'streaming')
   const isCompact = mode === 'compact'
 
@@ -127,9 +130,31 @@ export function App(): JSX.Element {
     setPermStatus(await window.api.permissions.status())
   }, [setPermStatus])
 
+  const panicReset = useCallback(() => {
+    capture.stop()
+    useTranscriptStore.getState().reset()
+    useLlmStore.getState().clear()
+    setRunning(false)
+    setHelpOpen(false)
+    setSettingsOpen(false)
+  }, [setRunning, setHelpOpen, setSettingsOpen])
+
+  const requestPanic = useCallback(() => {
+    void window.api.panic.request()
+  }, [])
+
   // Keyboard shortcuts
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.shiftKey &&
+        (event.key === 'Escape' || event.key === 'Esc')
+      ) {
+        event.preventDefault()
+        requestPanic()
+        return
+      }
       if (isEditableTarget(event.target)) return
 
       if (event.key === 'Escape') {
@@ -191,6 +216,7 @@ export function App(): JSX.Element {
     toggleHelp,
     toggleSettings,
     quit,
+    requestPanic,
     settingsOpen,
     setHelpOpen,
     setSettingsOpen,
@@ -204,13 +230,15 @@ export function App(): JSX.Element {
       if (!status.elevenlabsKeySet || !status.groqKeySet || !status.openaiKeySet) {
         openSettings()
       }
+      setHeadlineFirst(status.headlineFirst)
       setBootChecked(true)
     })
     void window.api.presets.get().then(setPresetState)
     void window.api.answerStyles.get().then(setAnswerStyleState)
+    void window.api.vault.get().then(setVaultState)
     void recheckPerms()
     setMounted(true)
-  }, [openSettings, recheckPerms, setAnswerStyleState, setPresetState])
+  }, [openSettings, recheckPerms, setAnswerStyleState, setPresetState, setHeadlineFirst, setVaultState])
 
   // Periodic perm re-check (in case user grants in System Settings)
   useEffect(() => {
@@ -236,6 +264,8 @@ export function App(): JSX.Element {
       window.api.llm.onError((evt) => errorEntry(evt.requestId, evt.message)),
       window.api.presets.onChanged(setPresetState),
       window.api.answerStyles.onChanged(setAnswerStyleState),
+      window.api.vault.onChanged(setVaultState),
+      window.api.panic.onTrigger(panicReset),
       window.api.ui.onOpenSettings(openSettings),
       window.api.window.onFocusState((evt) => setFocused(evt.focused)),
       window.api.window.onModeChanged((evt) => {
@@ -257,6 +287,8 @@ export function App(): JSX.Element {
     setMode,
     setPresetState,
     setSocket,
+    setVaultState,
+    panicReset,
     closeSlideOvers,
     openSettings,
     setHelpOpen,

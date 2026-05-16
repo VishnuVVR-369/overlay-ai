@@ -44,6 +44,9 @@ void app.whenReady().then(async () => {
   if (!reg.wide.ok) {
     sendToast(mainWindow, { level: 'warn', message: `Could not register ${reg.wide.accelerator} (already in use).` })
   }
+  if (!reg.panic.ok) {
+    sendToast(mainWindow, { level: 'warn', message: `Could not register panic shortcut ${reg.panic.accelerator} (already in use). Panic still works while the overlay window is focused.` })
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

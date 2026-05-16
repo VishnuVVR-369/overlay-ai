@@ -12,8 +12,24 @@ vi.mock('electron', () => ({
   ipcMain: ipcStub.ipcMain,
 }))
 
+const emptyVault = () => ({
+  resume: '',
+  jobDescription: '',
+  companyValues: '',
+  interviewerNotes: '',
+  stories: [] as Array<{ id: string; title: string; body: string }>,
+})
+
 const settingsState = {
-  status: { elevenlabsKeySet: false, groqKeySet: false, openaiKeySet: false, visionProvider: 'openai', visionModel: 'gpt-5.1' },
+  status: {
+    elevenlabsKeySet: false,
+    groqKeySet: false,
+    openaiKeySet: false,
+    visionProvider: 'openai',
+    visionModel: 'gpt-5.1',
+    headlineFirst: true,
+    vault: { hasResume: false, hasJobDescription: false, hasCompanyValues: false, hasInterviewerNotes: false, storiesCount: 0 },
+  },
   elevenlabsKey: null as string | null,
   groqKey: null as string | null,
   openaiKey: null as string | null,
@@ -21,6 +37,9 @@ const settingsState = {
   activeAnswerStyleId: 'concise' as 'concise' | 'think-aloud' | 'clarify' | 'edge-cases' | 'complexity',
   effectivePrompt: 'SYSTEM',
   visionModel: 'gpt-5.1',
+  headlineFirst: true,
+  vault: emptyVault(),
+  vaultUpdates: [] as ReturnType<typeof emptyVault>[],
   presetState: {
     active: 'behavioral',
     presets: [
@@ -43,8 +62,12 @@ const settingsState = {
 vi.mock('@main/settings', () => ({
   settings: {
     status: () => settingsState.status,
-    update: vi.fn(async (u: unknown) => {
+    update: vi.fn(async (u: { headlineFirst?: boolean }) => {
       settingsState.updates.push(u)
+      if (u && typeof u.headlineFirst === 'boolean') {
+        settingsState.headlineFirst = u.headlineFirst
+        settingsState.status.headlineFirst = u.headlineFirst
+      }
     }),
     getElevenLabsKey: () => settingsState.elevenlabsKey,
     getGroqKey: () => settingsState.groqKey,
@@ -53,6 +76,23 @@ vi.mock('@main/settings', () => ({
     getActiveAnswerStyleId: () => settingsState.activeAnswerStyleId,
     getEffectivePrompt: () => settingsState.effectivePrompt,
     getVisionModel: () => settingsState.visionModel,
+    getHeadlineFirst: () => settingsState.headlineFirst,
+    setHeadlineFirst: vi.fn(async (v: boolean) => {
+      settingsState.headlineFirst = v
+      settingsState.status.headlineFirst = v
+    }),
+    getVault: () => settingsState.vault,
+    setVault: vi.fn(async (v: typeof settingsState.vault) => {
+      settingsState.vaultUpdates.push(v)
+      settingsState.vault = v
+    }),
+    getVaultStatus: () => ({
+      hasResume: settingsState.vault.resume.length > 0,
+      hasJobDescription: settingsState.vault.jobDescription.length > 0,
+      hasCompanyValues: settingsState.vault.companyValues.length > 0,
+      hasInterviewerNotes: settingsState.vault.interviewerNotes.length > 0,
+      storiesCount: settingsState.vault.stories.length,
+    }),
     setActivePresetId: vi.fn(async (id: typeof settingsState.activePresetId) => {
       settingsState.activePresetId = id
     }),
@@ -65,6 +105,12 @@ vi.mock('@main/settings', () => ({
     getAnswerStyleState: () => settingsState.answerStyleState,
     load: async () => undefined,
   },
+}))
+
+const triggerPanicSpy = vi.fn()
+
+vi.mock('@main/panic', () => ({
+  triggerPanic: (...args: unknown[]) => triggerPanicSpy(...args),
 }))
 
 vi.mock('@main/permissions', () => ({
@@ -133,6 +179,7 @@ vi.mock('@main/shortcuts', () => ({
     screenAsk: { ok: true, accelerator: 'Cmd+Shift+\\' },
     toggle: { ok: true, accelerator: 'Cmd+B' },
     wide: { ok: true, accelerator: 'Cmd+W' },
+    panic: { ok: true, accelerator: 'Cmd+Shift+Escape' },
   }),
 }))
 
@@ -155,8 +202,20 @@ beforeEach(async () => {
       { id: 'think-aloud', label: 'Think aloud', instruction: 'steps' },
     ],
   }
-  settingsState.status = { elevenlabsKeySet: false, groqKeySet: false, openaiKeySet: false, visionProvider: 'openai', visionModel: 'gpt-5.1' }
+  settingsState.status = {
+    elevenlabsKeySet: false,
+    groqKeySet: false,
+    openaiKeySet: false,
+    visionProvider: 'openai',
+    visionModel: 'gpt-5.1',
+    headlineFirst: true,
+    vault: { hasResume: false, hasJobDescription: false, hasCompanyValues: false, hasInterviewerNotes: false, storiesCount: 0 },
+  }
   settingsState.updates = []
+  settingsState.headlineFirst = true
+  settingsState.vault = emptyVault()
+  settingsState.vaultUpdates = []
+  triggerPanicSpy.mockClear()
   groqStreamSpy.mockClear()
   visionStreamSpy.mockClear()
   captureSpy.mockClear()
@@ -189,6 +248,7 @@ describe('IPC handler registration', () => {
       IPC.answerStylesGet, IPC.answerStylesSetActive,
       IPC.readinessCheck,
       IPC.windowSetMode, IPC.windowQuit,
+      IPC.vaultGet, IPC.vaultSet, IPC.panicRequest,
     ]
     for (const ch of expected) expect(ipcStub.registered.has(ch)).toBe(true)
     expect(ipcStub.events.has(IPC.audioChunk)).toBe(true)
@@ -398,5 +458,80 @@ describe('window IPC', () => {
   it('window:quit calls app.quit()', async () => {
     await ipcStub.invoke(IPC.windowQuit)
     expect(appQuitSpy).toHaveBeenCalled()
+  })
+})
+
+describe('vault IPC', () => {
+  it('vault:get returns the current vault', async () => {
+    settingsState.vault = { ...emptyVault(), resume: 'r' }
+    const v = await ipcStub.invoke(IPC.vaultGet) as { resume: string }
+    expect(v.resume).toBe('r')
+  })
+
+  it('vault:set persists, broadcasts, and returns {ok:true}', async () => {
+    const payload = { ...emptyVault(), resume: 'r2', stories: [{ id: 's1', title: 't', body: 'b' }] }
+    const r = await ipcStub.invoke(IPC.vaultSet, payload) as { ok: boolean }
+    expect(r).toEqual({ ok: true })
+    expect(settingsState.vaultUpdates[0]).toEqual(payload)
+    expect(win.webContents.send).toHaveBeenCalledWith(IPC.vaultChanged, settingsState.vault)
+  })
+})
+
+describe('panic IPC', () => {
+  it('panic:request delegates to triggerPanic with the window', async () => {
+    await ipcStub.invoke(IPC.panicRequest)
+    expect(triggerPanicSpy).toHaveBeenCalledWith(win)
+  })
+})
+
+describe('headline-first + vault prompt injection', () => {
+  it('llm:start composes the system prompt with vault contents + headline directive', async () => {
+    settingsState.groqKey = 'gr'
+    settingsState.vault = {
+      resume: 'My resume',
+      jobDescription: '',
+      companyValues: '',
+      interviewerNotes: '',
+      stories: [{ id: 's1', title: 'Stripe migration', body: 'Cut latency 40%' }],
+    }
+    settingsState.headlineFirst = true
+    await ipcStub.invoke(IPC.llmStart)
+    expect(groqStreamSpy).toHaveBeenCalled()
+    const systemPrompt = groqStreamSpy.mock.calls[0][1] as string
+    expect(systemPrompt).toContain('headline answer')
+    expect(systemPrompt).toContain('Personal context')
+    expect(systemPrompt).toContain('Stripe migration')
+    expect(systemPrompt).toContain('My resume')
+  })
+
+  it('llm:start omits the headline directive when headlineFirst is false', async () => {
+    settingsState.groqKey = 'gr'
+    settingsState.headlineFirst = false
+    await ipcStub.invoke(IPC.llmStart)
+    const systemPrompt = groqStreamSpy.mock.calls[0][1] as string
+    expect(systemPrompt).not.toContain('headline answer')
+  })
+
+  it('vision:start composes the system prompt with vault contents + headline directive', async () => {
+    settingsState.openaiKey = 'oa'
+    settingsState.vault = {
+      resume: '',
+      jobDescription: 'Staff role',
+      companyValues: '',
+      interviewerNotes: '',
+      stories: [],
+    }
+    settingsState.headlineFirst = true
+    await ipcStub.invoke(IPC.visionStart)
+    expect(visionStreamSpy).toHaveBeenCalled()
+    const systemPrompt = visionStreamSpy.mock.calls[0][2] as string
+    expect(systemPrompt).toContain('headline answer')
+    expect(systemPrompt).toContain('Staff role')
+  })
+
+  it('settings:set with headlineFirst:false flips the flag and persists', async () => {
+    await ipcStub.invoke(IPC.settingsSet, { headlineFirst: false })
+    expect(settingsState.updates[0]).toEqual({ headlineFirst: false })
+    expect(settingsState.headlineFirst).toBe(false)
   })
 })

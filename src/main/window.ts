@@ -84,6 +84,12 @@ export function toggleWindowVisibility(win: BrowserWindow): void {
   }
 }
 
+export function hideWindow(win: BrowserWindow): void {
+  if (win.isDestroyed() || !win.isVisible()) return
+  win.webContents.send(IPC.windowVisibilityChanged, { visible: false })
+  win.hide()
+}
+
 export function getMode(): WindowMode {
   return currentMode
 }

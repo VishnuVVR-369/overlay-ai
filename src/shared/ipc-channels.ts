@@ -38,6 +38,11 @@ export const IPC = {
   answerStylesGet: 'answer-styles:get',
   answerStylesSetActive: 'answer-styles:set-active',
   answerStylesChanged: 'answer-styles:changed',
+  vaultGet: 'vault:get',
+  vaultSet: 'vault:set',
+  vaultChanged: 'vault:changed',
+  panicRequest: 'panic:request',
+  panicTrigger: 'panic:trigger',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

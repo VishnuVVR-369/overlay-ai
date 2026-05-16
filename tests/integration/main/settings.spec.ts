@@ -46,12 +46,20 @@ describe('settings store', () => {
   it('starts with everything unset and default vision settings', async () => {
     const { settings } = await freshSettings()
     await settings.load()
-    expect(settings.status()).toEqual({
+    expect(settings.status()).toMatchObject({
       elevenlabsKeySet: false,
       groqKeySet: false,
       openaiKeySet: false,
       visionProvider: 'openai',
       visionModel: 'gpt-5.1',
+      headlineFirst: true,
+      vault: {
+        hasResume: false,
+        hasJobDescription: false,
+        hasCompanyValues: false,
+        hasInterviewerNotes: false,
+        storiesCount: 0,
+      },
     })
   })
 
@@ -61,7 +69,7 @@ describe('settings store', () => {
     await settings.update({ elevenlabsKey: 'el-key' })
     const raw = await fs.readFile(join(temp.path, 'settings.json'), 'utf-8')
     const parsed = JSON.parse(raw)
-    expect(parsed.version).toBe(4)
+    expect(parsed.version).toBe(5)
     expect(parsed.elevenlabsKeyEnc).toBeDefined()
     expect(raw).not.toContain('el-key')
   })
@@ -207,5 +215,137 @@ describe('settings store', () => {
 
     await settings.setPresetOverride('coding', '   ')
     expect(settings.getPresetState().presets.find((p) => p.id === 'coding')?.overridden).toBe(false)
+  })
+
+  it('headlineFirst defaults to true and persists across reloads', async () => {
+    {
+      const { settings } = await freshSettings()
+      await settings.load()
+      expect(settings.getHeadlineFirst()).toBe(true)
+      await settings.setHeadlineFirst(false)
+    }
+    {
+      const { settings } = await freshSettings()
+      await settings.load()
+      expect(settings.getHeadlineFirst()).toBe(false)
+      expect(settings.status().headlineFirst).toBe(false)
+    }
+  })
+
+  it('vault: round-trips full data and reports status', async () => {
+    const { settings } = await freshSettings()
+    await settings.load()
+    await settings.setVault({
+      resume: 'r',
+      jobDescription: 'j',
+      companyValues: 'c',
+      interviewerNotes: 'i',
+      stories: [
+        { id: 's1', title: 'Stripe migration', body: 'b1' },
+        { id: 's2', title: 'Mentoring', body: 'b2' },
+      ],
+    })
+    const v = settings.getVault()
+    expect(v).toEqual({
+      resume: 'r',
+      jobDescription: 'j',
+      companyValues: 'c',
+      interviewerNotes: 'i',
+      stories: [
+        { id: 's1', title: 'Stripe migration', body: 'b1' },
+        { id: 's2', title: 'Mentoring', body: 'b2' },
+      ],
+    })
+    expect(settings.getVaultStatus()).toEqual({
+      hasResume: true,
+      hasJobDescription: true,
+      hasCompanyValues: true,
+      hasInterviewerNotes: true,
+      storiesCount: 2,
+    })
+  })
+
+  it('vault: never writes plaintext resume into settings.json', async () => {
+    const { settings } = await freshSettings()
+    await settings.load()
+    await settings.setVault({
+      resume: 'SUPER-SECRET-RESUME-TEXT-XYZ',
+      jobDescription: '',
+      companyValues: '',
+      interviewerNotes: '',
+      stories: [{ id: 's1', title: 'private', body: 'CONFIDENTIAL-PROJECT' }],
+    })
+    const raw = await fs.readFile(join(temp.path, 'settings.json'), 'utf-8')
+    expect(raw).not.toContain('SUPER-SECRET-RESUME-TEXT-XYZ')
+    expect(raw).not.toContain('CONFIDENTIAL-PROJECT')
+    expect(raw).toMatch(/"vaultEnc":/)
+  })
+
+  it('vault: returns the empty vault when vaultEnc is malformed and does not throw', async () => {
+    await fs.mkdir(temp.path, { recursive: true })
+    await fs.writeFile(
+      join(temp.path, 'settings.json'),
+      JSON.stringify({ version: 5, vaultEnc: 'not-a-valid-base64-or-encrypted-blob' }),
+      'utf-8',
+    )
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { settings } = await freshSettings()
+    await settings.load()
+    const v = settings.getVault()
+    expect(v).toEqual({
+      resume: '',
+      jobDescription: '',
+      companyValues: '',
+      interviewerNotes: '',
+      stories: [],
+    })
+    warn.mockRestore()
+  })
+
+  it('vault: persists across a process restart with safeStorage available', async () => {
+    {
+      const { settings } = await freshSettings()
+      await settings.load()
+      await settings.setVault({
+        resume: 'r2',
+        jobDescription: 'j2',
+        companyValues: '',
+        interviewerNotes: '',
+        stories: [{ id: 's1', title: 't1', body: 'b1' }],
+      })
+    }
+    {
+      const { settings } = await freshSettings()
+      await settings.load()
+      const v = settings.getVault()
+      expect(v.resume).toBe('r2')
+      expect(v.stories).toHaveLength(1)
+      expect(v.stories[0]).toMatchObject({ title: 't1', body: 'b1' })
+    }
+  })
+
+  it('migration: a v4 file with no vault or headlineFirst loads and reports defaults', async () => {
+    await fs.mkdir(temp.path, { recursive: true })
+    await fs.writeFile(
+      join(temp.path, 'settings.json'),
+      JSON.stringify({ version: 4, elevenlabsKeyEnc: 'enc:abc' }),
+      'utf-8',
+    )
+    const { settings } = await freshSettings()
+    await settings.load()
+    expect(settings.getHeadlineFirst()).toBe(true)
+    expect(settings.getVault().stories).toHaveLength(0)
+    expect(settings.status().vault.storiesCount).toBe(0)
+  })
+
+  it('settings.update with only headlineFirst persists without clobbering keys', async () => {
+    const { settings } = await freshSettings()
+    await settings.load()
+    await settings.update({ elevenlabsKey: 'el', groqKey: 'gr', openaiKey: 'oa' })
+    await settings.update({ headlineFirst: false })
+    expect(settings.getElevenLabsKey()).toBe('el')
+    expect(settings.getGroqKey()).toBe('gr')
+    expect(settings.getOpenAIKey()).toBe('oa')
+    expect(settings.getHeadlineFirst()).toBe(false)
   })
 })

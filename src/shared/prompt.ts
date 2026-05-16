@@ -1,4 +1,4 @@
-import type { AnswerStyleDef, AnswerStyleId, PresetDef, PresetId } from './types'
+import type { AnswerStyleDef, AnswerStyleId, PresetDef, PresetId, VaultData, VaultStory } from './types'
 
 const SHARED_HEADER = `You are the user, in a live job interview. Below is the recent conversation transcript. Lines tagged "Them:" are the interviewer; lines tagged "You:" are things you have already said.
 
@@ -94,4 +94,61 @@ export function isAnswerStyleId(value: unknown): value is AnswerStyleId {
 export function composePromptForAnswerStyle(basePrompt: string, style: AnswerStyleId): string {
   const def = getAnswerStyleDef(style)
   return `${basePrompt}\n\nAnswer style: ${def.label}\n${def.instruction}`
+}
+
+export const HEADLINE_DIRECTIVE = `Format requirement: lead your response with a single bold one-sentence "headline answer" of at most 12 words, safe to speak aloud verbatim. Place the headline on its own first line, surrounded by ** markers. Then put any supporting bullets or sentences on the lines below. The very first line must be only the headline, nothing else.`
+
+const STORY_BODY_MAX = 600
+const FIELD_MAX = 4000
+
+interface ComposeOpts {
+  vault?: VaultData
+  headlineFirst?: boolean
+}
+
+export function composeSystemPrompt(
+  basePrompt: string,
+  style: AnswerStyleId,
+  opts: ComposeOpts = {},
+): string {
+  let out = composePromptForAnswerStyle(basePrompt, style)
+  if (opts.headlineFirst) out += `\n\n${HEADLINE_DIRECTIVE}`
+  if (opts.vault) {
+    const vaultSection = formatVault(opts.vault)
+    if (vaultSection) {
+      out += `\n\nPersonal context (use only what is relevant; never invent details beyond what is written here):\n${vaultSection}`
+    }
+  }
+  return out
+}
+
+export function formatVault(vault: VaultData): string {
+  const sections: string[] = []
+  const trim = (s: string, cap = FIELD_MAX): string => {
+    const t = (s ?? '').trim()
+    if (!t) return ''
+    return t.length > cap ? `${t.slice(0, cap)}…` : t
+  }
+  const resume = trim(vault.resume)
+  if (resume) sections.push(`Resume / background:\n${resume}`)
+  const jd = trim(vault.jobDescription)
+  if (jd) sections.push(`Role / job description:\n${jd}`)
+  const company = trim(vault.companyValues)
+  if (company) sections.push(`Company values:\n${company}`)
+  const interviewer = trim(vault.interviewerNotes)
+  if (interviewer) sections.push(`Interviewer notes:\n${interviewer}`)
+  const stories = (vault.stories ?? [])
+    .filter((s: VaultStory) => s && (s.title || s.body))
+    .map((s) => `- ${(s.title || 'Untitled').trim()}: ${trim(s.body, STORY_BODY_MAX)}`.trim())
+    .filter((line) => line.length > 2)
+  if (stories.length > 0) sections.push(`STAR stories (pick the most relevant; do not blend):\n${stories.join('\n')}`)
+  return sections.join('\n\n')
+}
+
+export const EMPTY_VAULT: VaultData = {
+  resume: '',
+  jobDescription: '',
+  companyValues: '',
+  interviewerNotes: '',
+  stories: [],
 }

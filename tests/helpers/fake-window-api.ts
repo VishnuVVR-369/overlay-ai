@@ -20,6 +20,7 @@ import type {
   TranscriptionStatus,
   TranscriptSnapshot,
   TranscriptUpdate,
+  VaultData,
   WindowFocusState,
   WindowMode,
   WindowModeChangedEvent,
@@ -44,6 +45,8 @@ export interface FakeApi extends OverlayApi {
     modeChanged: (e: WindowModeChangedEvent) => void
     visibilityChanged: (e: WindowVisibilityChangedEvent) => void
     answerStylesChanged: (e: AnswerStyleState) => void
+    vaultChanged: (v: VaultData) => void
+    panic: () => void
   }
   __state: {
     settings: SettingsStatus
@@ -61,6 +64,9 @@ export interface FakeApi extends OverlayApi {
     activeAnswerStyles: AnswerStyleId[]
     visionStartResponse: LlmStartResponse
     llmStartResponse: LlmStartResponse
+    vault: VaultData
+    vaultUpdates: VaultData[]
+    panicRequests: number
   }
 }
 
@@ -80,6 +86,8 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
     modeChanged: new Set<Listener<WindowModeChangedEvent>>(),
     visibilityChanged: new Set<Listener<WindowVisibilityChangedEvent>>(),
     answerStylesChanged: new Set<Listener<AnswerStyleState>>(),
+    vaultChanged: new Set<Listener<VaultData>>(),
+    panic: new Set<() => void>(),
   }
 
   const state: FakeApi['__state'] = {
@@ -89,6 +97,14 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
       openaiKeySet: false,
       visionProvider: 'openai',
       visionModel: 'gpt-5.1',
+      headlineFirst: true,
+      vault: {
+        hasResume: false,
+        hasJobDescription: false,
+        hasCompanyValues: false,
+        hasInterviewerNotes: false,
+        storiesCount: 0,
+      },
     },
     perms: { mic: 'granted', screen: 'granted' },
     presets: {
@@ -126,6 +142,15 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
     activeAnswerStyles: [],
     visionStartResponse: { requestId: 'vis-1', mode: 'screen' },
     llmStartResponse: { requestId: 'llm-1', mode: 'transcript' },
+    vault: {
+      resume: '',
+      jobDescription: '',
+      companyValues: '',
+      interviewerNotes: '',
+      stories: [],
+    },
+    vaultUpdates: [],
+    panicRequests: 0,
     ...overrides,
   }
 
@@ -151,8 +176,31 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
         if (u.groqKey !== undefined) state.settings.groqKeySet = !!u.groqKey
         if (u.openaiKey !== undefined) state.settings.openaiKeySet = !!u.openaiKey
         if (u.visionModel !== undefined && u.visionModel.trim()) state.settings.visionModel = u.visionModel.trim()
+        if (u.headlineFirst !== undefined) state.settings.headlineFirst = !!u.headlineFirst
         return { ok: true }
       }),
+    },
+    vault: {
+      get: vi.fn(async () => state.vault),
+      set: vi.fn(async (v: VaultData) => {
+        state.vaultUpdates.push(v)
+        state.vault = v
+        state.settings.vault = {
+          hasResume: v.resume.trim().length > 0,
+          hasJobDescription: v.jobDescription.trim().length > 0,
+          hasCompanyValues: v.companyValues.trim().length > 0,
+          hasInterviewerNotes: v.interviewerNotes.trim().length > 0,
+          storiesCount: v.stories.length,
+        }
+        return { ok: true }
+      }),
+      onChanged: (h) => subscribe<VaultData>(listeners.vaultChanged, h),
+    },
+    panic: {
+      request: vi.fn(async () => {
+        state.panicRequests += 1
+      }),
+      onTrigger: (h) => subscribeNoArg(listeners.panic, h),
     },
     readiness: {
       check: vi.fn(async () => state.readiness),
@@ -237,6 +285,8 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
       modeChanged: (e) => listeners.modeChanged.forEach((l) => l(e)),
       visibilityChanged: (e) => listeners.visibilityChanged.forEach((l) => l(e)),
       answerStylesChanged: (e) => listeners.answerStylesChanged.forEach((l) => l(e)),
+      vaultChanged: (v) => listeners.vaultChanged.forEach((l) => l(v)),
+      panic: () => listeners.panic.forEach((l) => l()),
     },
     __state: state,
   }

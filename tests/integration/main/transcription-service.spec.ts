@@ -164,6 +164,25 @@ describe('TranscriptionService', () => {
     svc.stop()
   })
 
+  it('stop() and clear() before start() are no-ops (panic-during-idle is safe)', async () => {
+    const { TranscriptionService } = await loadService()
+    const svc = new TranscriptionService()
+    expect(() => svc.stop()).not.toThrow()
+    expect(() => svc.clear()).not.toThrow()
+    expect(svc.status().running).toBe(false)
+    expect(svc.snapshot().segments).toHaveLength(0)
+  })
+
+  it('stop() called twice in a row is safe', async () => {
+    const { TranscriptionService } = await loadService()
+    const svc = new TranscriptionService()
+    svc.start('k')
+    await waitFor(() => svc.status().micState === 'open')
+    svc.stop()
+    expect(() => svc.stop()).not.toThrow()
+    expect(svc.status().running).toBe(false)
+  })
+
   it('flattenForPrompt produces the canonical "You: ... / Them: ..." string after committed messages', async () => {
     const { TranscriptionService } = await loadService()
     const svc = new TranscriptionService()

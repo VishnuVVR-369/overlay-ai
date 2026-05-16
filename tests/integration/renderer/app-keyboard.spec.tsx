@@ -8,6 +8,7 @@ import { useLlmStore } from '@/state/llm-store'
 import { useTranscriptStore } from '@/state/transcript-store'
 import { usePresetStore } from '@/state/preset-store'
 import { useAnswerStyleStore } from '@/state/answer-style-store'
+import { useVaultStore, emptyVault } from '@/state/vault-store'
 import { installFakeApi, createFakeApi, type FakeApi } from '../../helpers/fake-window-api'
 
 vi.mock('@/audio/capture-controller', () => ({
@@ -32,7 +33,8 @@ vi.mock('@/markdown/StreamingBody', () => ({
 let api: FakeApi
 
 beforeEach(() => {
-  useUiStore.setState({ mode: 'normal', helpOpen: false, settingsOpen: false, focused: true, permStatus: { mic: 'granted', screen: 'granted' }, expandedEntries: {} })
+  useUiStore.setState({ mode: 'normal', helpOpen: false, settingsOpen: false, focused: true, permStatus: { mic: 'granted', screen: 'granted' }, expandedEntries: {}, headlineFirst: true })
+  useVaultStore.setState({ data: emptyVault(), hydrated: false })
   useStatusStore.setState({ running: false, micState: 'idle', systemState: 'idle' })
   useLlmStore.setState({ entries: [] })
   useTranscriptStore.setState({ segments: [], partials: {} })
@@ -53,7 +55,15 @@ beforeEach(() => {
     hydrated: true,
   })
   api = installFakeApi(createFakeApi({
-    settings: { elevenlabsKeySet: true, groqKeySet: true, openaiKeySet: true, visionProvider: 'openai', visionModel: 'gpt-5.1' },
+    settings: {
+      elevenlabsKeySet: true,
+      groqKeySet: true,
+      openaiKeySet: true,
+      visionProvider: 'openai',
+      visionModel: 'gpt-5.1',
+      headlineFirst: true,
+      vault: { hasResume: false, hasJobDescription: false, hasCompanyValues: false, hasInterviewerNotes: false, storiesCount: 0 },
+    },
   }))
 })
 
@@ -262,5 +272,51 @@ describe('App keyboard shortcuts', () => {
     fireEvent.mouseDown(window)
     expect(api.window.notifyUserActive).toHaveBeenCalledTimes(2)
     nowSpy.mockRestore()
+  })
+
+  it('Cmd+Shift+Escape calls window.api.panic.request', async () => {
+    await bootApp()
+    press('Escape', { metaKey: true, shiftKey: true })
+    await waitFor(() => expect(api.panic.request).toHaveBeenCalledTimes(1))
+  })
+
+  it('Ctrl+Shift+Escape (Windows) also calls window.api.panic.request', async () => {
+    await bootApp()
+    press('Escape', { ctrlKey: true, shiftKey: true })
+    await waitFor(() => expect(api.panic.request).toHaveBeenCalledTimes(1))
+  })
+
+  it('panic shortcut fires even while focus is inside an editable target', async () => {
+    await bootApp()
+    const input = document.createElement('textarea')
+    document.body.appendChild(input)
+    input.focus()
+    fireEvent.keyDown(input, { key: 'Escape', metaKey: true, shiftKey: true })
+    await waitFor(() => expect(api.panic.request).toHaveBeenCalledTimes(1))
+  })
+
+  it('panic:trigger event from main resets renderer state (transcript, llm, modals)', async () => {
+    await bootApp()
+    useTranscriptStore.setState({
+      segments: [{ id: 'a', speaker: 'them', status: 'committed', text: 'q', startedAt: 1 }],
+      partials: {},
+    })
+    useLlmStore.setState({ entries: [{ requestId: 'r', mode: 'transcript', text: 't', chunks: ['t'], status: 'done', startedAt: 1 }] })
+    useUiStore.setState({ helpOpen: true, settingsOpen: true })
+    useStatusStore.setState({ running: true })
+
+    act(() => api.__emit.panic())
+
+    expect(useTranscriptStore.getState().segments).toHaveLength(0)
+    expect(useLlmStore.getState().entries).toHaveLength(0)
+    expect(useUiStore.getState().helpOpen).toBe(false)
+    expect(useUiStore.getState().settingsOpen).toBe(false)
+    expect(useStatusStore.getState().running).toBe(false)
+  })
+
+  it('panic:trigger handler is idempotent (firing twice does not throw)', async () => {
+    await bootApp()
+    act(() => api.__emit.panic())
+    expect(() => act(() => api.__emit.panic())).not.toThrow()
   })
 })

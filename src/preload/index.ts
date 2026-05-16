@@ -21,6 +21,7 @@ import type {
   TranscriptionStatus,
   TranscriptSnapshot,
   TranscriptUpdate,
+  VaultData,
   WindowFocusState,
   WindowMode,
   WindowModeChangedEvent,
@@ -37,6 +38,19 @@ const api: OverlayApi = {
   settings: {
     get: () => ipcRenderer.invoke(IPC.settingsGet) as Promise<SettingsStatus>,
     set: (update: SettingsUpdate) => ipcRenderer.invoke(IPC.settingsSet, update) as Promise<{ ok: boolean }>,
+  },
+  vault: {
+    get: () => ipcRenderer.invoke(IPC.vaultGet) as Promise<VaultData>,
+    set: (value: VaultData) => ipcRenderer.invoke(IPC.vaultSet, value) as Promise<{ ok: boolean }>,
+    onChanged: (h) => subscribe<VaultData>(IPC.vaultChanged, h),
+  },
+  panic: {
+    request: () => ipcRenderer.invoke(IPC.panicRequest) as Promise<void>,
+    onTrigger: (h) => {
+      const listener = (): void => h()
+      ipcRenderer.on(IPC.panicTrigger, listener)
+      return () => ipcRenderer.removeListener(IPC.panicTrigger, listener)
+    },
   },
   readiness: {
     check: () => ipcRenderer.invoke(IPC.readinessCheck) as Promise<ReadinessStatus>,
