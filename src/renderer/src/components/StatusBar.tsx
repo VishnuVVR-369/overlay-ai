@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Eraser, HelpCircle, Settings, Minus, Power } from 'lucide-react'
-import type { PresetId, SocketState } from '@shared/types'
+import type { AnswerStyleId, PresetId, SocketState } from '@shared/types'
 import { useStatusStore } from '../state/status-store'
 import { usePresetStore } from '../state/preset-store'
+import { useAnswerStyleStore } from '../state/answer-style-store'
 
 interface Props {
   onToggleSettings: () => void
@@ -29,6 +30,7 @@ export function StatusBar(props: Props): JSX.Element {
         <SocketDot state={micState} title={`You · ${micState}`} />
         <SocketDot state={systemState} title={`Them · ${systemState}`} />
         <PresetChip />
+        <AnswerStyleChip />
       </div>
       <div className="status-bar-controls">
         <button
@@ -80,6 +82,34 @@ export function StatusBar(props: Props): JSX.Element {
         </button>
       </div>
     </div>
+  )
+}
+
+function AnswerStyleChip(): JSX.Element | null {
+  const active = useAnswerStyleStore((s) => s.active)
+  const styles = useAnswerStyleStore((s) => s.styles)
+  const hydrated = useAnswerStyleStore((s) => s.hydrated)
+
+  if (!hydrated || styles.length === 0) return null
+
+  const onChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
+    void window.api.answerStyles.setActive(e.target.value as AnswerStyleId)
+  }
+
+  return (
+    <select
+      className="preset-select"
+      value={active}
+      onChange={onChange}
+      title="Answer style"
+      aria-label="Answer style"
+    >
+      {styles.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.label}
+        </option>
+      ))}
+    </select>
   )
 }
 

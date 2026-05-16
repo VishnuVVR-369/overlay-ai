@@ -2,15 +2,18 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { IPC } from '@shared/ipc-channels'
 import type {
+  AnswerStyleId,
   AudioChunkMessage,
   LlmStartResponse,
   PresetId,
   PresetOverrideUpdate,
+  ReadinessCheck,
+  ReadinessStatus,
   SettingsUpdate,
   ToastEvent,
   WindowMode,
 } from '@shared/types'
-import { isPresetId } from '@shared/prompt'
+import { composePromptForAnswerStyle, isAnswerStyleId, isPresetId } from '@shared/prompt'
 import { settings } from './settings'
 import { getPermissionStatus, openScreenRecordingPrefs, requestMicAccess } from './permissions'
 import { transcription } from './transcription/transcription-service'
@@ -18,6 +21,7 @@ import { groq } from './llm/groq-client'
 import { openaiVision } from './llm/openai-vision-client'
 import { captureActiveDisplay } from './vision/screen-capture'
 import { setMode } from './window'
+import { getShortcutRegistration } from './shortcuts'
 
 export function registerIpc(win: BrowserWindow): void {
   ipcMain.handle(IPC.settingsGet, () => settings.status())
@@ -26,6 +30,8 @@ export function registerIpc(win: BrowserWindow): void {
     await settings.update(update)
     return { ok: true }
   })
+
+  ipcMain.handle(IPC.readinessCheck, (): ReadinessStatus => buildReadinessStatus())
 
   ipcMain.handle(IPC.permStatus, () => getPermissionStatus())
   ipcMain.handle(IPC.permRequestMic, () => requestMicAccess())
@@ -64,7 +70,8 @@ export function registerIpc(win: BrowserWindow): void {
       return { requestId, mode: 'transcript' }
     }
     const activeId = settings.getActivePresetId()
-    const systemPrompt = settings.getEffectivePrompt(activeId)
+    const styleId = settings.getActiveAnswerStyleId()
+    const systemPrompt = composePromptForAnswerStyle(settings.getEffectivePrompt(activeId), styleId)
     const transcript = transcription.flattenForPrompt()
     const requestId = randomUUID()
     void groq.streamAnswer(key, systemPrompt, transcript, {
@@ -106,7 +113,8 @@ export function registerIpc(win: BrowserWindow): void {
     }
 
     const activeId = settings.getActivePresetId()
-    const systemPrompt = settings.getEffectivePrompt(activeId)
+    const styleId = settings.getActiveAnswerStyleId()
+    const systemPrompt = composePromptForAnswerStyle(settings.getEffectivePrompt(activeId), styleId)
     const transcript = transcription.flattenForPrompt()
     const model = settings.getVisionModel()
     void openaiVision.streamScreenAnswer(key, model, systemPrompt, transcript, imageDataUrl, {
@@ -136,6 +144,15 @@ export function registerIpc(win: BrowserWindow): void {
     return { ok: true }
   })
 
+  ipcMain.handle(IPC.answerStylesGet, () => settings.getAnswerStyleState())
+
+  ipcMain.handle(IPC.answerStylesSetActive, async (_evt, id: AnswerStyleId) => {
+    if (!isAnswerStyleId(id)) return { ok: false }
+    await settings.setActiveAnswerStyleId(id)
+    if (!win.isDestroyed()) win.webContents.send(IPC.answerStylesChanged, settings.getAnswerStyleState())
+    return { ok: true }
+  })
+
   ipcMain.handle(IPC.windowSetMode, (_evt, mode: WindowMode) => setMode(win, mode))
   ipcMain.on(IPC.windowUserActive, () => {
     if (!win.isDestroyed()) win.webContents.send(IPC.windowFocusState, { focused: true })
@@ -148,6 +165,76 @@ export function registerIpc(win: BrowserWindow): void {
   transcription.on('socketStatus', (event) => {
     if (!win.isDestroyed()) win.webContents.send(IPC.socketStatus, event)
   })
+}
+
+function buildReadinessStatus(): ReadinessStatus {
+  const status = settings.status()
+  const perms = getPermissionStatus()
+  const tx = transcription.status()
+  const shortcuts = getShortcutRegistration()
+  const checks: ReadinessCheck[] = [
+    {
+      id: 'elevenlabs-key',
+      label: 'ElevenLabs key',
+      level: status.elevenlabsKeySet ? 'pass' : 'fail',
+      detail: status.elevenlabsKeySet ? 'Saved for realtime transcription.' : 'Missing. Add it before starting transcription.',
+    },
+    {
+      id: 'groq-key',
+      label: 'Groq key',
+      level: status.groqKeySet ? 'pass' : 'fail',
+      detail: status.groqKeySet ? 'Saved for transcript answers.' : 'Missing. Transcript answers cannot run.',
+    },
+    {
+      id: 'openai-key',
+      label: 'OpenAI key',
+      level: status.openaiKeySet ? 'pass' : 'warn',
+      detail: status.openaiKeySet ? 'Saved for screen ask.' : 'Missing. Screen ask will be unavailable.',
+    },
+    {
+      id: 'mic-permission',
+      label: 'Microphone permission',
+      level: perms.mic === 'granted' ? 'pass' : 'fail',
+      detail: perms.mic === 'granted' ? 'Granted.' : `Current state: ${perms.mic}. Request access before the call.`,
+    },
+    {
+      id: 'screen-permission',
+      label: 'Screen Recording permission',
+      level: perms.screen === 'granted' ? 'pass' : 'warn',
+      detail: perms.screen === 'granted' ? 'Granted for system audio and screen ask.' : `Current state: ${perms.screen}. System audio and screen ask may fail.`,
+    },
+    {
+      id: 'transcription-status',
+      label: 'Transcription sockets',
+      level: tx.running && tx.micState === 'open' && tx.systemState === 'open' ? 'pass' : tx.running ? 'warn' : 'warn',
+      detail: tx.running
+        ? `Mic: ${tx.micState}; system: ${tx.systemState}.`
+        : 'Not currently listening. Start once before the interview if you want a live socket check.',
+    },
+    {
+      id: 'global-shortcuts',
+      label: 'Global shortcuts',
+      level: shortcutLevel(shortcuts),
+      detail: shortcutDetail(shortcuts),
+    },
+  ]
+
+  return { checkedAt: Date.now(), checks }
+}
+
+function shortcutLevel(registration: ReturnType<typeof getShortcutRegistration>): ReadinessCheck['level'] {
+  if (!registration) return 'warn'
+  return Object.values(registration).every((item) => item.ok) ? 'pass' : 'fail'
+}
+
+function shortcutDetail(registration: ReturnType<typeof getShortcutRegistration>): string {
+  if (!registration) return 'Shortcut registration has not run yet.'
+  const failed = Object.values(registration).filter((item) => !item.ok)
+  if (failed.length === 0) {
+    const labels = Object.values(registration).map((item) => item.accelerator).join(', ')
+    return `Registered: ${labels}.`
+  }
+  return `Failed: ${failed.map((item) => item.accelerator).join(', ')}. Change conflicting app shortcuts.`
 }
 
 export function sendToast(win: BrowserWindow, toast: ToastEvent): void {

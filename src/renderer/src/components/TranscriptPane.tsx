@@ -40,14 +40,6 @@ export function TranscriptPane(): JSX.Element {
     stickyRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
   }
 
-  if (!hero && rest.length === 0) {
-    return (
-      <div className="transcript-pane">
-        <div className="transcript-empty">No speech yet — press <kbd>Space</kbd> to start</div>
-      </div>
-    )
-  }
-
   return (
     <div ref={scrollRef} onScroll={handleScroll} className="transcript-pane">
       {hero && (

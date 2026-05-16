@@ -14,6 +14,7 @@ import { useLlmStore } from './state/llm-store'
 import { useStatusStore } from './state/status-store'
 import { useUiStore } from './state/ui-store'
 import { usePresetStore } from './state/preset-store'
+import { useAnswerStyleStore } from './state/answer-style-store'
 
 export function App(): JSX.Element {
   const [bootChecked, setBootChecked] = useState(false)
@@ -37,6 +38,7 @@ export function App(): JSX.Element {
   const setFocused = useUiStore((s) => s.setFocused)
   const setPermStatus = useUiStore((s) => s.setPermStatus)
   const setPresetState = usePresetStore((s) => s.setState)
+  const setAnswerStyleState = useAnswerStyleStore((s) => s.setState)
   const heroStreaming = useLlmStore((s) => s.entries[0]?.status === 'streaming')
   const isCompact = mode === 'compact'
 
@@ -205,9 +207,10 @@ export function App(): JSX.Element {
       setBootChecked(true)
     })
     void window.api.presets.get().then(setPresetState)
+    void window.api.answerStyles.get().then(setAnswerStyleState)
     void recheckPerms()
     setMounted(true)
-  }, [openSettings, recheckPerms, setPresetState])
+  }, [openSettings, recheckPerms, setAnswerStyleState, setPresetState])
 
   // Periodic perm re-check (in case user grants in System Settings)
   useEffect(() => {
@@ -232,6 +235,7 @@ export function App(): JSX.Element {
       window.api.llm.onDone((evt) => finishEntry(evt.requestId, evt.full)),
       window.api.llm.onError((evt) => errorEntry(evt.requestId, evt.message)),
       window.api.presets.onChanged(setPresetState),
+      window.api.answerStyles.onChanged(setAnswerStyleState),
       window.api.ui.onOpenSettings(openSettings),
       window.api.window.onFocusState((evt) => setFocused(evt.focused)),
       window.api.window.onModeChanged((evt) => {
@@ -249,6 +253,7 @@ export function App(): JSX.Element {
     errorEntry,
     finishEntry,
     setFocused,
+    setAnswerStyleState,
     setMode,
     setPresetState,
     setSocket,

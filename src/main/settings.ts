@@ -2,26 +2,37 @@ import { app, safeStorage } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import type {
+  AnswerStyleId,
+  AnswerStyleState,
   PresetId,
   PresetState,
   SettingsStatus,
   SettingsUpdate,
   VisionProvider,
 } from '@shared/types'
-import { DEFAULT_PRESET_ID, PRESETS, getPresetDef, isPresetId } from '@shared/prompt'
+import {
+  ANSWER_STYLES,
+  DEFAULT_ANSWER_STYLE_ID,
+  DEFAULT_PRESET_ID,
+  PRESETS,
+  getPresetDef,
+  isAnswerStyleId,
+  isPresetId,
+} from '@shared/prompt'
 
 interface SettingsFile {
-  version: 3
+  version: 4
   elevenlabsKeyEnc?: string
   groqKeyEnc?: string
   openaiKeyEnc?: string
   activePresetId?: PresetId
+  activeAnswerStyleId?: AnswerStyleId
   presetOverrides?: Partial<Record<PresetId, string>>
   visionProvider?: VisionProvider
   visionModel?: string
 }
 
-const FILE_VERSION = 3
+const FILE_VERSION = 4
 export const DEFAULT_VISION_PROVIDER: VisionProvider = 'openai'
 export const DEFAULT_VISION_MODEL = 'gpt-5.1'
 
@@ -44,17 +55,19 @@ class SettingsStore {
         groqKeyEnc?: string
         openaiKeyEnc?: string
         activePresetId?: unknown
+        activeAnswerStyleId?: unknown
         presetOverrides?: unknown
         visionProvider?: unknown
         visionModel?: unknown
       }
-      if (parsed && typeof parsed === 'object' && [1, 2, 3].includes(parsed.version ?? 0)) {
+      if (parsed && typeof parsed === 'object' && [1, 2, 3, 4].includes(parsed.version ?? 0)) {
         this.cache = {
           version: FILE_VERSION,
           elevenlabsKeyEnc: parsed.elevenlabsKeyEnc,
           groqKeyEnc: parsed.groqKeyEnc,
           openaiKeyEnc: parsed.openaiKeyEnc,
           activePresetId: isPresetId(parsed.activePresetId) ? parsed.activePresetId : undefined,
+          activeAnswerStyleId: isAnswerStyleId(parsed.activeAnswerStyleId) ? parsed.activeAnswerStyleId : undefined,
           presetOverrides: this.sanitizeOverrides(parsed.presetOverrides),
           visionProvider: this.sanitizeVisionProvider(parsed.visionProvider),
           visionModel: this.sanitizeVisionModel(parsed.visionModel),
@@ -119,8 +132,17 @@ class SettingsStore {
     return this.cache.activePresetId ?? DEFAULT_PRESET_ID
   }
 
+  getActiveAnswerStyleId(): AnswerStyleId {
+    return this.cache.activeAnswerStyleId ?? DEFAULT_ANSWER_STYLE_ID
+  }
+
   async setActivePresetId(id: PresetId): Promise<void> {
     this.cache.activePresetId = id
+    await this.persist()
+  }
+
+  async setActiveAnswerStyleId(id: AnswerStyleId): Promise<void> {
+    this.cache.activeAnswerStyleId = id
     await this.persist()
   }
 
@@ -154,6 +176,13 @@ class SettingsStore {
           overridden,
         }
       }),
+    }
+  }
+
+  getAnswerStyleState(): AnswerStyleState {
+    return {
+      active: this.getActiveAnswerStyleId(),
+      styles: ANSWER_STYLES,
     }
   }
 

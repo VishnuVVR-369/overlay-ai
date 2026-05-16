@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { IPC } from '@shared/ipc-channels'
 import type {
+  AnswerStyleId,
+  AnswerStyleState,
   AudioChunkMessage,
   LlmDoneEvent,
   LlmErrorEvent,
@@ -11,6 +13,7 @@ import type {
   PresetId,
   PresetOverrideUpdate,
   PresetState,
+  ReadinessStatus,
   SettingsStatus,
   SettingsUpdate,
   SocketStatusEvent,
@@ -34,6 +37,9 @@ const api: OverlayApi = {
   settings: {
     get: () => ipcRenderer.invoke(IPC.settingsGet) as Promise<SettingsStatus>,
     set: (update: SettingsUpdate) => ipcRenderer.invoke(IPC.settingsSet, update) as Promise<{ ok: boolean }>,
+  },
+  readiness: {
+    check: () => ipcRenderer.invoke(IPC.readinessCheck) as Promise<ReadinessStatus>,
   },
   permissions: {
     status: () => ipcRenderer.invoke(IPC.permStatus) as Promise<PermissionStatus>,
@@ -85,6 +91,11 @@ const api: OverlayApi = {
     setOverride: (update: PresetOverrideUpdate) =>
       ipcRenderer.invoke(IPC.presetsSetOverride, update) as Promise<void>,
     onChanged: (h) => subscribe<PresetState>(IPC.presetsChanged, h),
+  },
+  answerStyles: {
+    get: () => ipcRenderer.invoke(IPC.answerStylesGet) as Promise<AnswerStyleState>,
+    setActive: (id: AnswerStyleId) => ipcRenderer.invoke(IPC.answerStylesSetActive, id) as Promise<void>,
+    onChanged: (h) => subscribe<AnswerStyleState>(IPC.answerStylesChanged, h),
   },
   loopback: {
     enable: () => ipcRenderer.invoke('enable-loopback-audio') as Promise<void>,

@@ -2,6 +2,7 @@ export const IPC = {
   settingsGet: 'settings:get',
   settingsSet: 'settings:set',
   settingsOpen: 'settings:open',
+  readinessCheck: 'readiness:check',
   permStatus: 'perm:status',
   permRequestMic: 'perm:request-mic',
   permOpenScreenPrefs: 'perm:open-screen-prefs',
@@ -34,6 +35,9 @@ export const IPC = {
   presetsSetActive: 'presets:set-active',
   presetsSetOverride: 'presets:set-override',
   presetsChanged: 'presets:changed',
+  answerStylesGet: 'answer-styles:get',
+  answerStylesSetActive: 'answer-styles:set-active',
+  answerStylesChanged: 'answer-styles:changed',
 } as const
 
 export type IpcChannel = (typeof IPC)[keyof typeof IPC]

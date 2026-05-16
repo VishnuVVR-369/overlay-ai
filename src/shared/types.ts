@@ -26,6 +26,20 @@ export interface TranscriptSnapshot {
   partials: { you?: TranscriptSegment; them?: TranscriptSegment }
 }
 
+export type ReadinessLevel = 'pass' | 'warn' | 'fail'
+
+export interface ReadinessCheck {
+  id: string
+  label: string
+  level: ReadinessLevel
+  detail: string
+}
+
+export interface ReadinessStatus {
+  checkedAt: number
+  checks: ReadinessCheck[]
+}
+
 export interface SettingsStatus {
   elevenlabsKeySet: boolean
   groqKeySet: boolean
@@ -45,11 +59,18 @@ export interface SettingsUpdate {
 export type VisionProvider = 'openai'
 
 export type PresetId = 'behavioral' | 'coding' | 'system-design' | 'negotiation'
+export type AnswerStyleId = 'concise' | 'think-aloud' | 'clarify' | 'edge-cases' | 'complexity'
 
 export interface PresetDef {
   id: PresetId
   label: string
   defaultPrompt: string
+}
+
+export interface AnswerStyleDef {
+  id: AnswerStyleId
+  label: string
+  instruction: string
 }
 
 export interface PresetEntry {
@@ -63,6 +84,11 @@ export interface PresetEntry {
 export interface PresetState {
   active: PresetId
   presets: PresetEntry[]
+}
+
+export interface AnswerStyleState {
+  active: AnswerStyleId
+  styles: AnswerStyleDef[]
 }
 
 export interface PresetOverrideUpdate {
@@ -143,6 +169,9 @@ export interface OverlayApi {
     get(): Promise<SettingsStatus>
     set(update: SettingsUpdate): Promise<{ ok: boolean }>
   }
+  readiness: {
+    check(): Promise<ReadinessStatus>
+  }
   permissions: {
     status(): Promise<PermissionStatus>
     requestMic(): Promise<boolean>
@@ -176,6 +205,11 @@ export interface OverlayApi {
     setActive(id: PresetId): Promise<void>
     setOverride(update: PresetOverrideUpdate): Promise<void>
     onChanged(handler: (state: PresetState) => void): () => void
+  }
+  answerStyles: {
+    get(): Promise<AnswerStyleState>
+    setActive(id: AnswerStyleId): Promise<void>
+    onChanged(handler: (state: AnswerStyleState) => void): () => void
   }
   ui: {
     onToast(handler: (event: ToastEvent) => void): () => void

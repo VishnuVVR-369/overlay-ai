@@ -1,4 +1,4 @@
-import type { PresetDef, PresetId } from './types'
+import type { AnswerStyleDef, AnswerStyleId, PresetDef, PresetId } from './types'
 
 const SHARED_HEADER = `You are the user, in a live job interview. Below is the recent conversation transcript. Lines tagged "Them:" are the interviewer; lines tagged "You:" are things you have already said.
 
@@ -41,9 +41,39 @@ export const PRESETS: PresetDef[] = [
   { id: 'negotiation', label: 'Negotiation', defaultPrompt: NEGOTIATION_PROMPT },
 ]
 
+export const ANSWER_STYLES: AnswerStyleDef[] = [
+  {
+    id: 'concise',
+    label: 'Concise',
+    instruction: 'Answer in the shortest natural form that is still useful in a live interview. Prefer 2-4 speakable sentences.',
+  },
+  {
+    id: 'think-aloud',
+    label: 'Think aloud',
+    instruction: 'Format the response as a calm think-aloud path: what I notice, what I would try, why it works, and the next step.',
+  },
+  {
+    id: 'clarify',
+    label: 'Clarify',
+    instruction: 'Do not jump straight to the final answer. Give one focused clarifying question or assumption, then a short direction if they ask you to proceed.',
+  },
+  {
+    id: 'edge-cases',
+    label: 'Edge cases',
+    instruction: 'Prioritize edge cases, pitfalls, and test scenarios. Keep the answer speakable and avoid long code unless explicitly requested.',
+  },
+  {
+    id: 'complexity',
+    label: 'Complexity',
+    instruction: 'Prioritize time/space complexity, scaling trade-offs, bottlenecks, and why the chosen approach is better than the obvious alternative.',
+  },
+]
+
 export const DEFAULT_PRESET_ID: PresetId = 'behavioral'
+export const DEFAULT_ANSWER_STYLE_ID: AnswerStyleId = 'concise'
 
 export const PRESET_IDS: PresetId[] = PRESETS.map((p) => p.id)
+export const ANSWER_STYLE_IDS: AnswerStyleId[] = ANSWER_STYLES.map((s) => s.id)
 
 export function getPresetDef(id: PresetId): PresetDef {
   return PRESETS.find((p) => p.id === id) ?? PRESETS[0]
@@ -51,4 +81,17 @@ export function getPresetDef(id: PresetId): PresetDef {
 
 export function isPresetId(value: unknown): value is PresetId {
   return typeof value === 'string' && PRESET_IDS.includes(value as PresetId)
+}
+
+export function getAnswerStyleDef(id: AnswerStyleId): AnswerStyleDef {
+  return ANSWER_STYLES.find((s) => s.id === id) ?? ANSWER_STYLES[0]
+}
+
+export function isAnswerStyleId(value: unknown): value is AnswerStyleId {
+  return typeof value === 'string' && ANSWER_STYLE_IDS.includes(value as AnswerStyleId)
+}
+
+export function composePromptForAnswerStyle(basePrompt: string, style: AnswerStyleId): string {
+  const def = getAnswerStyleDef(style)
+  return `${basePrompt}\n\nAnswer style: ${def.label}\n${def.instruction}`
 }

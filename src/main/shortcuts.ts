@@ -14,6 +14,8 @@ export interface ShortcutRegistration {
   wide: { ok: boolean; accelerator: string }
 }
 
+let lastRegistration: ShortcutRegistration | null = null
+
 export function registerShortcuts(win: BrowserWindow): ShortcutRegistration {
   const askOk = globalShortcut.register(ASK_ACCEL, () => {
     if (!win.isDestroyed()) {
@@ -30,10 +32,15 @@ export function registerShortcuts(win: BrowserWindow): ShortcutRegistration {
 
   app.on('will-quit', () => globalShortcut.unregisterAll())
 
-  return {
+  lastRegistration = {
     ask: { ok: askOk, accelerator: ASK_ACCEL },
     screenAsk: { ok: screenAskOk, accelerator: SCREEN_ASK_ACCEL },
     toggle: { ok: toggleOk, accelerator: TOGGLE_ACCEL },
     wide: { ok: wideOk, accelerator: WIDE_ACCEL },
   }
+  return lastRegistration
+}
+
+export function getShortcutRegistration(): ShortcutRegistration | null {
+  return lastRegistration
 }
