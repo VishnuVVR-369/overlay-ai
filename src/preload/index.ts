@@ -8,6 +8,12 @@ import type {
   LlmErrorEvent,
   LlmStartResponse,
   LlmTokenEvent,
+  MockAudioChunkMessage,
+  MockAudioDeltaEvent,
+  MockFeedbackEvent,
+  MockInterviewConfig,
+  MockInterviewStatus,
+  MockStatusEvent,
   OverlayApi,
   PermissionStatus,
   PresetId,
@@ -69,6 +75,23 @@ const api: OverlayApi = {
     clear: () => ipcRenderer.invoke(IPC.transcriptClear) as Promise<void>,
     onUpdate: (h) => subscribe<TranscriptUpdate>(IPC.transcriptUpdate, h),
     onSocketStatus: (h) => subscribe<SocketStatusEvent>(IPC.socketStatus, h),
+  },
+  mock: {
+    start: (config: MockInterviewConfig) =>
+      ipcRenderer.invoke(IPC.mockStart, config) as Promise<{ ok: boolean; reason?: string; status?: MockInterviewStatus }>,
+    stop: () => ipcRenderer.invoke(IPC.mockStop) as Promise<{ ok: boolean }>,
+    pause: () => ipcRenderer.invoke(IPC.mockPause) as Promise<{ ok: boolean }>,
+    resume: () => ipcRenderer.invoke(IPC.mockResume) as Promise<{ ok: boolean }>,
+    status: () => ipcRenderer.invoke(IPC.mockStatus) as Promise<MockInterviewStatus>,
+    sendAudio: (chunk: MockAudioChunkMessage) => ipcRenderer.send(IPC.mockAudioChunk, chunk),
+    onStatus: (h) => subscribe<MockStatusEvent>(IPC.mockStatusChanged, h),
+    onAudioDelta: (h) => subscribe<MockAudioDeltaEvent>(IPC.mockAudioDelta, h),
+    onFeedback: (h) => subscribe<MockFeedbackEvent>(IPC.mockFeedback, h),
+    onPlaybackStop: (h) => {
+      const listener = (): void => h()
+      ipcRenderer.on(IPC.mockPlaybackStop, listener)
+      return () => ipcRenderer.removeListener(IPC.mockPlaybackStop, listener)
+    },
   },
   llm: {
     start: () => ipcRenderer.invoke(IPC.llmStart) as Promise<LlmStartResponse>,

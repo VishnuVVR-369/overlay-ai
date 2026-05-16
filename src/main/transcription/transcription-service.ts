@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { speakerForStream, type AudioChunkMessage, type SocketState, type SocketStatusEvent, type StreamTag, type TranscriptSnapshot, type TranscriptUpdate } from '@shared/types'
+import { speakerForStream, type AudioChunkMessage, type SocketState, type SocketStatusEvent, type Speaker, type StreamTag, type TranscriptSnapshot, type TranscriptUpdate } from '@shared/types'
 import { ScribeRealtimeSocket } from './elevenlabs-socket'
 import { TranscriptStore } from './transcript-store'
 
@@ -44,6 +44,16 @@ export class TranscriptionService extends EventEmitter {
   ingest(chunk: AudioChunkMessage): void {
     const target = chunk.stream === 'mic' ? this.mic : this.system
     target?.send(chunk.audioBase64, chunk.sampleRate)
+  }
+
+  injectPartial(speaker: Speaker, text: string): void {
+    const update = this.store.applyPartial(speaker, text)
+    this.emit('update', update)
+  }
+
+  injectCommitted(speaker: Speaker, text: string): void {
+    const update = this.store.applyCommitted(speaker, text)
+    this.emit('update', update)
   }
 
   snapshot(): TranscriptSnapshot {

@@ -85,6 +85,7 @@ export type VisionProvider = 'openai'
 
 export type PresetId = 'behavioral' | 'coding' | 'system-design' | 'negotiation'
 export type AnswerStyleId = 'concise' | 'think-aloud' | 'clarify' | 'edge-cases' | 'complexity'
+export type MockInterviewState = 'idle' | 'connecting' | 'active' | 'paused' | 'stopping' | 'error'
 
 export interface PresetDef {
   id: PresetId
@@ -130,6 +131,36 @@ export interface AudioChunkMessage {
   stream: StreamTag
   audioBase64: string
   sampleRate: number
+}
+
+export interface MockAudioChunkMessage {
+  audioBase64: string
+  sampleRate: number
+}
+
+export interface MockInterviewConfig {
+  presetId: PresetId
+  durationMinutes: 15 | 30 | 45 | 60
+}
+
+export interface MockInterviewStatus {
+  state: MockInterviewState
+  startedAt?: number
+  endsAt?: number
+  paused: boolean
+  message?: string
+}
+
+export interface MockStatusEvent extends MockInterviewStatus {}
+
+export interface MockAudioDeltaEvent {
+  audioBase64: string
+  sampleRate: number
+}
+
+export interface MockFeedbackEvent {
+  requestId: string
+  text: string
 }
 
 export type SocketState = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'auth_error' | 'error' | 'closed'
@@ -220,6 +251,18 @@ export interface OverlayApi {
     clear(): Promise<void>
     onUpdate(handler: (event: TranscriptUpdate) => void): () => void
     onSocketStatus(handler: (event: SocketStatusEvent) => void): () => void
+  }
+  mock: {
+    start(config: MockInterviewConfig): Promise<{ ok: boolean; reason?: string; status?: MockInterviewStatus }>
+    stop(): Promise<{ ok: boolean }>
+    pause(): Promise<{ ok: boolean }>
+    resume(): Promise<{ ok: boolean }>
+    status(): Promise<MockInterviewStatus>
+    sendAudio(chunk: MockAudioChunkMessage): void
+    onStatus(handler: (event: MockStatusEvent) => void): () => void
+    onAudioDelta(handler: (event: MockAudioDeltaEvent) => void): () => void
+    onFeedback(handler: (event: MockFeedbackEvent) => void): () => void
+    onPlaybackStop(handler: () => void): () => void
   }
   llm: {
     start(): Promise<LlmStartResponse>

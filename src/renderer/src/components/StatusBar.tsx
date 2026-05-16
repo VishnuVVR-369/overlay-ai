@@ -1,15 +1,17 @@
 import { useState } from 'react'
-import { Eraser, HelpCircle, Settings, Minus, Power } from 'lucide-react'
+import { Eraser, HelpCircle, Settings, Minus, Power, Mic2 } from 'lucide-react'
 import type { AnswerStyleId, PresetId, SocketState } from '@shared/types'
 import { useStatusStore } from '../state/status-store'
 import { usePresetStore } from '../state/preset-store'
 import { useAnswerStyleStore } from '../state/answer-style-store'
+import { useMockStore } from '../state/mock-store'
 
 interface Props {
   onToggleSettings: () => void
   onToggleRunning: () => void
   onClearTranscript: () => void
   onOpenHelp: () => void
+  onToggleMock: () => void
   onToggleCompact: () => void
   onQuit: () => void
 }
@@ -18,6 +20,7 @@ export function StatusBar(props: Props): JSX.Element {
   const running = useStatusStore((s) => s.running)
   const micState = useStatusStore((s) => s.micState)
   const systemState = useStatusStore((s) => s.systemState)
+  const mockState = useMockStore((s) => s.status.state)
   const [hovered, setHovered] = useState(false)
 
   return (
@@ -39,6 +42,14 @@ export function StatusBar(props: Props): JSX.Element {
           title={running ? 'Stop listening (Space)' : 'Start listening (Space)'}
         >
           {running ? 'Stop' : 'Start'}
+        </button>
+        <button
+          onClick={props.onToggleMock}
+          className={mockState === 'active' || mockState === 'connecting' ? 'icon-btn running' : 'icon-btn'}
+          title={mockState === 'idle' ? 'Mock interview (M)' : 'Stop mock interview (M)'}
+          aria-label="Mock interview"
+        >
+          <Mic2 size={13} strokeWidth={1.75} />
         </button>
         <button
           onClick={props.onClearTranscript}

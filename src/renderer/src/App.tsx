@@ -8,18 +8,24 @@ import { HelpPanel } from './components/HelpPanel'
 import { AnswerCard } from './components/AnswerCard'
 import { PermissionsBanner } from './components/PermissionsBanner'
 import { SeamWaveform } from './components/SeamWaveform'
+import { MockInterviewPanel } from './components/MockInterviewPanel'
 import { capture } from './audio/capture-controller'
+import { mockPlayback } from './audio/mock-playback'
 import { useTranscriptStore } from './state/transcript-store'
 import { useLlmStore } from './state/llm-store'
 import { useStatusStore } from './state/status-store'
+import { useMockStore } from './state/mock-store'
 import { useUiStore } from './state/ui-store'
 import { usePresetStore } from './state/preset-store'
 import { useAnswerStyleStore } from './state/answer-style-store'
 import { useVaultStore } from './state/vault-store'
+import type { MockInterviewConfig } from '@shared/types'
 
 export function App(): JSX.Element {
   const [bootChecked, setBootChecked] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [mockPanelOpen, setMockPanelOpen] = useState(false)
+  const [mockStarting, setMockStarting] = useState(false)
   const applyTranscript = useTranscriptStore((s) => s.apply)
   const resetTranscript = useTranscriptStore((s) => s.reset)
   const startEntry = useLlmStore((s) => s.startEntry)
@@ -29,6 +35,8 @@ export function App(): JSX.Element {
   const setRunning = useStatusStore((s) => s.setRunning)
   const setSocket = useStatusStore((s) => s.setSocket)
   const running = useStatusStore((s) => s.running)
+  const mockStatus = useMockStore((s) => s.status)
+  const setMockStatus = useMockStore((s) => s.setStatus)
   const mode = useUiStore((s) => s.mode)
   const setMode = useUiStore((s) => s.setMode)
   const helpOpen = useUiStore((s) => s.helpOpen)
@@ -44,6 +52,7 @@ export function App(): JSX.Element {
   const setVaultState = useVaultStore((s) => s.setState)
   const heroStreaming = useLlmStore((s) => s.entries[0]?.status === 'streaming')
   const isCompact = mode === 'compact'
+  const mockActive = mockStatus.state !== 'idle'
 
   const triggerLlm = useCallback(async () => {
     const { requestId, mode: entryMode, imageDataUrl } = await window.api.llm.start()
@@ -57,6 +66,7 @@ export function App(): JSX.Element {
 
   const openSettings = useCallback(() => {
     setHelpOpen(false)
+    setMockPanelOpen(false)
     setSettingsOpen(true)
   }, [setHelpOpen, setSettingsOpen])
 
@@ -74,7 +84,7 @@ export function App(): JSX.Element {
     }
     const result = await window.api.transcription.start()
     if (!result.ok) {
-      openSettings()
+      if (result.reason === 'missing_key') openSettings()
       return
     }
     const captureResult = await capture.start()
@@ -85,6 +95,53 @@ export function App(): JSX.Element {
     setRunning(true)
   }, [openSettings, running, setRunning])
 
+  const startMock = useCallback(async (config: MockInterviewConfig) => {
+    setMockStarting(true)
+    try {
+      if (running) {
+        capture.stop()
+        await window.api.transcription.stop()
+        setRunning(false)
+      }
+      const status = await window.api.settings.get()
+      if (!status.openaiKeySet) {
+        openSettings()
+        return
+      }
+      const result = await window.api.mock.start(config)
+      if (!result.ok) {
+        if (result.reason === 'missing_openai_key') openSettings()
+        return
+      }
+      if (result.status) setMockStatus(result.status)
+      const captureResult = await capture.startMock()
+      if (!captureResult.micStarted) {
+        await window.api.mock.stop()
+        return
+      }
+      setMockPanelOpen(false)
+    } finally {
+      setMockStarting(false)
+    }
+  }, [openSettings, running, setMockStatus, setRunning])
+
+  const stopMock = useCallback(async () => {
+    capture.stop()
+    mockPlayback.stop()
+    await window.api.mock.stop()
+    setMockStatus({ state: 'idle', paused: false })
+  }, [setMockStatus])
+
+  const toggleMock = useCallback(() => {
+    if (mockActive) {
+      void stopMock()
+      return
+    }
+    setHelpOpen(false)
+    setSettingsOpen(false)
+    setMockPanelOpen((v) => !v)
+  }, [mockActive, setHelpOpen, setSettingsOpen, stopMock])
+
   const clearTranscript = useCallback(async () => {
     await window.api.transcription.clear()
     resetTranscript()
@@ -93,15 +150,18 @@ export function App(): JSX.Element {
   const closeSlideOvers = useCallback(() => {
     setHelpOpen(false)
     setSettingsOpen(false)
+    setMockPanelOpen(false)
   }, [setHelpOpen, setSettingsOpen])
 
   const toggleHelp = useCallback(() => {
     setSettingsOpen(false)
+    setMockPanelOpen(false)
     setHelpOpen(!helpOpen)
   }, [helpOpen, setHelpOpen, setSettingsOpen])
 
   const toggleSettings = useCallback(() => {
     setHelpOpen(false)
+    setMockPanelOpen(false)
     setSettingsOpen(!settingsOpen)
   }, [settingsOpen, setHelpOpen, setSettingsOpen])
 
@@ -132,11 +192,14 @@ export function App(): JSX.Element {
 
   const panicReset = useCallback(() => {
     capture.stop()
+    mockPlayback.stop()
     useTranscriptStore.getState().reset()
     useLlmStore.getState().clear()
+    useMockStore.getState().reset()
     setRunning(false)
     setHelpOpen(false)
     setSettingsOpen(false)
+    setMockPanelOpen(false)
   }, [setRunning, setHelpOpen, setSettingsOpen])
 
   const requestPanic = useCallback(() => {
@@ -166,6 +229,11 @@ export function App(): JSX.Element {
         if (settingsOpen) {
           event.preventDefault()
           setSettingsOpen(false)
+          return
+        }
+        if (mockPanelOpen) {
+          event.preventDefault()
+          setMockPanelOpen(false)
         }
         return
       }
@@ -181,6 +249,11 @@ export function App(): JSX.Element {
       if (isCompact) return
 
       switch (event.key) {
+        case 'm':
+        case 'M':
+          event.preventDefault()
+          toggleMock()
+          break
         case '?':
           event.preventDefault()
           toggleHelp()
@@ -213,6 +286,7 @@ export function App(): JSX.Element {
     clearTranscript,
     isCompact,
     helpOpen,
+    mockPanelOpen,
     toggleHelp,
     toggleSettings,
     quit,
@@ -221,6 +295,7 @@ export function App(): JSX.Element {
     setHelpOpen,
     setSettingsOpen,
     toggleCompact,
+    toggleMock,
     toggleRunning,
   ])
 
@@ -236,9 +311,10 @@ export function App(): JSX.Element {
     void window.api.presets.get().then(setPresetState)
     void window.api.answerStyles.get().then(setAnswerStyleState)
     void window.api.vault.get().then(setVaultState)
+    void window.api.mock.status().then(setMockStatus)
     void recheckPerms()
     setMounted(true)
-  }, [openSettings, recheckPerms, setAnswerStyleState, setPresetState, setHeadlineFirst, setVaultState])
+  }, [openSettings, recheckPerms, setAnswerStyleState, setPresetState, setHeadlineFirst, setVaultState, setMockStatus])
 
   // Periodic perm re-check (in case user grants in System Settings)
   useEffect(() => {
@@ -253,6 +329,17 @@ export function App(): JSX.Element {
     const subs = [
       window.api.transcription.onUpdate(applyTranscript),
       window.api.transcription.onSocketStatus((evt) => setSocket(evt.stream, evt.state, evt.message)),
+      window.api.mock.onStatus(setMockStatus),
+      window.api.mock.onAudioDelta((evt) => {
+        void mockPlayback.playPcm16(evt.audioBase64, evt.sampleRate)
+      }),
+      window.api.mock.onPlaybackStop(() => {
+        mockPlayback.stop()
+      }),
+      window.api.mock.onFeedback((evt) => {
+        useLlmStore.getState().startEntry(evt.requestId, 'transcript')
+        useLlmStore.getState().finishEntry(evt.requestId, evt.text)
+      }),
       window.api.llm.onTrigger(() => {
         void triggerLlm()
       }),
@@ -287,6 +374,7 @@ export function App(): JSX.Element {
     setMode,
     setPresetState,
     setSocket,
+    setMockStatus,
     setVaultState,
     panicReset,
     closeSlideOvers,
@@ -354,6 +442,7 @@ export function App(): JSX.Element {
         onToggleRunning={() => {
           void toggleRunning()
         }}
+        onToggleMock={toggleMock}
         onClearTranscript={() => {
           void clearTranscript()
         }}
@@ -370,6 +459,12 @@ export function App(): JSX.Element {
         onClose={() => setSettingsOpen(false)}
       />
       <HelpPanel open={!isCompact && helpOpen} onClose={() => setHelpOpen(false)} />
+      <MockInterviewPanel
+        open={!isCompact && mockPanelOpen}
+        starting={mockStarting}
+        onClose={() => setMockPanelOpen(false)}
+        onStart={(config) => void startMock(config)}
+      />
       <Toaster />
     </div>
   )

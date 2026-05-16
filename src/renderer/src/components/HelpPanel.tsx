@@ -65,6 +65,12 @@ const BUTTON_ACTIONS: ShortcutEntry[] = [
       'Opens microphone + system-audio capture and connects two parallel ElevenLabs Scribe v2 Realtime WebSockets. Stop closes both sockets.',
   },
   {
+    keys: ['M'],
+    label: 'Mock interview',
+    detail:
+      'Starts or stops an OpenAI Realtime mock interviewer. The mock transcript uses the same You/Them transcript as transcript ask and screen ask.',
+  },
+  {
     keys: ['C'],
     label: 'Clear transcript',
     detail:

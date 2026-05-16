@@ -163,6 +163,29 @@ vi.mock('@main/llm/openai-vision-client', () => ({
   },
 }))
 
+const mockStartSpy = vi.fn(async () => ({ state: 'active', paused: false, startedAt: 1, endsAt: 2 }))
+const mockStopSpy = vi.fn(async () => undefined)
+const mockPauseSpy = vi.fn()
+const mockResumeSpy = vi.fn()
+const mockIngestSpy = vi.fn()
+const mockAbortSpy = vi.fn()
+const mockResetContextSpy = vi.fn()
+const mockStatusSpy = vi.fn(() => ({ state: 'idle', paused: false }))
+const mockEmitter = new EventEmitter()
+
+vi.mock('@main/mock/mock-interview-service', () => ({
+  mockInterview: Object.assign(mockEmitter, {
+    start: (...args: unknown[]) => mockStartSpy(...args),
+    stop: () => mockStopSpy(),
+    pause: () => mockPauseSpy(),
+    resume: () => mockResumeSpy(),
+    ingest: (...args: unknown[]) => mockIngestSpy(...args),
+    abort: () => mockAbortSpy(),
+    resetContext: () => mockResetContextSpy(),
+    status: () => mockStatusSpy(),
+  }),
+}))
+
 const captureSpy = vi.fn(async () => ({ dataUrl: 'data:image/png;base64,xxx', width: 10, height: 10, displayId: '1' }))
 vi.mock('@main/vision/screen-capture', () => ({
   captureActiveDisplay: () => captureSpy(),
@@ -218,6 +241,16 @@ beforeEach(async () => {
   triggerPanicSpy.mockClear()
   groqStreamSpy.mockClear()
   visionStreamSpy.mockClear()
+  mockStartSpy.mockClear()
+  mockStopSpy.mockClear()
+  mockPauseSpy.mockClear()
+  mockResumeSpy.mockClear()
+  mockIngestSpy.mockClear()
+  mockAbortSpy.mockClear()
+  mockResetContextSpy.mockClear()
+  mockStatusSpy.mockClear()
+  mockStatusSpy.mockReturnValue({ state: 'idle', paused: false })
+  mockEmitter.removeAllListeners()
   captureSpy.mockClear()
   setModeSpy.mockClear()
   transcriptionInstance.removeAllListeners()
@@ -242,6 +275,7 @@ describe('IPC handler registration', () => {
     const expected = [
       IPC.settingsGet, IPC.settingsSet, IPC.permStatus, IPC.permRequestMic, IPC.permOpenScreenPrefs,
       IPC.transcriptionStart, IPC.transcriptionStop, IPC.transcriptionStatus,
+      IPC.mockStart, IPC.mockStop, IPC.mockPause, IPC.mockResume, IPC.mockStatus,
       IPC.transcriptSnapshot, IPC.transcriptClear,
       IPC.llmStart, IPC.llmAbort, IPC.visionStart, IPC.visionAbort,
       IPC.presetsGet, IPC.presetsSetActive, IPC.presetsSetOverride,
@@ -252,6 +286,7 @@ describe('IPC handler registration', () => {
     ]
     for (const ch of expected) expect(ipcStub.registered.has(ch)).toBe(true)
     expect(ipcStub.events.has(IPC.audioChunk)).toBe(true)
+    expect(ipcStub.events.has(IPC.mockAudioChunk)).toBe(true)
     expect(ipcStub.events.has(IPC.windowUserActive)).toBe(true)
   })
 })
@@ -297,6 +332,13 @@ describe('transcription IPC', () => {
     expect(transcriptionInstance.start).toHaveBeenCalledWith('el-key')
   })
 
+  it('transcription:start refuses while mock interview is active', async () => {
+    mockStatusSpy.mockReturnValueOnce({ state: 'active', paused: false })
+    settingsState.elevenlabsKey = 'el-key'
+    expect(await ipcStub.invoke(IPC.transcriptionStart)).toEqual({ ok: false, reason: 'mock_active' })
+    expect(transcriptionInstance.start).not.toHaveBeenCalled()
+  })
+
   it('audio:chunk forwards to transcription.ingest with stream tag', () => {
     ipcStub.send(IPC.audioChunk, { stream: 'mic', audioBase64: 'AAA', sampleRate: 16000 })
     expect(transcriptionInstance.ingest).toHaveBeenCalledWith({ stream: 'mic', audioBase64: 'AAA', sampleRate: 16000 })
@@ -307,6 +349,13 @@ describe('transcription IPC', () => {
     expect(transcriptionInstance.clear).toHaveBeenCalled()
   })
 
+  it('transcript:clear resets mock context when a mock interview is active', async () => {
+    mockStatusSpy.mockReturnValueOnce({ state: 'active', paused: false })
+    await ipcStub.invoke(IPC.transcriptClear)
+    expect(transcriptionInstance.clear).toHaveBeenCalled()
+    expect(mockResetContextSpy).toHaveBeenCalled()
+  })
+
   it('transcription "update" events broadcast on transcript:update channel', () => {
     transcriptionInstance.emit('update', { speaker: 'them', kind: 'partial', segmentId: 'a', text: 'x', startedAt: 1 })
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.transcriptUpdate, expect.objectContaining({ text: 'x' }))
@@ -315,6 +364,55 @@ describe('transcription IPC', () => {
   it('transcription "socketStatus" events broadcast on socket:status channel', () => {
     transcriptionInstance.emit('socketStatus', { stream: 'mic', state: 'open' })
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.socketStatus, { stream: 'mic', state: 'open' })
+  })
+})
+
+describe('mock interview IPC', () => {
+  it('mock:start requires an OpenAI key', async () => {
+    settingsState.openaiKey = null
+    const result = await ipcStub.invoke(IPC.mockStart, { presetId: 'behavioral', durationMinutes: 30 })
+    expect(result).toEqual({ ok: false, reason: 'missing_openai_key' })
+    expect(mockStartSpy).not.toHaveBeenCalled()
+  })
+
+  it('mock:start refuses while live transcription is running', async () => {
+    settingsState.openaiKey = 'oa'
+    transcriptionInstance.status.mockReturnValueOnce({ running: true, micState: 'open', systemState: 'open' })
+    const result = await ipcStub.invoke(IPC.mockStart, { presetId: 'behavioral', durationMinutes: 30 })
+    expect(result).toEqual({ ok: false, reason: 'transcription_active' })
+    expect(mockStartSpy).not.toHaveBeenCalled()
+  })
+
+  it('mock:start starts the service with vault context', async () => {
+    settingsState.openaiKey = 'oa'
+    settingsState.vault = { ...emptyVault(), resume: 'resume' }
+    const result = await ipcStub.invoke(IPC.mockStart, { presetId: 'behavioral', durationMinutes: 30 }) as { ok: boolean }
+    expect(result.ok).toBe(true)
+    expect(mockStartSpy).toHaveBeenCalledWith('oa', { presetId: 'behavioral', durationMinutes: 30 }, expect.objectContaining({
+      vault: expect.objectContaining({ resume: 'resume' }),
+    }))
+  })
+
+  it('mock audio chunks and controls proxy to the service', async () => {
+    ipcStub.send(IPC.mockAudioChunk, { audioBase64: 'AAA', sampleRate: 16000 })
+    expect(mockIngestSpy).toHaveBeenCalledWith({ audioBase64: 'AAA', sampleRate: 16000 })
+    await ipcStub.invoke(IPC.mockPause)
+    await ipcStub.invoke(IPC.mockResume)
+    await ipcStub.invoke(IPC.mockStop)
+    expect(mockPauseSpy).toHaveBeenCalled()
+    expect(mockResumeSpy).toHaveBeenCalled()
+    expect(mockStopSpy).toHaveBeenCalled()
+  })
+
+  it('mock service events broadcast to renderer channels', () => {
+    mockEmitter.emit('status', { state: 'active', paused: false })
+    mockEmitter.emit('audioDelta', { audioBase64: 'AAA', sampleRate: 24000 })
+    mockEmitter.emit('feedback', { requestId: 'fb', text: 'Good.' })
+    mockEmitter.emit('playbackStop')
+    expect(win.webContents.send).toHaveBeenCalledWith(IPC.mockStatusChanged, { state: 'active', paused: false })
+    expect(win.webContents.send).toHaveBeenCalledWith(IPC.mockAudioDelta, { audioBase64: 'AAA', sampleRate: 24000 })
+    expect(win.webContents.send).toHaveBeenCalledWith(IPC.mockFeedback, { requestId: 'fb', text: 'Good.' })
+    expect(win.webContents.send).toHaveBeenCalledWith(IPC.mockPlaybackStop)
   })
 })
 

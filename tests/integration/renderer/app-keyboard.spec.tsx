@@ -4,15 +4,25 @@ import { render, fireEvent, waitFor, act } from '@testing-library/react'
 import { App } from '@/App'
 import { useUiStore } from '@/state/ui-store'
 import { useStatusStore } from '@/state/status-store'
+import { useMockStore } from '@/state/mock-store'
 import { useLlmStore } from '@/state/llm-store'
 import { useTranscriptStore } from '@/state/transcript-store'
 import { usePresetStore } from '@/state/preset-store'
 import { useAnswerStyleStore } from '@/state/answer-style-store'
 import { useVaultStore, emptyVault } from '@/state/vault-store'
+import { mockPlayback } from '@/audio/mock-playback'
 import { installFakeApi, createFakeApi, type FakeApi } from '../../helpers/fake-window-api'
 
 vi.mock('@/audio/capture-controller', () => ({
-  capture: { start: vi.fn(async () => ({ micStarted: true, systemStarted: true, warnings: [] })), stop: vi.fn() },
+  capture: {
+    start: vi.fn(async () => ({ micStarted: true, systemStarted: true, warnings: [] })),
+    startMock: vi.fn(async () => ({ micStarted: true, warnings: [] })),
+    stop: vi.fn(),
+  },
+}))
+
+vi.mock('@/audio/mock-playback', () => ({
+  mockPlayback: { playPcm16: vi.fn(async () => undefined), stop: vi.fn() },
 }))
 
 vi.mock('@/components/SeamWaveform', () => ({
@@ -33,9 +43,12 @@ vi.mock('@/markdown/StreamingBody', () => ({
 let api: FakeApi
 
 beforeEach(() => {
+  vi.mocked(mockPlayback.stop).mockClear()
+  vi.mocked(mockPlayback.playPcm16).mockClear()
   useUiStore.setState({ mode: 'normal', helpOpen: false, settingsOpen: false, focused: true, permStatus: { mic: 'granted', screen: 'granted' }, expandedEntries: {}, headlineFirst: true })
   useVaultStore.setState({ data: emptyVault(), hydrated: false })
   useStatusStore.setState({ running: false, micState: 'idle', systemState: 'idle' })
+  useMockStore.setState({ status: { state: 'idle', paused: false } })
   useLlmStore.setState({ entries: [] })
   useTranscriptStore.setState({ segments: [], partials: {} })
   usePresetStore.setState({
@@ -186,6 +199,50 @@ describe('App keyboard shortcuts', () => {
     expect(useStatusStore.getState().running).toBe(false)
   })
 
+  it('"M" opens the mock interview panel and can start mock mode', async () => {
+    const { getByText } = await bootApp()
+    press('m')
+    await waitFor(() => expect(getByText('Mock Interview')).toBeTruthy())
+    fireEvent.click(getByText('Start mock interview'))
+    await waitFor(() => expect(api.mock.start).toHaveBeenCalledWith({ presetId: 'behavioral', durationMinutes: 30 }))
+    expect(useMockStore.getState().status.state).toBe('active')
+  })
+
+  it('"M" stops an active mock interview', async () => {
+    await bootApp()
+    act(() => useMockStore.setState({ status: { state: 'active', paused: false } }))
+    press('m')
+    await waitFor(() => expect(api.mock.stop).toHaveBeenCalled())
+    expect(useMockStore.getState().status.state).toBe('idle')
+  })
+
+  it('Space asks main to start transcription while mock mode is active so main can show a toast', async () => {
+    api = installFakeApi(createFakeApi({
+      settings: {
+        elevenlabsKeySet: true,
+        groqKeySet: true,
+        openaiKeySet: true,
+        visionProvider: 'openai',
+        visionModel: 'gpt-5.1',
+        headlineFirst: true,
+        vault: { hasResume: false, hasJobDescription: false, hasCompanyValues: false, hasInterviewerNotes: false, storiesCount: 0 },
+      },
+      transcriptionStartResult: { ok: false, reason: 'mock_active' },
+      mockStatus: { state: 'active', paused: false },
+    }))
+    await bootApp()
+    act(() => useMockStore.setState({ status: { state: 'active', paused: false } }))
+    press(' ')
+    await waitFor(() => expect(api.transcription.start).toHaveBeenCalled())
+    expect(useStatusStore.getState().running).toBe(false)
+  })
+
+  it('mock playback-stop events clear queued interviewer audio', async () => {
+    await bootApp()
+    act(() => api.__emit.mockPlaybackStop())
+    expect(mockPlayback.stop).toHaveBeenCalled()
+  })
+
   it('shortcuts are skipped while focus is in an input', async () => {
     await bootApp()
     const input = document.createElement('input')
@@ -304,6 +361,7 @@ describe('App keyboard shortcuts', () => {
     useLlmStore.setState({ entries: [{ requestId: 'r', mode: 'transcript', text: 't', chunks: ['t'], status: 'done', startedAt: 1 }] })
     useUiStore.setState({ helpOpen: true, settingsOpen: true })
     useStatusStore.setState({ running: true })
+    useMockStore.setState({ status: { state: 'active', paused: false } })
 
     act(() => api.__emit.panic())
 
@@ -312,6 +370,7 @@ describe('App keyboard shortcuts', () => {
     expect(useUiStore.getState().helpOpen).toBe(false)
     expect(useUiStore.getState().settingsOpen).toBe(false)
     expect(useStatusStore.getState().running).toBe(false)
+    expect(useMockStore.getState().status.state).toBe('idle')
   })
 
   it('panic:trigger handler is idempotent (firing twice does not throw)', async () => {

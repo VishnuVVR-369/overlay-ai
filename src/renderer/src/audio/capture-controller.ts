@@ -1,4 +1,3 @@
-import type { StreamTag } from '@shared/types'
 import { PCM16_WORKLET_SOURCE } from './pcm16-worklet'
 import { arrayBufferToBase64 } from './encode'
 import { useAudioLevelsStore } from '../state/audio-levels-store'
@@ -15,6 +14,8 @@ interface StreamHandle {
   buf: Float32Array
   stream: MediaStream
 }
+
+type AudioSink = (audioBase64: string, sampleRate: number) => void
 
 export class CaptureController {
   private audioCtx: AudioContext | null = null
@@ -53,7 +54,9 @@ export class CaptureController {
           autoGainControl: true,
         },
       })
-      this.mic = this.attachStream(micStream, 'mic')
+      this.mic = this.attachStream(micStream, (audioBase64, sampleRate) => {
+        window.api.transcription.sendAudio({ stream: 'mic', audioBase64, sampleRate })
+      })
       micStarted = true
     } catch (err) {
       warnings.push(`Microphone capture failed: ${(err as Error).message}`)
@@ -61,7 +64,9 @@ export class CaptureController {
 
     try {
       const sysStream = await getSystemAudioStream()
-      this.system = this.attachStream(sysStream, 'system')
+      this.system = this.attachStream(sysStream, (audioBase64, sampleRate) => {
+        window.api.transcription.sendAudio({ stream: 'system', audioBase64, sampleRate })
+      })
       systemStarted = true
     } catch (err) {
       warnings.push(`System audio capture failed: ${(err as Error).message}`)
@@ -74,6 +79,44 @@ export class CaptureController {
     return { micStarted, systemStarted, warnings }
   }
 
+  async startMock(): Promise<{ micStarted: boolean; warnings: string[] }> {
+    this.stop()
+    const warnings: string[] = []
+    if (!this.audioCtx) {
+      this.audioCtx = new AudioContext({ sampleRate: TARGET_RATE })
+    }
+    if (this.audioCtx.state === 'suspended') {
+      await this.audioCtx.resume()
+    }
+    if (!this.workletReady) {
+      if (!this.workletUrl) {
+        const blob = new Blob([PCM16_WORKLET_SOURCE], { type: 'application/javascript' })
+        this.workletUrl = URL.createObjectURL(blob)
+      }
+      await this.audioCtx.audioWorklet.addModule(this.workletUrl)
+      this.workletReady = true
+    }
+
+    try {
+      const micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
+      this.mic = this.attachStream(micStream, (audioBase64, sampleRate) => {
+        window.api.mock.sendAudio({ audioBase64, sampleRate })
+      })
+      this.startLevelLoop()
+      return { micStarted: true, warnings }
+    } catch (err) {
+      warnings.push(`Microphone capture failed: ${(err as Error).message}`)
+      return { micStarted: false, warnings }
+    }
+  }
+
   stop(): void {
     this.stopLevelLoop()
     this.detach(this.mic)
@@ -83,7 +126,7 @@ export class CaptureController {
     useAudioLevelsStore.getState().resetAll()
   }
 
-  private attachStream(stream: MediaStream, tag: StreamTag): StreamHandle {
+  private attachStream(stream: MediaStream, sink: AudioSink): StreamHandle {
     const ctx = this.audioCtx
     if (!ctx) throw new Error('AudioContext not initialised')
     const source = ctx.createMediaStreamSource(stream)
@@ -95,7 +138,7 @@ export class CaptureController {
     node.port.onmessage = (evt) => {
       const buf = evt.data as ArrayBuffer
       const audioBase64 = arrayBufferToBase64(buf)
-      window.api.transcription.sendAudio({ stream: tag, audioBase64, sampleRate: TARGET_RATE })
+      sink(audioBase64, TARGET_RATE)
     }
     const analyser = ctx.createAnalyser()
     analyser.fftSize = ANALYSER_FFT

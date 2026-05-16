@@ -5,6 +5,8 @@ import type {
   AnswerStyleId,
   AudioChunkMessage,
   LlmStartResponse,
+  MockAudioChunkMessage,
+  MockInterviewConfig,
   PresetId,
   PresetOverrideUpdate,
   ReadinessCheck,
@@ -20,6 +22,8 @@ import { getPermissionStatus, openScreenRecordingPrefs, requestMicAccess } from 
 import { transcription } from './transcription/transcription-service'
 import { groq } from './llm/groq-client'
 import { openaiVision } from './llm/openai-vision-client'
+import { mockInterview } from './mock/mock-interview-service'
+import { sanitizeMockConfig } from './mock/mock-config'
 import { captureActiveDisplay } from './vision/screen-capture'
 import { setMode } from './window'
 import { getShortcutRegistration } from './shortcuts'
@@ -40,6 +44,10 @@ export function registerIpc(win: BrowserWindow): void {
   ipcMain.handle(IPC.permOpenScreenPrefs, () => openScreenRecordingPrefs())
 
   ipcMain.handle(IPC.transcriptionStart, () => {
+    if (mockInterview.status().state !== 'idle') {
+      sendToast(win, { level: 'warn', message: 'Stop the mock interview before starting live transcription.' })
+      return { ok: false, reason: 'mock_active' }
+    }
     const key = settings.getElevenLabsKey()
     if (!key) return { ok: false, reason: 'missing_key' }
     transcription.start(key)
@@ -57,9 +65,58 @@ export function registerIpc(win: BrowserWindow): void {
     transcription.ingest(chunk)
   })
 
+  ipcMain.handle(IPC.mockStart, async (_evt, config: MockInterviewConfig) => {
+    if (transcription.status().running) {
+      sendToast(win, { level: 'warn', message: 'Stop live transcription before starting a mock interview.' })
+      return { ok: false, reason: 'transcription_active' }
+    }
+    const key = settings.getOpenAIKey()
+    if (!key) {
+      sendToast(win, { level: 'error', message: 'OpenAI API key not set. Open Settings to add it.' })
+      openSettings(win)
+      return { ok: false, reason: 'missing_openai_key' }
+    }
+    const presetState = settings.getPresetState()
+    const preset = presetState.presets.find((p) => p.id === config.presetId)
+    try {
+      const status = await mockInterview.start(
+        key,
+        sanitizeMockConfig(config, { presetId: settings.getActivePresetId() }),
+        { preset, vault: settings.getVault() },
+      )
+      return { ok: true, status }
+    } catch (err: unknown) {
+      const message = (err as Error).message ?? 'Mock interview failed to start.'
+      sendToast(win, { level: 'error', message })
+      return { ok: false, reason: message }
+    }
+  })
+
+  ipcMain.handle(IPC.mockStop, async () => {
+    await mockInterview.stop()
+    return { ok: true }
+  })
+
+  ipcMain.handle(IPC.mockPause, () => {
+    mockInterview.pause()
+    return { ok: true }
+  })
+
+  ipcMain.handle(IPC.mockResume, () => {
+    mockInterview.resume()
+    return { ok: true }
+  })
+
+  ipcMain.handle(IPC.mockStatus, () => mockInterview.status())
+
+  ipcMain.on(IPC.mockAudioChunk, (_evt, chunk: MockAudioChunkMessage) => {
+    mockInterview.ingest(chunk)
+  })
+
   ipcMain.handle(IPC.transcriptSnapshot, () => transcription.snapshot())
   ipcMain.handle(IPC.transcriptClear, () => {
     transcription.clear()
+    if (mockInterview.status().state !== 'idle') void mockInterview.resetContext()
   })
 
   ipcMain.handle(IPC.llmStart, async (): Promise<LlmStartResponse> => {
@@ -182,6 +239,21 @@ export function registerIpc(win: BrowserWindow): void {
   })
   transcription.on('socketStatus', (event) => {
     if (!win.isDestroyed()) win.webContents.send(IPC.socketStatus, event)
+  })
+  mockInterview.on('status', (event) => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.mockStatusChanged, event)
+  })
+  mockInterview.on('audioDelta', (event) => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.mockAudioDelta, event)
+  })
+  mockInterview.on('feedback', (event) => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.mockFeedback, event)
+  })
+  mockInterview.on('playbackStop', () => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.mockPlaybackStop)
+  })
+  mockInterview.on('error', (message) => {
+    sendToast(win, { level: 'error', message })
   })
 }
 
