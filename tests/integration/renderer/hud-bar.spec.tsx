@@ -32,6 +32,7 @@ beforeEach(() => {
       { id: 'behavioral', label: 'Behavioral', defaultPrompt: 'd', effectivePrompt: 'd', overridden: false },
     ],
     hydrated: true,
+    drafts: {},
   })
 })
 
@@ -113,7 +114,7 @@ describe('HudBar', () => {
   })
 
   it('omits the mode chip until presets have hydrated', () => {
-    act(() => usePresetStore.setState({ active: 'behavioral', presets: [], hydrated: false }))
+    act(() => usePresetStore.setState({ active: 'behavioral', presets: [], hydrated: false, drafts: {} }))
     const { container } = renderBar()
     expect(container.querySelector('.hud-preset')).toBeNull()
   })

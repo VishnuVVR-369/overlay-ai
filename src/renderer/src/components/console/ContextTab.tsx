@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import type { VaultData, VaultStory } from '@shared/types'
-import { useVaultStore, emptyVault } from '../../state/vault-store'
+import {
+  useVaultStore,
+  emptyVault,
+  validateVault,
+  vaultEquals,
+  type VaultIssue,
+} from '../../state/vault-store'
+
+const LEDE =
+  'Injected into every transcript and screen ask so answers use your real history instead of plausible fiction. Stored locally and encrypted at rest.'
 
 const FIELDS: Array<{
   key: keyof Omit<VaultData, 'stories'>
@@ -41,37 +50,68 @@ const FIELDS: Array<{
 ]
 
 export function ContextTab(): JSX.Element {
-  const hydrated = useVaultStore((s) => s.data)
+  const stored = useVaultStore((s) => s.data)
+  const hydrated = useVaultStore((s) => s.hydrated)
+  const storedDraft = useVaultStore((s) => s.draft)
   const setVaultState = useVaultStore((s) => s.setState)
-  const [draft, setDraft] = useState<VaultData>(emptyVault())
+  const setStoredDraft = useVaultStore((s) => s.setDraft)
   const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [reloadCount, setReloadCount] = useState(0)
+  const draft = storedDraft ?? emptyVault()
 
   useEffect(() => {
-    void window.api.vault.get().then((value) => {
-      setDraft(value)
-      setVaultState(value)
-    })
-  }, [setVaultState])
+    let cancelled = false
+    setLoadError(null)
+    void window.api.vault.get().then(
+      (value) => {
+        if (!cancelled) setVaultState(value)
+      },
+      (err: unknown) => {
+        if (!cancelled) setLoadError(describeError(err))
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [reloadCount, setVaultState])
 
   useEffect(() => {
-    setDraft(hydrated)
-  }, [hydrated])
+    if (hydrated && storedDraft === null) setStoredDraft(stored)
+  }, [hydrated, setStoredDraft, stored, storedDraft])
 
-  const dirty = useMemo(() => !vaultEquals(draft, hydrated), [draft, hydrated])
+  const dirty = useMemo(() => !vaultEquals(draft, stored), [draft, stored])
+  const validation = useMemo(() => validateVault(draft), [draft])
 
   const updateField = (key: keyof Omit<VaultData, 'stories'>, value: string): void => {
-    setDraft((v) => ({ ...v, [key]: value }))
+    setStoredDraft({ ...draft, [key]: value })
   }
 
   const updateStory = (index: number, patch: Partial<VaultStory>): void => {
-    setDraft((v) => ({ ...v, stories: v.stories.map((s, i) => (i === index ? { ...s, ...patch } : s)) }))
+    setStoredDraft({
+      ...draft,
+      stories: draft.stories.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+    })
   }
 
   const save = async (): Promise<void> => {
+    if (!validation.ok) return
+    const submitted = draft
     setSaving(true)
+    setSaveError(null)
     try {
-      const result = await window.api.vault.set(draft)
-      if (!result.ok) return
+      const result = await window.api.vault.set(submitted)
+      if (!result.ok) {
+        setSaveError('Could not save your context. Your edits are still here — try again.')
+        return
+      }
+      const persisted = await window.api.vault.get()
+      setVaultState(persisted)
+      const current = useVaultStore.getState().draft
+      if (current === null || vaultEquals(current, submitted)) setStoredDraft(persisted)
+    } catch (err) {
+      setSaveError(`Could not save your context. Your edits are still here. ${describeError(err)}`)
     } finally {
       setSaving(false)
     }
@@ -79,14 +119,39 @@ export function ContextTab(): JSX.Element {
 
   const filled = FIELDS.filter((f) => draft[f.key].trim().length > 0).length
 
+  if (!hydrated || storedDraft === null) {
+    return (
+      <section className="pane">
+        <h3>Personal context</h3>
+        <p className="pane-lede">{LEDE}</p>
+        {loadError === null ? (
+          <div className="empty-box">Loading your saved context…</div>
+        ) : (
+          <>
+            <div className="inline-error">
+              Could not load your saved context, so editing is disabled to avoid overwriting it.{' '}
+              {loadError}
+            </div>
+            <div className="pane-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => setReloadCount((n) => n + 1)}
+              >
+                Try again
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+    )
+  }
+
   return (
     <>
       <section className="pane">
         <h3>Personal context</h3>
-        <p className="pane-lede">
-          Injected into every transcript and screen ask so answers use your real history instead of
-          plausible fiction. Stored locally and encrypted at rest.
-        </p>
+        <p className="pane-lede">{LEDE}</p>
         <div className="context-progress">
           <span>
             {filled} of {FIELDS.length} sections filled · {draft.stories.length}{' '}
@@ -108,7 +173,11 @@ export function ContextTab(): JSX.Element {
               rows={field.rows}
               spellCheck={false}
               placeholder={field.placeholder}
+              aria-invalid={validation.fields[field.key] ? true : undefined}
             />
+            {validation.fields[field.key] && (
+              <span className="field-error">{issueMessage(validation.fields[field.key]!)}</span>
+            )}
           </label>
         ))}
       </section>
@@ -120,7 +189,10 @@ export function ContextTab(): JSX.Element {
             className="btn btn-quiet"
             type="button"
             onClick={() =>
-              setDraft((v) => ({ ...v, stories: [...v.stories, { id: makeStoryId(), title: '', body: '' }] }))
+              setStoredDraft({
+                ...draft,
+                stories: [...draft.stories, { id: makeStoryId(), title: '', body: '' }],
+              })
             }
           >
             <Plus size={12} strokeWidth={2} />
@@ -134,7 +206,7 @@ export function ContextTab(): JSX.Element {
           </div>
         ) : (
           draft.stories.map((story, idx) => (
-            <div key={story.id} className="story">
+            <div key={story.id} className={`story ${validation.stories[idx] ? 'story-invalid' : ''}`}>
               <div className="story-head">
                 <input
                   type="text"
@@ -146,7 +218,12 @@ export function ContextTab(): JSX.Element {
                 <button
                   className="icon-btn danger"
                   type="button"
-                  onClick={() => setDraft((v) => ({ ...v, stories: v.stories.filter((_, i) => i !== idx) }))}
+                  onClick={() =>
+                    setStoredDraft({
+                      ...draft,
+                      stories: draft.stories.filter((_, i) => i !== idx),
+                    })
+                  }
                   aria-label={`Remove story ${idx + 1}`}
                 >
                   <Trash2 size={13} strokeWidth={1.75} />
@@ -160,35 +237,58 @@ export function ContextTab(): JSX.Element {
                 placeholder="Situation, task, action, result — terse bullets are fine."
                 aria-label={`Story ${idx + 1} body`}
               />
+              {validation.stories[idx] && (
+                <span className="field-error">{issueMessage(validation.stories[idx])}</span>
+              )}
             </div>
           ))
         )}
       </section>
 
+      {saveError !== null && <div className="inline-error">{saveError}</div>}
+
       <div className="pane-actions">
-        <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving || !dirty}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={() => void save()}
+          disabled={saving || !dirty || !validation.ok}
+        >
           {saving ? 'Saving…' : dirty ? 'Save personal context' : 'Saved'}
         </button>
+        {!validation.ok && (
+          <span className="pane-meta">
+            Finish or remove the flagged entries above — saving now would drop them.
+          </span>
+        )}
       </div>
     </>
   )
 }
 
+function issueMessage(issue: VaultIssue): string {
+  switch (issue.kind) {
+    case 'missing-title':
+      return 'Needs a title before it can be saved — add one or remove the story.'
+    case 'missing-body':
+      return 'Needs a body before it can be saved — add one or remove the story.'
+    case 'title-too-long':
+      return `Title is ${issue.length} characters; only the first ${issue.limit} are saved.`
+    case 'body-too-long':
+      return `Body is ${issue.length} characters; only the first ${issue.limit} are saved.`
+    case 'over-story-limit':
+      return `Only the first ${issue.limit} stories are saved — remove one before saving.`
+    case 'too-long':
+      return `${issue.length} characters; only the first ${issue.limit} are saved. Trim it first.`
+  }
+}
+
+function describeError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  return message.trim().length > 0 ? message : 'Unknown error.'
+}
+
 function makeStoryId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
   return `story-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function vaultEquals(a: VaultData, b: VaultData): boolean {
-  if (a.resume !== b.resume) return false
-  if (a.jobDescription !== b.jobDescription) return false
-  if (a.companyValues !== b.companyValues) return false
-  if (a.interviewerNotes !== b.interviewerNotes) return false
-  if (a.stories.length !== b.stories.length) return false
-  for (let i = 0; i < a.stories.length; i++) {
-    const x = a.stories[i]
-    const y = b.stories[i]
-    if (x.id !== y.id || x.title !== y.title || x.body !== y.body) return false
-  }
-  return true
 }

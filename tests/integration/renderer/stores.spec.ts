@@ -13,7 +13,7 @@ beforeEach(() => {
   useUiStore.setState({ mode: 'normal', helpOpen: false, settingsOpen: false, focused: true, permStatus: { mic: 'unknown', screen: 'unknown' }, expandedEntries: {} })
   useAudioLevelsStore.getState().resetAll()
   useLlmStore.setState({ entries: [] })
-  usePresetStore.setState({ active: 'behavioral', presets: [], hydrated: false })
+  usePresetStore.setState({ active: 'behavioral', presets: [], hydrated: false, drafts: {} })
 })
 
 describe('transcript store (renderer)', () => {

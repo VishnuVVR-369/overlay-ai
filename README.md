@@ -10,6 +10,7 @@ A stealth live-interview assistant overlay built with Electron.
 - On `Cmd/Ctrl+\`, sends the full session transcript to Groq's `openai/gpt-oss-120b` and streams the answer back.
 - On `Cmd/Ctrl+Shift+\`, captures the active display, sends the screenshot plus transcript context to OpenAI's vision model, and streams the answer back.
 - Keeps setup, personal context, prompts, mock practice, session history, and help in one tabbed command console.
+- Keeps unsaved personal-context and system-prompt drafts while you navigate or reopen the console; personal context persists only after you save it, and API-key inputs are never retained as drafts.
 - Opens a searchable command palette with `Cmd/Ctrl+K`.
 - Cycles compact, normal, and wide layouts with `Cmd/Ctrl+Shift+E`.
 - On `Cmd/Ctrl+Shift+B`, toggles window visibility; `Cmd/Ctrl+Shift+Escape` stops capture, clears the session, and hides the overlay.
