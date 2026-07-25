@@ -23,3 +23,40 @@ test('setup, console navigation, and command palette work in the packaged render
     await app.close()
   }
 })
+
+test('Setup shortcuts remain available while typing personal context', async ({}, testInfo) => {
+  const { app, page } = await launchApp()
+  try {
+    await page.getByRole('button', { name: 'Context' }).click()
+    const resume = page.getByRole('textbox', { name: /Resume \/ background/ })
+    await resume.fill('Candidate background')
+    await resume.press('?')
+
+    await expect(resume).toHaveValue('Candidate background?')
+    await expect(page.getByRole('button', { name: 'Context', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    await page.screenshot({
+      path: testInfo.outputPath('personal-context-typing.png'),
+    })
+
+    await resume.press('Meta+,')
+    await expect(page.getByRole('button', { name: 'Setup' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    await page.screenshot({
+      path: testInfo.outputPath('setup-opened-from-editable-field.png'),
+    })
+
+    await page.getByRole('button', { name: 'Context', exact: true }).click()
+    await page.getByRole('textbox', { name: /Resume \/ background/ }).press('Control+,')
+    await expect(page.getByRole('button', { name: 'Setup' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  } finally {
+    await app.close()
+  }
+})
