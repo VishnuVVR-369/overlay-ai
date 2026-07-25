@@ -48,6 +48,16 @@ npm run dist:win    # Windows NSIS installer
 
 Without code-signing certificates, installers run unsigned (right-click → Open on macOS, "More info → Run anyway" on Windows SmartScreen).
 
+## Install the latest local macOS app
+
+On an Apple Silicon Mac, this builds the latest `origin` revision, stages and validates the app bundle, then replaces `/Applications/Overlay AI.app`. The existing app is deleted only after the staged replacement validates successfully:
+
+```sh
+npm run install:mac
+```
+
+Use `npm run install:mac -- --dry-run` to build and validate the staged replacement without changing the installed app. The command requires a clean Git working tree so it can safely fast-forward to the latest upstream revision.
+
 ## Stack
 
 Electron + electron-vite + React + TypeScript. State via zustand. Audio loopback via [`electron-audio-loopback`](https://github.com/alectrocute/electron-audio-loopback).
