@@ -63,6 +63,8 @@ export class MockInterviewService extends EventEmitter {
   private pendingInputTranscriptions = new Set<string>()
   private inputTranscriptResolve: (() => void) | null = null
   private inputTranscriptTimer: NodeJS.Timeout | null = null
+  private inputDrainMarkerId: string | null = null
+  private shutdownCommitEventId: string | null = null
   private sessionId: string | null = null
   private sessionStartedAt = 0
   private stopPromise: Promise<void> | null = null
@@ -88,6 +90,7 @@ export class MockInterviewService extends EventEmitter {
   }
 
   async start(apiKey: string, config: MockInterviewConfig, context: MockPromptContext): Promise<MockInterviewStatus> {
+    if (this.stopPromise) throw new Error('The previous mock interview is still being saved.')
     if (this.ws && this.statusValue.state !== 'idle') return this.status()
     this.setStatus({ state: 'connecting', paused: false, message: 'Connecting mock interviewer.' })
 
@@ -123,7 +126,10 @@ export class MockInterviewService extends EventEmitter {
     if (this.stopPromise) return this.stopPromise
     const operation = this.performStop()
     const tracked = operation.finally(() => {
-      if (this.stopPromise === tracked) this.stopPromise = null
+      if (this.stopPromise === tracked) {
+        this.stopPromise = null
+        this.setStatus({ state: 'idle', paused: false })
+      }
     })
     this.stopPromise = tracked
     return tracked
@@ -146,7 +152,9 @@ export class MockInterviewService extends EventEmitter {
     await this.requestFeedback()
     const legacyFeedback = this.feedbackText.trim()
     const transcriptSnapshot = this.captureTranscriptSnapshot()
-    this.close()
+    // Tear down transport state now, but remain visibly `stopping` until the
+    // transcript has been graded and durably written below.
+    this.close(false)
     if (sessionId && config && context && transcriptSnapshot.length > 0) {
       await this.persistSession({
         sessionId,
@@ -300,7 +308,27 @@ export class MockInterviewService extends EventEmitter {
 
   private flushInputTranscript(): Promise<void> | null {
     if (!this.ws || (!this.inputBufferHasAudio && this.pendingInputTranscriptions.size === 0)) return null
-    if (this.inputBufferHasAudio) this.send({ type: 'input_audio_buffer.commit' })
+    if (this.inputBufferHasAudio) {
+      this.shutdownCommitEventId = `shutdown-commit-${randomUUID()}`
+      this.inputDrainMarkerId = `shutdown-drain-${randomUUID()}`
+      this.send({
+        event_id: this.shutdownCommitEventId,
+        type: 'input_audio_buffer.commit',
+      })
+      // Server events are ordered on the WebSocket. Once this marker item is
+      // acknowledged, the preceding explicit commit event has been observed,
+      // so its item id is present in pendingInputTranscriptions. Delete the
+      // marker before feedback is requested so it never enters model context.
+      this.send({
+        type: 'conversation.item.create',
+        item: {
+          id: this.inputDrainMarkerId,
+          type: 'message',
+          role: 'system',
+          content: [{ type: 'input_text', text: 'Mock interview shutdown barrier.' }],
+        },
+      })
+    }
     return new Promise<void>((resolve) => {
       this.inputTranscriptResolve = resolve
       this.inputTranscriptTimer = setTimeout(resolve, INPUT_TRANSCRIPT_TIMEOUT_MS)
@@ -381,6 +409,14 @@ export class MockInterviewService extends EventEmitter {
     const type = typeof event.type === 'string' ? event.type : ''
 
     if (type === 'error') {
+      const clientEventId = readNestedString(event, ['error', 'event_id'])
+      if (clientEventId && clientEventId === this.shutdownCommitEventId) {
+        // Server VAD may have committed the buffer just before our explicit
+        // shutdown commit arrived. The ordered marker still guarantees that
+        // every resulting transcription item is tracked before we snapshot.
+        this.shutdownCommitEventId = null
+        return
+      }
       const message = readNestedString(event, ['error', 'message']) ?? 'OpenAI realtime error.'
       this.setStatus({ ...this.statusValue, state: 'error', message })
       this.emit('error', message)
@@ -392,6 +428,17 @@ export class MockInterviewService extends EventEmitter {
       const itemId = typeof event.item_id === 'string' ? event.item_id : ''
       if (itemId) this.pendingInputTranscriptions.add(itemId)
       this.resolveInputTranscriptIfDrained()
+      return
+    }
+
+    if (type === 'conversation.item.added' || type === 'conversation.item.created') {
+      const itemId = readNestedString(event, ['item', 'id'])
+      if (itemId && itemId === this.inputDrainMarkerId) {
+        this.send({ type: 'conversation.item.delete', item_id: itemId })
+        this.inputDrainMarkerId = null
+        this.shutdownCommitEventId = null
+        this.resolveInputTranscriptIfDrained()
+      }
       return
     }
 
@@ -525,7 +572,7 @@ export class MockInterviewService extends EventEmitter {
     this.ws.send(JSON.stringify(payload))
   }
 
-  private close(): void {
+  private close(publishIdle = true): void {
     this.clearTimer()
     this.clearFeedbackTimer()
     this.outputTranscript = ''
@@ -546,7 +593,7 @@ export class MockInterviewService extends EventEmitter {
     this.ws = null
     if (ws && ws.readyState === WebSocket.OPEN) ws.close()
     else if (ws) ws.terminate()
-    this.setStatus({ state: 'idle', paused: false })
+    if (publishIdle) this.setStatus({ state: 'idle', paused: false })
   }
 
   private clearTimer(): void {
@@ -560,7 +607,7 @@ export class MockInterviewService extends EventEmitter {
   }
 
   private resolveInputTranscriptIfDrained(): void {
-    if (this.inputBufferHasAudio || this.pendingInputTranscriptions.size > 0) return
+    if (this.inputDrainMarkerId || this.pendingInputTranscriptions.size > 0) return
     this.inputTranscriptResolve?.()
   }
 
@@ -578,6 +625,8 @@ export class MockInterviewService extends EventEmitter {
   private resetInputTracking(): void {
     this.inputBufferHasAudio = false
     this.pendingInputTranscriptions.clear()
+    this.inputDrainMarkerId = null
+    this.shutdownCommitEventId = null
   }
 
   private setStatus(next: MockInterviewStatus): void {

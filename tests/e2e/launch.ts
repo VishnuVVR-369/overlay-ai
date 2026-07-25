@@ -13,9 +13,10 @@ export async function launchApp(): Promise<{ app: ElectronApplication; page: Pag
   // images export it, so strip it rather than inherit it.
   const { ELECTRON_RUN_AS_NODE: _ignored, ...env } = process.env
   const userDataDir = mkdtempSync(join(tmpdir(), 'overlay-ai-e2e-'))
+  let app: ElectronApplication | null = null
 
   try {
-    const app = await electron.launch({
+    app = await electron.launch({
       args: [resolve(repoRoot, 'out/main/index.js'), `--user-data-dir=${userDataDir}`],
       cwd: repoRoot,
       env: { ...env, NODE_ENV: 'test' },
@@ -25,6 +26,7 @@ export async function launchApp(): Promise<{ app: ElectronApplication; page: Pag
     await page.waitForLoadState('domcontentloaded')
     return { app, page }
   } catch (error) {
+    if (app) await app.close().catch(() => undefined)
     rmSync(userDataDir, { recursive: true, force: true })
     throw error
   }

@@ -408,6 +408,7 @@ describe('MockInterviewService session persistence', () => {
       sessionApiKey: string | null
       feedbackResolve: (() => void) | null
       feedbackRequestPending: boolean
+      inputDrainMarkerId: string | null
       handleMessage(raw: string): void
     }
     testable.ws = { readyState: 1, send: (message) => sent.push(message), close: vi.fn(), terminate: vi.fn() }
@@ -422,14 +423,18 @@ describe('MockInterviewService session persistence', () => {
 
     service.ingest({ audioBase64: 'AAAA', sampleRate: 16000 })
     const stopPromise = service.stop()
-    expect(sent.map((message) => JSON.parse(message) as { type: string })).toContainEqual({
+    expect(sent.map((message) => JSON.parse(message) as { type: string })).toContainEqual(expect.objectContaining({
       type: 'input_audio_buffer.commit',
-    })
+    }))
     expect(sessions.store.save).not.toHaveBeenCalled()
 
     testable.handleMessage(JSON.stringify({
       type: 'input_audio_buffer.committed',
       item_id: 'final-item',
+    }))
+    testable.handleMessage(JSON.stringify({
+      type: 'conversation.item.added',
+      item: { id: testable.inputDrainMarkerId },
     }))
     transcriptionMock.snapshot.mockReturnValue({
       segments: [
@@ -449,6 +454,79 @@ describe('MockInterviewService session persistence', () => {
     expect(sessions.store.save).toHaveBeenCalledWith(expect.objectContaining({
       transcript: [expect.objectContaining({ id: 'final', text: 'final answer' })],
     }))
+  })
+
+  it('waits for the explicit shutdown commit when an earlier VAD commit arrives late', async () => {
+    const sessions = makeSessions()
+    const service = new MockInterviewService({
+      grader: makeGrader({ rubric: [], annotations: [], strengths: [], gaps: [], nextDrills: [] }),
+      sessions: sessions.store as never,
+    })
+    const sent: string[] = []
+    const testable = service as unknown as {
+      ws: { readyState: number; send: (m: string) => void; close: () => void; terminate: () => void } | null
+      statusValue: { state: string; paused: boolean }
+      sessionId: string | null
+      sessionStartedAt: number
+      sessionConfig: unknown
+      promptContext: unknown
+      sessionApiKey: string | null
+      feedbackRequestPending: boolean
+      inputDrainMarkerId: string | null
+      handleMessage(raw: string): void
+    }
+    testable.ws = { readyState: 1, send: (message) => sent.push(message), close: vi.fn(), terminate: vi.fn() }
+    testable.statusValue = { state: 'active', paused: false }
+    testable.sessionId = 'sess-ordered-drain'
+    testable.sessionStartedAt = 1000
+    testable.sessionConfig = { presetId: 'behavioral', durationMinutes: 30 }
+    testable.promptContext = { preset: undefined, vault: emptyVault() }
+    testable.sessionApiKey = 'oa'
+    transcriptionMock.flattenForPrompt.mockReturnValue('Them: Q\nYou: final answer')
+    transcriptionMock.snapshot.mockReturnValue({
+      segments: [{ id: 'final', speaker: 'you', status: 'committed', text: 'final answer', startedAt: 1500 }],
+      partials: {},
+    })
+
+    service.ingest({ audioBase64: 'AAAA', sampleRate: 16000 })
+    const stopPromise = service.stop()
+    const markerId = testable.inputDrainMarkerId
+    expect(markerId).toMatch(/^shutdown-drain-/)
+
+    testable.handleMessage(JSON.stringify({
+      type: 'input_audio_buffer.committed',
+      item_id: 'earlier-vad-item',
+    }))
+    testable.handleMessage(JSON.stringify({
+      type: 'conversation.item.input_audio_transcription.completed',
+      item_id: 'earlier-vad-item',
+      transcript: 'earlier answer',
+    }))
+    expect(testable.feedbackRequestPending).toBe(false)
+
+    testable.handleMessage(JSON.stringify({
+      type: 'input_audio_buffer.committed',
+      item_id: 'shutdown-item',
+    }))
+    testable.handleMessage(JSON.stringify({
+      type: 'conversation.item.added',
+      item: { id: markerId },
+    }))
+    expect(testable.feedbackRequestPending).toBe(false)
+
+    testable.handleMessage(JSON.stringify({
+      type: 'conversation.item.input_audio_transcription.completed',
+      item_id: 'shutdown-item',
+      transcript: 'final answer',
+    }))
+    await vi.waitFor(() => expect(testable.feedbackRequestPending).toBe(true))
+    testable.handleMessage(JSON.stringify({ type: 'response.done' }))
+    await stopPromise
+
+    expect(sent.map((message) => JSON.parse(message) as { type: string })).toContainEqual({
+      type: 'conversation.item.delete',
+      item_id: markerId,
+    })
   })
 
   it('does not resolve stop until the session write completes', async () => {
@@ -493,10 +571,18 @@ describe('MockInterviewService session persistence', () => {
     testable.feedbackResolve?.()
     await vi.waitFor(() => expect(sessions.store.save).toHaveBeenCalled())
     expect(stopped).toBe(false)
+    expect(service.status().state).toBe('stopping')
+    await expect(
+      service.start('next-key', { presetId: 'behavioral', durationMinutes: 15 }, {
+        preset: undefined,
+        vault: emptyVault(),
+      }),
+    ).rejects.toThrow(/still being saved/)
 
     resolveSave(undefined)
     await stopPromise
     expect(stopped).toBe(true)
+    expect(service.status().state).toBe('idle')
   })
 
   it('captureTranscriptSnapshot filters segments older than sessionStartedAt', () => {
