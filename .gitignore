@@ -1,43 +1,12 @@
-# Dependencies
-node_modules/
-
-# Build outputs
-dist/
-*.dmg
-
-# Rust build artifacts
-native/audio-engine/target/
-
-# Environment files
+node_modules
+out
+release
+dist
+coverage
+test-results
+.DS_Store
+*.log
 .env
 .env.local
-.env.*.local
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
-
-# Logs
-*.log
-npm-debug.log*
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Vite
-vite.config.ts.timestamp-*
-
-# AI docs
-docs/
-
-# Rust Binaries
-resources/
-
-# Coverage reports
-coverage/
-
-images/
-ToDo.txt
+.vscode
+.idea
