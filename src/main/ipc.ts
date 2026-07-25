@@ -24,8 +24,9 @@ import { groq } from './llm/groq-client'
 import { openaiVision } from './llm/openai-vision-client'
 import { mockInterview } from './mock/mock-interview-service'
 import { sanitizeMockConfig } from './mock/mock-config'
+import { mockSessionStore } from './mock/mock-session-store'
 import { captureActiveDisplay } from './vision/screen-capture'
-import { setMode } from './window'
+import { hideWindow, setMode } from './window'
 import { getShortcutRegistration } from './shortcuts'
 import { triggerPanic } from './panic'
 
@@ -111,6 +112,17 @@ export function registerIpc(win: BrowserWindow): void {
 
   ipcMain.on(IPC.mockAudioChunk, (_evt, chunk: MockAudioChunkMessage) => {
     mockInterview.ingest(chunk)
+  })
+
+  ipcMain.handle(IPC.mockSessionsList, () => mockSessionStore.list())
+  ipcMain.handle(IPC.mockSessionsGet, (_evt, id: unknown) => {
+    if (typeof id !== 'string' || !id) return null
+    return mockSessionStore.get(id)
+  })
+  ipcMain.handle(IPC.mockSessionsDelete, async (_evt, id: unknown) => {
+    if (typeof id !== 'string' || !id) return { ok: false }
+    const ok = await mockSessionStore.delete(id)
+    return { ok }
   })
 
   ipcMain.handle(IPC.transcriptSnapshot, () => transcription.snapshot())
@@ -219,6 +231,7 @@ export function registerIpc(win: BrowserWindow): void {
   })
 
   ipcMain.handle(IPC.windowSetMode, (_evt, mode: WindowMode) => setMode(win, mode))
+  ipcMain.handle(IPC.windowHide, () => hideWindow(win))
   ipcMain.on(IPC.windowUserActive, () => {
     if (!win.isDestroyed()) win.webContents.send(IPC.windowFocusState, { focused: true })
   })
@@ -251,6 +264,9 @@ export function registerIpc(win: BrowserWindow): void {
   })
   mockInterview.on('playbackStop', () => {
     if (!win.isDestroyed()) win.webContents.send(IPC.mockPlaybackStop)
+  })
+  mockInterview.on('sessionSaved', (event) => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.mockSessionSaved, event)
   })
   mockInterview.on('error', (message) => {
     sendToast(win, { level: 'error', message })

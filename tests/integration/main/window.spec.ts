@@ -88,7 +88,7 @@ describe('window mode helpers', () => {
     const { setMode, NORMAL_SIZE } = await load()
     setMode(win as unknown as Parameters<typeof setMode>[0], 'normal')
     expect(win.setResizable).toHaveBeenCalledWith(true)
-    expect(win.setMinimumSize).toHaveBeenCalledWith(360, 320)
+    expect(win.setMinimumSize).toHaveBeenCalledWith(380, 340)
     expect(win.setSize).toHaveBeenCalledWith(NORMAL_SIZE.width, NORMAL_SIZE.height, expect.any(Boolean))
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.windowModeChanged, { mode: 'normal' })
   })
@@ -96,7 +96,7 @@ describe('window mode helpers', () => {
   it('setMode(wide) sets wide dimensions and broadcasts', async () => {
     const { setMode, WIDE_SIZE } = await load()
     setMode(win as unknown as Parameters<typeof setMode>[0], 'wide')
-    expect(win.setMinimumSize).toHaveBeenCalledWith(360, 320)
+    expect(win.setMinimumSize).toHaveBeenCalledWith(380, 340)
     expect(win.setSize).toHaveBeenCalledWith(WIDE_SIZE.width, WIDE_SIZE.height, expect.any(Boolean))
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.windowModeChanged, { mode: 'wide' })
   })
@@ -109,21 +109,29 @@ describe('window mode helpers', () => {
     expect(getMode()).toBe('wide')
   })
 
-  it('toggleWide flips between normal and wide', async () => {
-    const { setMode, toggleWide } = await load()
-    setMode(win as unknown as Parameters<typeof setMode>[0], 'normal')
-    toggleWide(win as unknown as Parameters<typeof toggleWide>[0])
-    expect(win.webContents.send).toHaveBeenCalledWith(IPC.windowModeChanged, { mode: 'wide' })
-    toggleWide(win as unknown as Parameters<typeof toggleWide>[0])
+  it('cycleHudSize walks compact → normal → wide and wraps back to compact', async () => {
+    const { setMode, cycleHudSize, getMode } = await load()
+    const w = win as unknown as Parameters<typeof setMode>[0]
+    setMode(w, 'compact')
+
+    cycleHudSize(w)
+    expect(getMode()).toBe('normal')
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.windowModeChanged, { mode: 'normal' })
+
+    cycleHudSize(w)
+    expect(getMode()).toBe('wide')
+
+    cycleHudSize(w)
+    expect(getMode()).toBe('compact')
   })
 
-  it('toggleWide is a no-op while in compact mode', async () => {
-    const { setMode, toggleWide } = await load()
-    setMode(win as unknown as Parameters<typeof setMode>[0], 'compact')
+  it('cycleHudSize can leave compact mode, so the overlay is never stuck at one size', async () => {
+    const { setMode, cycleHudSize } = await load()
+    const w = win as unknown as Parameters<typeof setMode>[0]
+    setMode(w, 'compact')
     win.webContents.send = vi.fn()
-    toggleWide(win as unknown as Parameters<typeof toggleWide>[0])
-    expect(win.webContents.send).not.toHaveBeenCalled()
+    cycleHudSize(w)
+    expect(win.webContents.send).toHaveBeenCalledWith(IPC.windowModeChanged, { mode: 'normal' })
   })
 
   it('toggleWindowVisibility hides when visible and broadcasts visible:false', async () => {
@@ -143,10 +151,10 @@ describe('window mode helpers', () => {
   })
 
   it('mutating helpers are no-ops when window is destroyed', async () => {
-    const { setMode, toggleWide, toggleWindowVisibility } = await load()
+    const { setMode, cycleHudSize, toggleWindowVisibility } = await load()
     win.isDestroyed = vi.fn().mockReturnValue(true)
     setMode(win as unknown as Parameters<typeof setMode>[0], 'compact')
-    toggleWide(win as unknown as Parameters<typeof toggleWide>[0])
+    cycleHudSize(win as unknown as Parameters<typeof cycleHudSize>[0])
     toggleWindowVisibility(win as unknown as Parameters<typeof toggleWindowVisibility>[0])
     expect(win.setSize).not.toHaveBeenCalled()
     expect(win.webContents.send).not.toHaveBeenCalled()

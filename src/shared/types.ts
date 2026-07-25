@@ -163,6 +163,55 @@ export interface MockFeedbackEvent {
   text: string
 }
 
+export type MockRubricDimension =
+  | 'clarification'
+  | 'structure'
+  | 'communication'
+  | 'correctness'
+  | 'starCompleteness'
+  | 'tradeoffs'
+  | 'complexity'
+
+export interface MockRubricScore {
+  dimension: MockRubricDimension
+  label: string
+  score: number
+  evidence: string
+}
+
+export interface MockSessionAnnotation {
+  transcriptIndex: number
+  severity: 'good' | 'warn' | 'gap'
+  note: string
+  betterAnswer?: string
+}
+
+export interface MockSessionSummary {
+  id: string
+  presetId: PresetId
+  presetLabel: string
+  durationMinutes: number
+  startedAt: number
+  endedAt: number
+  averageScore: number | null
+  graded: boolean
+}
+
+export interface MockSessionRecord extends MockSessionSummary {
+  transcript: TranscriptSegment[]
+  legacyFeedback: string
+  rubric: MockRubricScore[]
+  annotations: MockSessionAnnotation[]
+  strengths: string[]
+  gaps: string[]
+  nextDrills: string[]
+  graderError?: string
+}
+
+export interface MockSessionSavedEvent {
+  summary: MockSessionSummary
+}
+
 export type SocketState = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'auth_error' | 'error' | 'closed'
 
 export interface SocketStatusEvent {
@@ -251,6 +300,8 @@ export interface OverlayApi {
     clear(): Promise<void>
     onUpdate(handler: (event: TranscriptUpdate) => void): () => void
     onSocketStatus(handler: (event: SocketStatusEvent) => void): () => void
+    /** Global "toggle listening" accelerator, usable while the overlay is unfocused. */
+    onListenTrigger(handler: () => void): () => void
   }
   mock: {
     start(config: MockInterviewConfig): Promise<{ ok: boolean; reason?: string; status?: MockInterviewStatus }>
@@ -263,6 +314,12 @@ export interface OverlayApi {
     onAudioDelta(handler: (event: MockAudioDeltaEvent) => void): () => void
     onFeedback(handler: (event: MockFeedbackEvent) => void): () => void
     onPlaybackStop(handler: () => void): () => void
+  }
+  mockSessions: {
+    list(): Promise<MockSessionSummary[]>
+    get(id: string): Promise<MockSessionRecord | null>
+    delete(id: string): Promise<{ ok: boolean }>
+    onSaved(handler: (event: MockSessionSavedEvent) => void): () => void
   }
   llm: {
     start(): Promise<LlmStartResponse>
@@ -298,6 +355,7 @@ export interface OverlayApi {
   }
   window: {
     setMode(mode: WindowMode): Promise<void>
+    hide(): Promise<void>
     notifyUserActive(): void
     onFocusState(handler: (event: WindowFocusState) => void): () => void
     onModeChanged(handler: (event: WindowModeChangedEvent) => void): () => void

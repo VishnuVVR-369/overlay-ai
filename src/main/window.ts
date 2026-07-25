@@ -6,9 +6,12 @@ import type { WindowMode } from '@shared/types'
 const isDev = !app.isPackaged
 const RENDERER_DEV_URL = process.env['ELECTRON_RENDERER_URL']
 
-export const COMPACT_SIZE = { width: 360, height: 120 }
-export const NORMAL_SIZE = { width: 460, height: 620 }
-export const WIDE_SIZE = { width: 760, height: 620 }
+export const COMPACT_SIZE = { width: 400, height: 148 }
+export const NORMAL_SIZE = { width: 480, height: 640 }
+export const WIDE_SIZE = { width: 780, height: 640 }
+
+// Smallest → largest, so repeated presses grow the overlay and wrap around.
+const SIZE_CYCLE: WindowMode[] = ['compact', 'normal', 'wide']
 
 let currentMode: WindowMode = 'normal'
 
@@ -104,14 +107,14 @@ export function setMode(win: BrowserWindow, mode: WindowMode): void {
     win.setSize(COMPACT_SIZE.width, COMPACT_SIZE.height, animate)
   } else {
     win.setResizable(true)
-    win.setMinimumSize(360, 320)
+    win.setMinimumSize(380, 340)
     const size = mode === 'wide' ? WIDE_SIZE : NORMAL_SIZE
     win.setSize(size.width, size.height, animate)
   }
   win.webContents.send(IPC.windowModeChanged, { mode })
 }
 
-export function toggleWide(win: BrowserWindow): void {
-  if (currentMode === 'compact') return
-  setMode(win, currentMode === 'wide' ? 'normal' : 'wide')
+export function cycleHudSize(win: BrowserWindow): void {
+  const next = SIZE_CYCLE[(SIZE_CYCLE.indexOf(currentMode) + 1) % SIZE_CYCLE.length]
+  setMode(win, next)
 }

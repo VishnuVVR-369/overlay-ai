@@ -7,11 +7,13 @@ interface Props {
   className?: string
 }
 
-const STROKE_YOU = 'rgba(122, 163, 197, 0.85)'
-const STROKE_THEM = 'rgba(212, 165, 116, 0.85)'
-const FILL_YOU = 'rgba(122, 163, 197, 0.18)'
-const FILL_THEM = 'rgba(212, 165, 116, 0.18)'
-const CENTER_LINE = 'rgba(255, 255, 255, 0.06)'
+const STROKE_YOU = 'rgba(134, 176, 214, 0.6)'
+const STROKE_THEM = 'rgba(224, 177, 132, 0.6)'
+const FILL_YOU = 'rgba(134, 176, 214, 0.16)'
+const FILL_THEM = 'rgba(224, 177, 132, 0.16)'
+// Barely there. At full opacity a flat, silent waveform reads as a hard rule
+// struck through the UI rather than as a dormant meter.
+const CENTER_LINE = 'rgba(255, 255, 255, 0.03)'
 
 export function SeamWaveform({ height = 28, className = '' }: Props): JSX.Element {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -69,6 +71,18 @@ export function SeamWaveform({ height = 28, className = '' }: Props): JSX.Elemen
       themPathRef.current?.setAttribute('d', buildLine(system, -1))
       youFillRef.current?.setAttribute('d', buildFill(mic, +1))
       themFillRef.current?.setAttribute('d', buildFill(system, -1))
+
+      // A silent waveform is geometrically a straight line, which reads as a
+      // hard divider struck across the UI. Fade the whole trace with the signal
+      // so silence recedes and speech is what draws the eye.
+      let peak = 0
+      for (let i = 0; i < AUDIO_HISTORY; i++) {
+        if (mic[i] > peak) peak = mic[i]
+        if (system[i] > peak) peak = system[i]
+      }
+      if (svgRef.current) {
+        svgRef.current.style.opacity = (0.18 + 0.82 * Math.min(1, peak * 1.6)).toFixed(3)
+      }
 
       raf = requestAnimationFrame(draw)
     }

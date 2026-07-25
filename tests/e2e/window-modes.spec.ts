@@ -20,16 +20,16 @@ test.describe('e2e window modes', () => {
     }
 
     const compact = await sizeAfter('compact')
-    expect(compact.width).toBe(360)
-    expect(compact.height).toBe(120)
+    expect(compact.width).toBe(400)
+    expect(compact.height).toBe(148)
 
     const normal = await sizeAfter('normal')
-    expect(normal.width).toBe(460)
-    expect(normal.height).toBe(620)
+    expect(normal.width).toBe(480)
+    expect(normal.height).toBe(640)
 
     const wide = await sizeAfter('wide')
-    expect(wide.width).toBe(760)
-    expect(wide.height).toBe(620)
+    expect(wide.width).toBe(780)
+    expect(wide.height).toBe(640)
 
     await app.close()
   })

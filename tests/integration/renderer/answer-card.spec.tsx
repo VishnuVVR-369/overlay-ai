@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { AnswerCard } from '@/components/AnswerCard'
 import { useStatusStore } from '@/state/status-store'
 import { useLlmStore } from '@/state/llm-store'
+import { useMockStore } from '@/state/mock-store'
 import { useTranscriptStore } from '@/state/transcript-store'
 
 vi.mock('@/components/SeamWaveform', () => ({
@@ -11,69 +12,75 @@ vi.mock('@/components/SeamWaveform', () => ({
 }))
 
 beforeEach(() => {
-  useStatusStore.setState({ running: false, micState: 'idle', systemState: 'idle' })
+  useStatusStore.setState({ running: false, startedAt: null, micState: 'idle', systemState: 'idle' })
   useLlmStore.setState({ entries: [] })
+  useMockStore.setState({ status: { state: 'idle', paused: false } })
   useTranscriptStore.setState({ segments: [], partials: {} })
 })
 
-describe('AnswerCard', () => {
-  it('shows "idle" + "awaiting question" when nothing is going on', () => {
-    render(<AnswerCard onExpand={() => {}} onQuit={() => {}} />)
-    expect(screen.getByText('idle')).toBeTruthy()
-    expect(screen.getByText('awaiting question')).toBeTruthy()
+describe('AnswerCard (compact mode)', () => {
+  it('reads "Idle" and prompts for a question when nothing is going on', () => {
+    render(<AnswerCard onExpand={() => {}} />)
+    expect(screen.getByText('Idle')).toBeTruthy()
+    expect(screen.getByText('waiting for a question')).toBeTruthy()
   })
 
-  it('shows "live" when transcription is running', () => {
+  it('reads "Listening" once transcription is running', () => {
     useStatusStore.setState({ running: true, micState: 'open', systemState: 'open' })
-    render(<AnswerCard onExpand={() => {}} onQuit={() => {}} />)
-    expect(screen.getByText(/live/)).toBeTruthy()
+    render(<AnswerCard onExpand={() => {}} />)
+    expect(screen.getByText('Listening')).toBeTruthy()
   })
 
-  it('shows " · answering" suffix while the latest entry is streaming', () => {
-    useLlmStore.setState({ entries: [{ requestId: 'r', mode: 'transcript', text: '', chunks: [], status: 'streaming', startedAt: 1 }] })
-    render(<AnswerCard onExpand={() => {}} onQuit={() => {}} />)
-    expect(screen.getByText(/answering/)).toBeTruthy()
+  it('reads "Answering" while the latest entry streams', () => {
+    useStatusStore.setState({ running: true })
+    useLlmStore.setState({
+      entries: [{ requestId: 'r', mode: 'transcript', text: '', chunks: [], status: 'streaming', startedAt: 1 }],
+    })
+    render(<AnswerCard onExpand={() => {}} />)
+    expect(screen.getByText('Answering')).toBeTruthy()
   })
 
-  it('renders the latest "them" question or partial as Q · …', () => {
+  it('reads "Mock" while a mock interview is live, ahead of listening state', () => {
+    useMockStore.setState({ status: { state: 'active', paused: false } })
+    render(<AnswerCard onExpand={() => {}} />)
+    expect(screen.getByText('Mock')).toBeTruthy()
+  })
+
+  it('renders the latest committed "them" question', () => {
     useTranscriptStore.setState({
-      segments: [
-        { id: 'a', speaker: 'them', status: 'committed', text: 'binary search?', startedAt: 1 },
-      ],
+      segments: [{ id: 'a', speaker: 'them', status: 'committed', text: 'binary search?', startedAt: 1 }],
       partials: {},
     })
-    render(<AnswerCard onExpand={() => {}} onQuit={() => {}} />)
-    expect(screen.getByText(/binary search\?/)).toBeTruthy()
+    render(<AnswerCard onExpand={() => {}} />)
+    expect(screen.getByText('binary search?')).toBeTruthy()
   })
 
-  it('uses the most recent "them" partial when available', () => {
+  it('prefers the live "them" partial over the last committed question', () => {
     useTranscriptStore.setState({
       segments: [{ id: 'a', speaker: 'them', status: 'committed', text: 'old', startedAt: 1 }],
       partials: { them: { id: 'p', speaker: 'them', status: 'partial', text: 'newer partial', startedAt: 2 } },
     })
-    render(<AnswerCard onExpand={() => {}} onQuit={() => {}} />)
-    expect(screen.getByText(/newer partial/)).toBeTruthy()
+    render(<AnswerCard onExpand={() => {}} />)
+    expect(screen.getByText('newer partial')).toBeTruthy()
   })
 
-  it('shows the latest completed answer text', () => {
+  it('shows only the latest answer, never the history', () => {
     useLlmStore.setState({
       entries: [
-        { requestId: 'r2', mode: 'screen', imageDataUrl: 'data:image/png;base64,xxx', text: 'Use a two-pointer scan.', chunks: [], status: 'done', startedAt: 2 },
+        { requestId: 'r2', mode: 'screen', text: 'Use a two-pointer scan.', chunks: [], status: 'done', startedAt: 2 },
         { requestId: 'r1', mode: 'transcript', text: 'older answer', chunks: [], status: 'done', startedAt: 1 },
       ],
     })
-    render(<AnswerCard onExpand={() => {}} onQuit={() => {}} />)
+    render(<AnswerCard onExpand={() => {}} />)
     expect(screen.getByText('Use a two-pointer scan.')).toBeTruthy()
     expect(screen.queryByText('older answer')).toBeNull()
   })
 
-  it('expand and quit buttons fire their callbacks', () => {
+  it('exposes expand as the only control, so quit cannot be hit by accident mid-call', () => {
     const onExpand = vi.fn()
-    const onQuit = vi.fn()
-    render(<AnswerCard onExpand={onExpand} onQuit={onQuit} />)
-    fireEvent.click(screen.getByLabelText('Expand'))
-    fireEvent.click(screen.getByLabelText('Quit'))
+    render(<AnswerCard onExpand={onExpand} />)
+    fireEvent.click(screen.getByLabelText('Expand overlay'))
     expect(onExpand).toHaveBeenCalled()
-    expect(onQuit).toHaveBeenCalled()
+    expect(screen.queryByLabelText(/quit/i)).toBeNull()
   })
 })

@@ -12,6 +12,9 @@ import type {
   MockFeedbackEvent,
   MockInterviewConfig,
   MockInterviewStatus,
+  MockSessionRecord,
+  MockSessionSavedEvent,
+  MockSessionSummary,
   MockStatusEvent,
   OverlayApi,
   PermissionStatus,
@@ -48,6 +51,8 @@ export interface FakeApi extends OverlayApi {
     mockAudioDelta: (e: MockAudioDeltaEvent) => void
     mockFeedback: (e: MockFeedbackEvent) => void
     mockPlaybackStop: () => void
+    mockSessionSaved: (e: MockSessionSavedEvent) => void
+    listenTrigger: () => void
     presetsChanged: (e: PresetState) => void
     toast: (e: ToastEvent) => void
     openSettings: () => void
@@ -78,6 +83,9 @@ export interface FakeApi extends OverlayApi {
     mockStartResult: { ok: boolean; reason?: string; status?: MockInterviewStatus }
     mockAudioChunks: MockAudioChunkMessage[]
     mockConfigs: MockInterviewConfig[]
+    mockSessionSummaries: MockSessionSummary[]
+    mockSessionRecords: Record<string, MockSessionRecord>
+    mockSessionDeletes: string[]
     vault: VaultData
     vaultUpdates: VaultData[]
     panicRequests: number
@@ -97,6 +105,8 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
     mockAudioDelta: new Set<Listener<MockAudioDeltaEvent>>(),
     mockFeedback: new Set<Listener<MockFeedbackEvent>>(),
     mockPlaybackStop: new Set<() => void>(),
+    mockSessionSaved: new Set<Listener<MockSessionSavedEvent>>(),
+    listenTrigger: new Set<() => void>(),
     presetsChanged: new Set<Listener<PresetState>>(),
     toast: new Set<Listener<ToastEvent>>(),
     openSettings: new Set<() => void>(),
@@ -164,6 +174,9 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
     mockStartResult: { ok: true, status: { state: 'active', paused: false, startedAt: 1, endsAt: 2 } },
     mockAudioChunks: [],
     mockConfigs: [],
+    mockSessionSummaries: [],
+    mockSessionRecords: {},
+    mockSessionDeletes: [],
     vault: {
       resume: '',
       jobDescription: '',
@@ -243,6 +256,7 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
       clear: vi.fn(async () => undefined),
       onUpdate: (h) => subscribe<TranscriptUpdate>(listeners.transcriptUpdate, h),
       onSocketStatus: (h) => subscribe<SocketStatusEvent>(listeners.socketStatus, h),
+      onListenTrigger: (h) => subscribeNoArg(listeners.listenTrigger, h),
     },
     llm: {
       start: vi.fn(async () => state.llmStartResponse),
@@ -272,6 +286,18 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
       onAudioDelta: (h) => subscribe<MockAudioDeltaEvent>(listeners.mockAudioDelta, h),
       onFeedback: (h) => subscribe<MockFeedbackEvent>(listeners.mockFeedback, h),
       onPlaybackStop: (h) => subscribeNoArg(listeners.mockPlaybackStop, h),
+    },
+    mockSessions: {
+      list: vi.fn(async () => state.mockSessionSummaries),
+      get: vi.fn(async (id: string) => state.mockSessionRecords[id] ?? null),
+      delete: vi.fn(async (id: string) => {
+        state.mockSessionDeletes.push(id)
+        const idx = state.mockSessionSummaries.findIndex((s) => s.id === id)
+        if (idx >= 0) state.mockSessionSummaries.splice(idx, 1)
+        delete state.mockSessionRecords[id]
+        return { ok: true }
+      }),
+      onSaved: (h) => subscribe<MockSessionSavedEvent>(listeners.mockSessionSaved, h),
     },
     vision: {
       start: vi.fn(async () => state.visionStartResponse),
@@ -307,6 +333,7 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
     },
     window: {
       setMode: vi.fn(async (_m: WindowMode) => undefined),
+      hide: vi.fn(async () => undefined),
       notifyUserActive: vi.fn(),
       onFocusState: (h) => subscribe<WindowFocusState>(listeners.focus, h),
       onModeChanged: (h) => subscribe<WindowModeChangedEvent>(listeners.modeChanged, h),
@@ -325,6 +352,8 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
       mockAudioDelta: (e) => listeners.mockAudioDelta.forEach((l) => l(e)),
       mockFeedback: (e) => listeners.mockFeedback.forEach((l) => l(e)),
       mockPlaybackStop: () => listeners.mockPlaybackStop.forEach((l) => l()),
+      mockSessionSaved: (e) => listeners.mockSessionSaved.forEach((l) => l(e)),
+      listenTrigger: () => listeners.listenTrigger.forEach((l) => l()),
       presetsChanged: (e) => listeners.presetsChanged.forEach((l) => l(e)),
       toast: (e) => listeners.toast.forEach((l) => l(e)),
       openSettings: () => listeners.openSettings.forEach((l) => l()),

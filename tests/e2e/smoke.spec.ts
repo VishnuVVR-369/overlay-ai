@@ -21,11 +21,29 @@ test.describe('e2e smoke', () => {
       const api = (window as unknown as { api: Record<string, unknown> }).api
       return {
         keys: Object.keys(api).sort(),
+        hasInternalStoreBridge: '__stores' in window,
       }
     })
     expect(sections.keys).toEqual(
-      ['answerStyles', 'llm', 'loopback', 'permissions', 'presets', 'readiness', 'settings', 'transcription', 'ui', 'vision', 'window'].sort(),
+      [
+        'answerStyles',
+        'llm',
+        'loopback',
+        'mock',
+        'mockSessions',
+        'panic',
+        'permissions',
+        'presets',
+        'readiness',
+        'settings',
+        'transcription',
+        'ui',
+        'vault',
+        'vision',
+        'window',
+      ].sort(),
     )
+    expect(sections.hasInternalStoreBridge).toBe(false)
     await app.close()
   })
 

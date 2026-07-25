@@ -13,6 +13,9 @@ import type {
   MockFeedbackEvent,
   MockInterviewConfig,
   MockInterviewStatus,
+  MockSessionRecord,
+  MockSessionSavedEvent,
+  MockSessionSummary,
   MockStatusEvent,
   OverlayApi,
   PermissionStatus,
@@ -75,6 +78,11 @@ const api: OverlayApi = {
     clear: () => ipcRenderer.invoke(IPC.transcriptClear) as Promise<void>,
     onUpdate: (h) => subscribe<TranscriptUpdate>(IPC.transcriptUpdate, h),
     onSocketStatus: (h) => subscribe<SocketStatusEvent>(IPC.socketStatus, h),
+    onListenTrigger: (h) => {
+      const listener = (): void => h()
+      ipcRenderer.on(IPC.listenTrigger, listener)
+      return () => ipcRenderer.removeListener(IPC.listenTrigger, listener)
+    },
   },
   mock: {
     start: (config: MockInterviewConfig) =>
@@ -92,6 +100,12 @@ const api: OverlayApi = {
       ipcRenderer.on(IPC.mockPlaybackStop, listener)
       return () => ipcRenderer.removeListener(IPC.mockPlaybackStop, listener)
     },
+  },
+  mockSessions: {
+    list: () => ipcRenderer.invoke(IPC.mockSessionsList) as Promise<MockSessionSummary[]>,
+    get: (id: string) => ipcRenderer.invoke(IPC.mockSessionsGet, id) as Promise<MockSessionRecord | null>,
+    delete: (id: string) => ipcRenderer.invoke(IPC.mockSessionsDelete, id) as Promise<{ ok: boolean }>,
+    onSaved: (h) => subscribe<MockSessionSavedEvent>(IPC.mockSessionSaved, h),
   },
   llm: {
     start: () => ipcRenderer.invoke(IPC.llmStart) as Promise<LlmStartResponse>,
@@ -140,6 +154,7 @@ const api: OverlayApi = {
   },
   window: {
     setMode: (mode: WindowMode) => ipcRenderer.invoke(IPC.windowSetMode, mode) as Promise<void>,
+    hide: () => ipcRenderer.invoke(IPC.windowHide) as Promise<void>,
     notifyUserActive: () => ipcRenderer.send(IPC.windowUserActive),
     onFocusState: (h) => subscribe<WindowFocusState>(IPC.windowFocusState, h),
     onModeChanged: (h) => subscribe<WindowModeChangedEvent>(IPC.windowModeChanged, h),

@@ -1,54 +1,65 @@
 import { BrowserWindow, app, globalShortcut } from 'electron'
 import { IPC } from '@shared/ipc-channels'
-import { toggleWindowVisibility, toggleWide } from './window'
+import { toggleWindowVisibility, cycleHudSize } from './window'
 import { triggerPanic } from './panic'
 
-const ASK_ACCEL = process.platform === 'darwin' ? 'Cmd+\\' : 'Ctrl+\\'
-const SCREEN_ASK_ACCEL = process.platform === 'darwin' ? 'Cmd+Shift+\\' : 'Ctrl+Shift+\\'
-const TOGGLE_ACCEL = process.platform === 'darwin' ? 'Cmd+B' : 'Ctrl+B'
-const WIDE_ACCEL = process.platform === 'darwin' ? 'Cmd+W' : 'Ctrl+W'
-const PANIC_ACCEL = process.platform === 'darwin' ? 'Cmd+Shift+Escape' : 'Ctrl+Shift+Escape'
+// Global shortcuts are stolen from every other app on the machine, so they must
+// be combinations nothing else claims. Plain Cmd+<letter> is not safe: Cmd+W
+// closes tabs and Cmd+B bolds text, and the overlay is meant to run for hours
+// underneath a browser or an editor. Everything here is Cmd+Shift+<key>.
+const accel = (key: string): string => (process.platform === 'darwin' ? `Cmd+${key}` : `Ctrl+${key}`)
 
-export interface ShortcutRegistration {
-  ask: { ok: boolean; accelerator: string }
-  screenAsk: { ok: boolean; accelerator: string }
-  toggle: { ok: boolean; accelerator: string }
-  wide: { ok: boolean; accelerator: string }
-  panic: { ok: boolean; accelerator: string }
+export const ACCELERATORS = {
+  ask: accel('\\'),
+  screenAsk: accel('Shift+\\'),
+  toggle: accel('Shift+B'),
+  listen: accel('Shift+L'),
+  hud: accel('Shift+E'),
+  panic: accel('Shift+Escape'),
+} as const
+
+export type ShortcutId = keyof typeof ACCELERATORS
+
+export interface ShortcutSlot {
+  ok: boolean
+  accelerator: string
 }
+
+export type ShortcutRegistration = Record<ShortcutId, ShortcutSlot>
 
 let lastRegistration: ShortcutRegistration | null = null
 
 export function registerShortcuts(win: BrowserWindow): ShortcutRegistration {
-  const askOk = globalShortcut.register(ASK_ACCEL, () => {
-    if (!win.isDestroyed()) {
-      win.webContents.send(IPC.llmTrigger)
-    }
-  })
-  const screenAskOk = globalShortcut.register(SCREEN_ASK_ACCEL, () => {
-    if (!win.isDestroyed()) {
-      win.webContents.send(IPC.visionTrigger)
-    }
-  })
-  const toggleOk = globalShortcut.register(TOGGLE_ACCEL, () => toggleWindowVisibility(win))
-  const wideOk = globalShortcut.register(WIDE_ACCEL, () => toggleWide(win))
-  const panicOk = (() => {
+  const send = (channel: string) => (): void => {
+    if (!win.isDestroyed()) win.webContents.send(channel)
+  }
+
+  const handlers: Record<ShortcutId, () => void> = {
+    ask: send(IPC.llmTrigger),
+    screenAsk: send(IPC.visionTrigger),
+    toggle: () => toggleWindowVisibility(win),
+    listen: send(IPC.listenTrigger),
+    hud: () => cycleHudSize(win),
+    panic: () => triggerPanic(win),
+  }
+
+  const registration = {} as ShortcutRegistration
+  for (const id of Object.keys(ACCELERATORS) as ShortcutId[]) {
+    const accelerator = ACCELERATORS[id]
+    let ok = false
     try {
-      return globalShortcut.register(PANIC_ACCEL, () => triggerPanic(win))
+      // The OS reserves some combinations outright and Electron throws rather
+      // than returning false, so every registration is guarded.
+      ok = globalShortcut.register(accelerator, handlers[id])
     } catch {
-      return false
+      ok = false
     }
-  })()
+    registration[id] = { ok, accelerator }
+  }
 
   app.on('will-quit', () => globalShortcut.unregisterAll())
 
-  lastRegistration = {
-    ask: { ok: askOk, accelerator: ASK_ACCEL },
-    screenAsk: { ok: screenAskOk, accelerator: SCREEN_ASK_ACCEL },
-    toggle: { ok: toggleOk, accelerator: TOGGLE_ACCEL },
-    wide: { ok: wideOk, accelerator: WIDE_ACCEL },
-    panic: { ok: panicOk, accelerator: PANIC_ACCEL },
-  }
+  lastRegistration = registration
   return lastRegistration
 }
 

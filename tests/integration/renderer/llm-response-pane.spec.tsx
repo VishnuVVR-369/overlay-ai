@@ -14,7 +14,14 @@ vi.mock('@/markdown/StreamingBody', () => ({
 
 beforeEach(() => {
   useLlmStore.setState({ entries: [] })
-  useUiStore.setState({ mode: 'normal', helpOpen: false, settingsOpen: false, focused: true, permStatus: { mic: 'unknown', screen: 'unknown' }, expandedEntries: {} })
+  useUiStore.setState({
+    mode: 'normal',
+    consoleTab: null,
+    paletteOpen: false,
+    focused: true,
+    permStatus: { mic: 'unknown', screen: 'unknown' },
+    expandedEntries: {},
+  })
   Object.defineProperty(navigator, 'clipboard', {
     configurable: true,
     value: { writeText: vi.fn().mockResolvedValue(undefined) },
@@ -22,23 +29,25 @@ beforeEach(() => {
 })
 
 describe('LLMResponsePane', () => {
-  it('shows the empty hint when there are no entries', () => {
+  it('shows an empty state that names every way to ask', () => {
     render(<LLMResponsePane />)
-    expect(screen.getByText(/to ask/i)).toBeTruthy()
+    expect(screen.getByText('Nothing asked yet')).toBeTruthy()
+    expect(screen.getByText(/answer the last thing they asked/i)).toBeTruthy()
+    expect(screen.getByText(/answer what is on your screen/i)).toBeTruthy()
   })
 
-  it('renders the hero entry with mode tag and StreamingBody while streaming', () => {
+  it('renders StreamingBody and a Transcript tag while streaming', () => {
     useLlmStore.setState({
       entries: [{ requestId: 'r1', mode: 'transcript', text: 'hi', chunks: ['hi'], status: 'streaming', startedAt: 1 }],
     })
     render(<LLMResponsePane />)
     expect(screen.getByTestId('streaming').textContent).toBe('hi')
-    expect(screen.getByText('transcript')).toBeTruthy()
+    expect(screen.getByText('Transcript')).toBeTruthy()
   })
 
-  it('swaps to MarkdownBody and shows Copy button when entry is done', () => {
+  it('swaps to MarkdownBody and offers Copy once the entry is done', () => {
     useLlmStore.setState({
-      entries: [{ requestId: 'r1', mode: 'transcript', text: 'final', chunks: ['final'], status: 'done', startedAt: 1, finishedAt: 2 }],
+      entries: [{ requestId: 'r1', mode: 'transcript', text: 'final', chunks: ['final'], status: 'done', startedAt: 1 }],
     })
     render(<LLMResponsePane />)
     expect(screen.getByTestId('md').textContent).toBe('final')
@@ -47,15 +56,17 @@ describe('LLMResponsePane', () => {
 
   it('renders the screenshot thumbnail for vision-mode entries', () => {
     useLlmStore.setState({
-      entries: [{ requestId: 'r1', mode: 'screen', imageDataUrl: 'data:image/png;base64,xxx', text: 't', chunks: [], status: 'done', startedAt: 1 }],
+      entries: [
+        { requestId: 'r1', mode: 'screen', imageDataUrl: 'data:image/png;base64,xxx', text: 't', chunks: [], status: 'done', startedAt: 1 },
+      ],
     })
     const { container } = render(<LLMResponsePane />)
-    const img = container.querySelector('img.llm-screenshot') as HTMLImageElement | null
+    const img = container.querySelector('img.answer-shot') as HTMLImageElement | null
     expect(img?.src).toBe('data:image/png;base64,xxx')
-    expect(screen.getByText('screen')).toBeTruthy()
+    expect(screen.getByText('Screen')).toBeTruthy()
   })
 
-  it('shows the error message when an entry errored', () => {
+  it('surfaces the error message when an entry failed', () => {
     useLlmStore.setState({
       entries: [{ requestId: 'r1', mode: 'transcript', text: '', chunks: [], status: 'error', error: 'rate limited', startedAt: 1 }],
     })
@@ -64,7 +75,7 @@ describe('LLMResponsePane', () => {
     expect(screen.getByText('error')).toBeTruthy()
   })
 
-  it('older entries collapse to a clickable preview button', () => {
+  it('collapses older entries to a clickable one-line preview', () => {
     useLlmStore.setState({
       entries: [
         { requestId: 'a', mode: 'transcript', text: 'newest', chunks: ['newest'], status: 'done', startedAt: 2 },
@@ -72,7 +83,7 @@ describe('LLMResponsePane', () => {
       ],
     })
     const { container } = render(<LLMResponsePane />)
-    const collapsed = container.querySelector('button.llm-entry.collapsed')
+    const collapsed = container.querySelector('button.answer-collapsed')
     expect(collapsed).toBeTruthy()
     expect(collapsed?.textContent).toContain('older entry first line')
   })
@@ -85,11 +96,11 @@ describe('LLMResponsePane', () => {
       ],
     })
     const { container } = render(<LLMResponsePane />)
-    fireEvent.click(container.querySelector('button.llm-entry.collapsed')!)
+    fireEvent.click(container.querySelector('button.answer-collapsed')!)
     expect(useUiStore.getState().expandedEntries['b']).toBe(true)
   })
 
-  it('Copy button writes the entry text to clipboard', () => {
+  it('Copy writes the entry text and confirms it in the tooltip', () => {
     const writeText = navigator.clipboard.writeText as unknown as ReturnType<typeof vi.fn>
     useLlmStore.setState({
       entries: [{ requestId: 'r1', mode: 'transcript', text: 'copy me', chunks: [], status: 'done', startedAt: 1 }],
@@ -97,5 +108,6 @@ describe('LLMResponsePane', () => {
     render(<LLMResponsePane />)
     fireEvent.click(screen.getByLabelText('Copy answer'))
     expect(writeText).toHaveBeenCalledWith('copy me')
+    expect(screen.getByLabelText('Copy answer').getAttribute('title')).toBe('Copied')
   })
 })

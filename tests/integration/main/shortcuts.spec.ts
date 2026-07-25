@@ -38,147 +38,141 @@ beforeEach(() => {
   Object.defineProperty(process, 'platform', { value: platformRef.current, configurable: true })
 })
 
-async function load(): Promise<typeof import('@main/shortcuts')> {
+async function load(platform: NodeJS.Platform = 'darwin'): Promise<typeof import('@main/shortcuts')> {
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true })
   vi.resetModules()
   return await import('@main/shortcuts')
 }
 
+type RegisterShortcuts = typeof import('@main/shortcuts')['registerShortcuts']
+const asWin = (win: ReturnType<typeof makeFakeWindow>): Parameters<RegisterShortcuts>[0] =>
+  win as unknown as Parameters<RegisterShortcuts>[0]
+
 describe('global shortcuts', () => {
-  it('registers all five expected accelerators on macOS', async () => {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    const { registerShortcuts } = await load()
-    const win = makeFakeWindow()
-    const reg = registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+  it('registers the six accelerators on macOS', async () => {
+    const { registerShortcuts } = await load('darwin')
+    const reg = registerShortcuts(asWin(makeFakeWindow()))
     expect(reg.ask.accelerator).toBe('Cmd+\\')
     expect(reg.screenAsk.accelerator).toBe('Cmd+Shift+\\')
-    expect(reg.toggle.accelerator).toBe('Cmd+B')
-    expect(reg.wide.accelerator).toBe('Cmd+W')
+    expect(reg.toggle.accelerator).toBe('Cmd+Shift+B')
+    expect(reg.listen.accelerator).toBe('Cmd+Shift+L')
+    expect(reg.hud.accelerator).toBe('Cmd+Shift+E')
     expect(reg.panic.accelerator).toBe('Cmd+Shift+Escape')
-    expect(reg.ask.ok && reg.screenAsk.ok && reg.toggle.ok && reg.wide.ok && reg.panic.ok).toBe(true)
+    expect(Object.values(reg).every((slot) => slot.ok)).toBe(true)
   })
 
   it('uses Ctrl-prefixed accelerators on non-mac', async () => {
-    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
-    const { registerShortcuts } = await load()
-    const win = makeFakeWindow()
-    const reg = registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    const { registerShortcuts } = await load('win32')
+    const reg = registerShortcuts(asWin(makeFakeWindow()))
     expect(reg.ask.accelerator).toBe('Ctrl+\\')
     expect(reg.screenAsk.accelerator).toBe('Ctrl+Shift+\\')
-    expect(reg.toggle.accelerator).toBe('Ctrl+B')
-    expect(reg.wide.accelerator).toBe('Ctrl+W')
+    expect(reg.toggle.accelerator).toBe('Ctrl+Shift+B')
+    expect(reg.listen.accelerator).toBe('Ctrl+Shift+L')
+    expect(reg.hud.accelerator).toBe('Ctrl+Shift+E')
     expect(reg.panic.accelerator).toBe('Ctrl+Shift+Escape')
   })
 
-  it('reports {ok:false} for any individual registration that fails', async () => {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    registerSpy.mockImplementation((accel: string, cb: () => void) => {
-      callbacks.set(accel, cb)
-      return accel !== 'Cmd+B'
-    })
-    const { registerShortcuts } = await load()
-    const win = makeFakeWindow()
-    const reg = registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
-    expect(reg.toggle.ok).toBe(false)
-    expect(reg.ask.ok).toBe(true)
-    expect(reg.screenAsk.ok).toBe(true)
-    expect(reg.wide.ok).toBe(true)
+  it('never claims plain Cmd+W or Cmd+B, which other apps need for close-tab and bold', async () => {
+    const { registerShortcuts } = await load('darwin')
+    registerShortcuts(asWin(makeFakeWindow()))
+    const claimed = [...callbacks.keys()]
+    expect(claimed).not.toContain('Cmd+W')
+    expect(claimed).not.toContain('Cmd+B')
   })
 
-  it('Cmd+\\ callback sends llmTrigger to the window', async () => {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    const { registerShortcuts } = await load()
+  it('reports {ok:false} for any individual registration that fails', async () => {
+    registerSpy.mockImplementation((accel: string, cb: () => void) => {
+      callbacks.set(accel, cb)
+      return accel !== 'Cmd+Shift+B'
+    })
+    const { registerShortcuts } = await load('darwin')
+    const reg = registerShortcuts(asWin(makeFakeWindow()))
+    expect(reg.toggle.ok).toBe(false)
+    expect(reg.ask.ok).toBe(true)
+    expect(reg.listen.ok).toBe(true)
+  })
+
+  it('Cmd+\\ sends llmTrigger to the window', async () => {
+    const { registerShortcuts } = await load('darwin')
     const win = makeFakeWindow()
-    registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    registerShortcuts(asWin(win))
     callbacks.get('Cmd+\\')!()
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.llmTrigger)
   })
 
-  it('Cmd+Shift+\\ callback sends visionTrigger', async () => {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    const { registerShortcuts } = await load()
+  it('Cmd+Shift+\\ sends visionTrigger', async () => {
+    const { registerShortcuts } = await load('darwin')
     const win = makeFakeWindow()
-    registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    registerShortcuts(asWin(win))
     callbacks.get('Cmd+Shift+\\')!()
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.visionTrigger)
   })
 
-  it('Cmd+B callback toggles window visibility', async () => {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    const { registerShortcuts } = await load()
+  it('Cmd+Shift+L sends listenTrigger, so listening toggles while the overlay is unfocused', async () => {
+    const { registerShortcuts } = await load('darwin')
     const win = makeFakeWindow()
-    registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
-    callbacks.get('Cmd+B')!()
+    registerShortcuts(asWin(win))
+    callbacks.get('Cmd+Shift+L')!()
+    expect(win.webContents.send).toHaveBeenCalledWith(IPC.listenTrigger)
+  })
+
+  it('Cmd+Shift+B toggles window visibility', async () => {
+    const { registerShortcuts } = await load('darwin')
+    const win = makeFakeWindow()
+    registerShortcuts(asWin(win))
+    callbacks.get('Cmd+Shift+B')!()
     expect(win.hide).toHaveBeenCalled()
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.windowVisibilityChanged, { visible: false })
   })
 
-  it('Cmd+W callback toggles wide mode', async () => {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    const { registerShortcuts } = await load()
+  it('Cmd+Shift+E cycles the HUD size', async () => {
+    const { registerShortcuts } = await load('darwin')
     const win = makeFakeWindow()
-    registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
-    callbacks.get('Cmd+W')!()
-    expect(win.webContents.send).toHaveBeenCalledWith(IPC.windowModeChanged, { mode: 'wide' })
+    registerShortcuts(asWin(win))
+    callbacks.get('Cmd+Shift+E')!()
+    expect(win.webContents.send).toHaveBeenCalledWith(IPC.windowModeChanged, { mode: expect.any(String) })
   })
 
-  it('ask and screen callbacks are no-ops when the window is destroyed', async () => {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    const { registerShortcuts } = await load()
+  it('renderer-bound callbacks are no-ops when the window is destroyed', async () => {
+    const { registerShortcuts } = await load('darwin')
     const win = makeFakeWindow()
     win.isDestroyed.mockReturnValue(true)
-    registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    registerShortcuts(asWin(win))
     callbacks.get('Cmd+\\')!()
     callbacks.get('Cmd+Shift+\\')!()
+    callbacks.get('Cmd+Shift+L')!()
     expect(win.webContents.send).not.toHaveBeenCalled()
   })
 
   it('getShortcutRegistration returns the last registration', async () => {
     const { registerShortcuts, getShortcutRegistration } = await load()
-    const win = makeFakeWindow()
-    const reg = registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    const reg = registerShortcuts(asWin(makeFakeWindow()))
     expect(getShortcutRegistration()).toBe(reg)
   })
 
   it('hooks app "will-quit" to unregister all shortcuts', async () => {
     const { registerShortcuts } = await load()
-    const win = makeFakeWindow()
-    registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    registerShortcuts(asWin(makeFakeWindow()))
     expect(willQuitListeners.length).toBe(1)
   })
 
-  it('Cmd+Shift+Escape callback invokes triggerPanic with the window', async () => {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    const { registerShortcuts } = await load()
+  it('Cmd+Shift+Escape invokes triggerPanic with the window', async () => {
+    const { registerShortcuts } = await load('darwin')
     const win = makeFakeWindow()
-    registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    registerShortcuts(asWin(win))
     callbacks.get('Cmd+Shift+Escape')!()
     expect(triggerPanicSpy).toHaveBeenCalledTimes(1)
     expect(triggerPanicSpy.mock.calls[0][0]).toBe(win)
   })
 
-  it('panic registration failure surfaces ok:false (so the UI can toast)', async () => {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
-    registerSpy.mockImplementation((accel: string, cb: () => void) => {
-      callbacks.set(accel, cb)
-      return accel !== 'Cmd+Shift+Escape'
-    })
-    const { registerShortcuts } = await load()
-    const win = makeFakeWindow()
-    const reg = registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
-    expect(reg.panic.ok).toBe(false)
-    expect(reg.ask.ok).toBe(true)
-  })
-
-  it('panic registration that throws synchronously is caught and reports ok:false', async () => {
-    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+  it('a registration that throws synchronously is caught and reported as ok:false', async () => {
     registerSpy.mockImplementation((accel: string, cb: () => void) => {
       if (accel === 'Cmd+Shift+Escape') throw new Error('OS reserves this shortcut')
       callbacks.set(accel, cb)
       return true
     })
-    const { registerShortcuts } = await load()
-    const win = makeFakeWindow()
-    const reg = registerShortcuts(win as unknown as Parameters<typeof registerShortcuts>[0])
+    const { registerShortcuts } = await load('darwin')
+    const reg = registerShortcuts(asWin(makeFakeWindow()))
     expect(reg.panic.ok).toBe(false)
     expect(reg.ask.ok).toBe(true)
   })

@@ -4,6 +4,7 @@ import { settings } from './settings'
 import { createOverlayWindow } from './window'
 import { registerIpc, sendToast } from './ipc'
 import { registerShortcuts } from './shortcuts'
+import { mockSessionStore } from './mock/mock-session-store'
 
 initLoopbackAudio({ forceCoreAudioTap: true })
 
@@ -27,25 +28,18 @@ app.on('second-instance', () => {
 
 void app.whenReady().then(async () => {
   await settings.load()
+  await mockSessionStore.load()
 
   mainWindow = createOverlayWindow()
   registerIpc(mainWindow)
   const reg = registerShortcuts(mainWindow)
 
-  if (!reg.ask.ok) {
-    sendToast(mainWindow, { level: 'warn', message: `Could not register ${reg.ask.accelerator} (already in use).` })
-  }
-  if (!reg.screenAsk.ok) {
-    sendToast(mainWindow, { level: 'warn', message: `Could not register ${reg.screenAsk.accelerator} (already in use).` })
-  }
-  if (!reg.toggle.ok) {
-    sendToast(mainWindow, { level: 'warn', message: `Could not register ${reg.toggle.accelerator} (already in use).` })
-  }
-  if (!reg.wide.ok) {
-    sendToast(mainWindow, { level: 'warn', message: `Could not register ${reg.wide.accelerator} (already in use).` })
-  }
-  if (!reg.panic.ok) {
-    sendToast(mainWindow, { level: 'warn', message: `Could not register panic shortcut ${reg.panic.accelerator} (already in use). Panic still works while the overlay window is focused.` })
+  const unavailable = Object.values(reg).filter((slot) => !slot.ok)
+  if (unavailable.length > 0) {
+    sendToast(mainWindow, {
+      level: 'warn',
+      message: `Another app already owns ${unavailable.map((slot) => slot.accelerator).join(', ')}. Those actions still work from the overlay (⌘K).`,
+    })
   }
 
   app.on('activate', () => {

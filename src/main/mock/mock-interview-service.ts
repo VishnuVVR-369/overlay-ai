@@ -7,7 +7,10 @@ import type {
   MockFeedbackEvent,
   MockInterviewConfig,
   MockInterviewStatus,
+  MockSessionRecord,
+  MockSessionSavedEvent,
   MockStatusEvent,
+  TranscriptSegment,
 } from '@shared/types'
 import { transcription } from '../transcription/transcription-service'
 import {
@@ -17,6 +20,8 @@ import {
   RESET_RESPONSE_INSTRUCTIONS,
   type MockPromptContext,
 } from './mock-config'
+import { mockGrader, averageRubricScore, type GraderClient, type GraderResult } from './mock-grader'
+import { mockSessionStore, type MockSessionStore } from './mock-session-store'
 
 const REALTIME_MODEL = 'gpt-realtime-2'
 const REALTIME_URL = `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`
@@ -30,6 +35,12 @@ export interface MockInterviewServiceEvents {
   feedback: (event: MockFeedbackEvent) => void
   playbackStop: () => void
   error: (message: string) => void
+  sessionSaved: (event: MockSessionSavedEvent) => void
+}
+
+export interface MockInterviewServiceDeps {
+  grader?: GraderClient
+  sessions?: MockSessionStore
 }
 
 export class MockInterviewService extends EventEmitter {
@@ -47,6 +58,16 @@ export class MockInterviewService extends EventEmitter {
   private currentResponseAudio = false
   private committedInputKeys = new Set<string>()
   private committedOutputKeys = new Set<string>()
+  private sessionId: string | null = null
+  private sessionStartedAt = 0
+  private grader: GraderClient
+  private sessions: MockSessionStore
+
+  constructor(deps: MockInterviewServiceDeps = {}) {
+    super()
+    this.grader = deps.grader ?? mockGrader
+    this.sessions = deps.sessions ?? mockSessionStore
+  }
 
   on<K extends keyof MockInterviewServiceEvents>(event: K, listener: MockInterviewServiceEvents[K]): this {
     return super.on(event, listener as (...args: unknown[]) => void)
@@ -78,6 +99,8 @@ export class MockInterviewService extends EventEmitter {
     this.sessionApiKey = apiKey
     this.sessionConfig = config
     this.promptContext = context
+    this.sessionId = randomUUID()
+    this.sessionStartedAt = startedAt
     this.resetEventDedupe()
     this.configureSession(config, context)
     this.requestOpeningQuestion()
@@ -96,8 +119,30 @@ export class MockInterviewService extends EventEmitter {
     }
     this.setStatus({ ...this.statusValue, state: 'stopping', message: 'Stopping mock interview.' })
     this.cancelCurrentResponse()
+    const sessionId = this.sessionId
+    const startedAt = this.sessionStartedAt
+    const config = this.sessionConfig
+    const context = this.promptContext
+    const apiKey = this.sessionApiKey
     await this.requestFeedback()
+    const legacyFeedback = this.feedbackText.trim()
+    // Transcription completion events can still arrive while feedback is being
+    // requested. Snapshot at the last possible moment so the saved/grader input
+    // does not drop the candidate's final turn.
+    const transcriptSnapshot = this.captureTranscriptSnapshot()
     this.close()
+    if (sessionId && config && context && transcriptSnapshot.length > 0) {
+      void this.persistSession({
+        sessionId,
+        startedAt,
+        endedAt: Date.now(),
+        config,
+        context,
+        apiKey,
+        transcript: transcriptSnapshot,
+        legacyFeedback,
+      })
+    }
   }
 
   pause(): void {
@@ -227,6 +272,71 @@ export class MockInterviewService extends EventEmitter {
     this.feedbackRequestPending = false
     const text = this.feedbackText.trim()
     if (text) this.emit('feedback', { requestId: randomUUID(), text })
+  }
+
+  private captureTranscriptSnapshot(): TranscriptSegment[] {
+    const snap = transcription.snapshot()
+    return snap.segments.filter((seg) => seg.startedAt >= this.sessionStartedAt)
+  }
+
+  private async persistSession(args: {
+    sessionId: string
+    startedAt: number
+    endedAt: number
+    config: MockInterviewConfig
+    context: MockPromptContext
+    apiKey: string | null
+    transcript: TranscriptSegment[]
+    legacyFeedback: string
+  }): Promise<void> {
+    let grade: GraderResult = { rubric: [], annotations: [], strengths: [], gaps: [], nextDrills: [] }
+    let graded = false
+    let graderError: string | undefined
+    if (args.apiKey) {
+      try {
+        grade = await this.grader.grade(args.apiKey, args.config.presetId, args.transcript)
+        graded = grade.rubric.length > 0
+      } catch (err) {
+        graderError = (err as Error)?.message ?? 'Grading failed.'
+      }
+    } else {
+      graderError = 'OpenAI key not available for grading.'
+    }
+
+    try {
+      const record: MockSessionRecord = await this.sessions.save({
+        id: args.sessionId,
+        presetId: args.config.presetId,
+        presetLabel: args.context.preset?.label ?? args.config.presetId,
+        durationMinutes: args.config.durationMinutes,
+        startedAt: args.startedAt,
+        endedAt: args.endedAt,
+        transcript: args.transcript,
+        legacyFeedback: args.legacyFeedback,
+        rubric: grade.rubric,
+        annotations: grade.annotations,
+        strengths: grade.strengths,
+        gaps: grade.gaps,
+        nextDrills: grade.nextDrills,
+        averageScore: averageRubricScore(grade.rubric),
+        graded,
+        ...(graderError ? { graderError } : {}),
+      })
+      this.emit('sessionSaved', {
+        summary: {
+          id: record.id,
+          presetId: record.presetId,
+          presetLabel: record.presetLabel,
+          durationMinutes: record.durationMinutes,
+          startedAt: record.startedAt,
+          endedAt: record.endedAt,
+          averageScore: record.averageScore,
+          graded: record.graded,
+        },
+      })
+    } catch (err) {
+      this.emit('error', `Failed to save mock session: ${(err as Error)?.message ?? 'unknown'}`)
+    }
   }
 
   private handleMessage(raw: string): void {
@@ -377,6 +487,8 @@ export class MockInterviewService extends EventEmitter {
     this.sessionApiKey = null
     this.sessionConfig = null
     this.promptContext = null
+    this.sessionId = null
+    this.sessionStartedAt = 0
     this.resetEventDedupe()
     const ws = this.ws
     this.ws = null

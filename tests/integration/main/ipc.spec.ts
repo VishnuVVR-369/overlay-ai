@@ -186,6 +186,20 @@ vi.mock('@main/mock/mock-interview-service', () => ({
   }),
 }))
 
+const sessionsListSpy = vi.fn(async () => [] as Array<Record<string, unknown>>)
+const sessionsGetSpy = vi.fn(async (_id: string) => null as Record<string, unknown> | null)
+const sessionsDeleteSpy = vi.fn(async (_id: string) => true)
+
+vi.mock('@main/mock/mock-session-store', () => ({
+  mockSessionStore: {
+    load: vi.fn(async () => undefined),
+    list: (...args: unknown[]) => sessionsListSpy(...args as []),
+    get: (id: string) => sessionsGetSpy(id),
+    delete: (id: string) => sessionsDeleteSpy(id),
+    save: vi.fn(async () => undefined),
+  },
+}))
+
 const captureSpy = vi.fn(async () => ({ dataUrl: 'data:image/png;base64,xxx', width: 10, height: 10, displayId: '1' }))
 vi.mock('@main/vision/screen-capture', () => ({
   captureActiveDisplay: () => captureSpy(),
@@ -251,6 +265,12 @@ beforeEach(async () => {
   mockStatusSpy.mockClear()
   mockStatusSpy.mockReturnValue({ state: 'idle', paused: false })
   mockEmitter.removeAllListeners()
+  sessionsListSpy.mockReset()
+  sessionsListSpy.mockResolvedValue([])
+  sessionsGetSpy.mockReset()
+  sessionsGetSpy.mockResolvedValue(null)
+  sessionsDeleteSpy.mockReset()
+  sessionsDeleteSpy.mockResolvedValue(true)
   captureSpy.mockClear()
   setModeSpy.mockClear()
   transcriptionInstance.removeAllListeners()
@@ -276,6 +296,7 @@ describe('IPC handler registration', () => {
       IPC.settingsGet, IPC.settingsSet, IPC.permStatus, IPC.permRequestMic, IPC.permOpenScreenPrefs,
       IPC.transcriptionStart, IPC.transcriptionStop, IPC.transcriptionStatus,
       IPC.mockStart, IPC.mockStop, IPC.mockPause, IPC.mockResume, IPC.mockStatus,
+      IPC.mockSessionsList, IPC.mockSessionsGet, IPC.mockSessionsDelete,
       IPC.transcriptSnapshot, IPC.transcriptClear,
       IPC.llmStart, IPC.llmAbort, IPC.visionStart, IPC.visionAbort,
       IPC.presetsGet, IPC.presetsSetActive, IPC.presetsSetOverride,
@@ -413,6 +434,49 @@ describe('mock interview IPC', () => {
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.mockAudioDelta, { audioBase64: 'AAA', sampleRate: 24000 })
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.mockFeedback, { requestId: 'fb', text: 'Good.' })
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.mockPlaybackStop)
+  })
+
+  it('sessionSaved event broadcasts on mock-sessions:saved', () => {
+    const summary = {
+      id: 'sess-1', presetId: 'behavioral', presetLabel: 'Behavioral',
+      durationMinutes: 30, startedAt: 1, endedAt: 2, averageScore: 4.0, graded: true,
+    }
+    mockEmitter.emit('sessionSaved', { summary })
+    expect(win.webContents.send).toHaveBeenCalledWith(IPC.mockSessionSaved, { summary })
+  })
+})
+
+describe('mock sessions IPC', () => {
+  it('mock-sessions:list proxies to the store', async () => {
+    sessionsListSpy.mockResolvedValueOnce([{ id: 'a', startedAt: 1 }])
+    const result = await ipcStub.invoke(IPC.mockSessionsList)
+    expect(sessionsListSpy).toHaveBeenCalled()
+    expect(result).toEqual([{ id: 'a', startedAt: 1 }])
+  })
+
+  it('mock-sessions:get fetches a record by id', async () => {
+    sessionsGetSpy.mockResolvedValueOnce({ id: 'a', transcript: [] } as never)
+    const result = await ipcStub.invoke(IPC.mockSessionsGet, 'a') as { id: string }
+    expect(sessionsGetSpy).toHaveBeenCalledWith('a')
+    expect(result.id).toBe('a')
+  })
+
+  it('mock-sessions:get rejects invalid ids', async () => {
+    const result = await ipcStub.invoke(IPC.mockSessionsGet, '')
+    expect(result).toBeNull()
+    expect(sessionsGetSpy).not.toHaveBeenCalled()
+  })
+
+  it('mock-sessions:delete returns ok flag from store result', async () => {
+    sessionsDeleteSpy.mockResolvedValueOnce(true)
+    expect(await ipcStub.invoke(IPC.mockSessionsDelete, 'a')).toEqual({ ok: true })
+    sessionsDeleteSpy.mockResolvedValueOnce(false)
+    expect(await ipcStub.invoke(IPC.mockSessionsDelete, 'missing')).toEqual({ ok: false })
+  })
+
+  it('mock-sessions:delete rejects non-string ids', async () => {
+    expect(await ipcStub.invoke(IPC.mockSessionsDelete, null)).toEqual({ ok: false })
+    expect(sessionsDeleteSpy).not.toHaveBeenCalled()
   })
 })
 

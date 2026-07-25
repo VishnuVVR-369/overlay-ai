@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useTranscriptStore } from '../state/transcript-store'
+import { useStatusStore } from '../state/status-store'
 import type { TranscriptSegment } from '@shared/types'
+import { formatTimeSeconds } from '../lib/time'
 
 export function TranscriptPane(): JSX.Element {
   const segments = useTranscriptStore((s) => s.segments)
   const partials = useTranscriptStore((s) => s.partials)
+  const running = useStatusStore((s) => s.running)
   const scrollRef = useRef<HTMLDivElement>(null)
   const stickyRef = useRef(true)
 
@@ -19,11 +22,8 @@ export function TranscriptPane(): JSX.Element {
     const restList: TranscriptSegment[] = []
     for (let i = all.length - 1; i >= 0; i--) {
       const seg = all[i]
-      if (!heroSeg && seg.speaker === 'them') {
-        heroSeg = seg
-      } else {
-        restList.unshift(seg)
-      }
+      if (!heroSeg && seg.speaker === 'them') heroSeg = seg
+      else restList.unshift(seg)
     }
     return { hero: heroSeg, rest: restList }
   }, [segments, partials])
@@ -40,22 +40,18 @@ export function TranscriptPane(): JSX.Element {
     stickyRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
   }
 
+  if (!hero && rest.length === 0) {
+    return (
+      <div className="transcript-pane transcript-idle">
+        <span className="transcript-placeholder">
+          {running ? 'Listening for the first question…' : 'Not listening'}
+        </span>
+      </div>
+    )
+  }
+
   return (
     <div ref={scrollRef} onScroll={handleScroll} className="transcript-pane">
-      {hero && (
-        <div className="transcript-hero">
-          <div className="transcript-hero-marker">Q</div>
-          <div className="transcript-hero-body">
-            <div
-              key={hero.id}
-              className={`transcript-hero-text ${hero.status === 'partial' ? 'partial' : ''}`}
-            >
-              {hero.text || '…'}
-            </div>
-            <div className="transcript-hero-time">{formatTime(hero.startedAt)}</div>
-          </div>
-        </div>
-      )}
       {rest.length > 0 && (
         <div className="transcript-rest">
           {rest.map((seg) => (
@@ -69,14 +65,20 @@ export function TranscriptPane(): JSX.Element {
           ))}
         </div>
       )}
+      {hero && (
+        <div className="transcript-hero">
+          <div className="transcript-hero-head">
+            <span className="transcript-hero-tag">Latest question</span>
+            <span className="transcript-hero-time">{formatTimeSeconds(hero.startedAt)}</span>
+          </div>
+          <div
+            key={hero.id}
+            className={`transcript-hero-text ${hero.status === 'partial' ? 'partial' : ''}`}
+          >
+            {hero.text || '…'}
+          </div>
+        </div>
+      )}
     </div>
   )
-}
-
-function formatTime(ts: number): string {
-  const d = new Date(ts)
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  const ss = String(d.getSeconds()).padStart(2, '0')
-  return `${hh}:${mm}:${ss}`
 }

@@ -1,66 +1,59 @@
-import { Maximize2, Power } from 'lucide-react'
-import type { SocketState } from '@shared/types'
+import { useMemo } from 'react'
+import { Maximize2 } from 'lucide-react'
 import { useStatusStore } from '../state/status-store'
 import { useLlmStore } from '../state/llm-store'
 import { useTranscriptStore } from '../state/transcript-store'
-import { SeamWaveform } from './SeamWaveform'
+import { useMockStore } from '../state/mock-store'
+import { toPlainText } from '../lib/plain-text'
 
 interface Props {
   onExpand: () => void
-  onQuit: () => void
 }
 
-export function AnswerCard({ onExpand, onQuit }: Props): JSX.Element {
-  const micState = useStatusStore((s) => s.micState)
-  const systemState = useStatusStore((s) => s.systemState)
+/**
+ * Compact mode: the glance surface. Whatever is here has to be readable in the
+ * half-second someone looks away from the call, so it carries exactly one
+ * question and the opening of one answer — no controls competing for space.
+ */
+export function AnswerCard({ onExpand }: Props): JSX.Element {
   const running = useStatusStore((s) => s.running)
   const entries = useLlmStore((s) => s.entries)
   const segments = useTranscriptStore((s) => s.segments)
   const partials = useTranscriptStore((s) => s.partials)
+  const mockState = useMockStore((s) => s.status.state)
 
   const latest = entries[0]
-  const lastQuestion = latestThemQuestion(segments, partials)
+  const question = latestQuestion(segments, partials)
   const streaming = latest?.status === 'streaming'
+  const mockLive = mockState === 'active' || mockState === 'paused'
+  const answer = useMemo(() => toPlainText(latest?.text ?? ''), [latest?.text])
+
+  const state = mockLive ? 'mock' : running ? 'live' : 'idle'
+  const label = mockLive ? 'Mock' : streaming ? 'Answering' : running ? 'Listening' : 'Idle'
 
   return (
-    <div className={`answer-card ${streaming ? 'streaming' : ''} ${running ? 'live' : ''}`}>
-      <div className="answer-card-row">
-        <SocketDot state={micState} title={`You · ${micState}`} />
-        <SocketDot state={systemState} title={`Them · ${systemState}`} />
-        <span className="answer-card-status">
-          {running ? 'live' : 'idle'}
-          {streaming ? ' · answering' : ''}
-        </span>
-        <span className="answer-card-spacer" />
-        <button onClick={onExpand} className="icon-btn" title="Expand" aria-label="Expand">
-          <Maximize2 size={12} strokeWidth={1.75} />
-        </button>
-        <button onClick={onQuit} className="icon-btn danger" title="Quit" aria-label="Quit">
-          <Power size={12} strokeWidth={1.75} />
+    <div className={`card card-${state} ${streaming ? 'streaming' : ''}`}>
+      <div className="card-top">
+        <span className={`hud-lamp ${streaming ? 'streaming' : ''}`} aria-hidden />
+        <span className="card-state">{label}</span>
+        <span className="card-spacer" />
+        <button onClick={onExpand} className="icon-btn" title="Expand overlay" aria-label="Expand overlay">
+          <Maximize2 size={13} strokeWidth={1.75} />
         </button>
       </div>
-      <div className="answer-card-waveform">
-        <SeamWaveform height={20} />
+
+      <div className="card-question" title={question ?? undefined}>
+        {question ?? <span className="card-muted">waiting for a question</span>}
       </div>
-      {lastQuestion ? (
-        <div className="answer-card-question" title={lastQuestion}>
-          Q · {lastQuestion}
-        </div>
-      ) : (
-        <div className="answer-card-empty">awaiting question</div>
-      )}
-      <div className="answer-card-answer">
-        {latest?.text || (
-          <span className="answer-card-empty">
-            {streaming ? 'thinking…' : 'no answer yet'}
-          </span>
-        )}
+
+      <div className="card-answer">
+        {answer || <span className="card-muted">{streaming ? 'thinking…' : 'no answer yet'}</span>}
       </div>
     </div>
   )
 }
 
-function latestThemQuestion(
+function latestQuestion(
   segments: ReturnType<typeof useTranscriptStore.getState>['segments'],
   partials: ReturnType<typeof useTranscriptStore.getState>['partials'],
 ): string | null {
@@ -70,29 +63,4 @@ function latestThemQuestion(
     if (s.speaker === 'them' && s.text.trim()) return s.text
   }
   return null
-}
-
-function SocketDot({ state, title }: { state: SocketState; title: string }): JSX.Element {
-  return (
-    <span className="socket-dot" title={title}>
-      <span className="dot" style={{ backgroundColor: colorForState(state) }} />
-    </span>
-  )
-}
-
-function colorForState(state: SocketState): string {
-  switch (state) {
-    case 'open':
-      return '#8fcfb3'
-    case 'connecting':
-    case 'reconnecting':
-      return '#e6c068'
-    case 'auth_error':
-    case 'error':
-      return '#d97a7a'
-    case 'closed':
-    case 'idle':
-    default:
-      return '#3a3f47'
-  }
 }
