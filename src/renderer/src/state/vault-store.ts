@@ -24,7 +24,10 @@ export const useVaultStore = create<VaultStoreState>((set) => ({
   setState: (data) =>
     set((state) => ({
       data,
-      draft: state.draft === null || vaultEquals(state.draft, state.data) ? data : state.draft,
+      draft:
+        state.draft === null || !state.hydrated || vaultEquals(state.draft, state.data)
+          ? data
+          : state.draft,
       hydrated: true,
     })),
   setDraft: (draft) => set({ draft }),

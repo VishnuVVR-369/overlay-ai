@@ -219,14 +219,16 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
       get: vi.fn(async () => state.vault),
       set: vi.fn(async (v: VaultData) => {
         state.vaultUpdates.push(v)
-        state.vault = v
+        const stored = sanitizeVaultLikeMain(v)
+        state.vault = stored
         state.settings.vault = {
-          hasResume: v.resume.trim().length > 0,
-          hasJobDescription: v.jobDescription.trim().length > 0,
-          hasCompanyValues: v.companyValues.trim().length > 0,
-          hasInterviewerNotes: v.interviewerNotes.trim().length > 0,
-          storiesCount: v.stories.length,
+          hasResume: stored.resume.length > 0,
+          hasJobDescription: stored.jobDescription.length > 0,
+          hasCompanyValues: stored.companyValues.length > 0,
+          hasInterviewerNotes: stored.interviewerNotes.length > 0,
+          storiesCount: stored.stories.length,
         }
+        listeners.vaultChanged.forEach((l) => l(stored))
         return { ok: true }
       }),
       onChanged: (h) => subscribe<VaultData>(listeners.vaultChanged, h),
@@ -367,6 +369,20 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
     __state: state,
   }
   return api
+}
+
+// Mirrors the trimming and story-dropping that src/main/settings.ts does on write,
+// so the renderer sees the same stored value the real main process would hand back.
+function sanitizeVaultLikeMain(v: VaultData): VaultData {
+  return {
+    resume: v.resume.trim(),
+    jobDescription: v.jobDescription.trim(),
+    companyValues: v.companyValues.trim(),
+    interviewerNotes: v.interviewerNotes.trim(),
+    stories: v.stories
+      .map((s) => ({ id: s.id, title: s.title.trim(), body: s.body.trim() }))
+      .filter((s) => s.title.length > 0 && s.body.length > 0),
+  }
 }
 
 export function installFakeApi(api?: FakeApi): FakeApi {

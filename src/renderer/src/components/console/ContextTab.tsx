@@ -3,6 +3,9 @@ import { Plus, Trash2 } from 'lucide-react'
 import type { VaultData, VaultStory } from '@shared/types'
 import { useVaultStore, emptyVault, vaultEquals } from '../../state/vault-store'
 
+const LEDE =
+  'Injected into every transcript and screen ask so answers use your real history instead of plausible fiction. Stored locally and encrypted at rest.'
+
 const FIELDS: Array<{
   key: keyof Omit<VaultData, 'stories'>
   label: string
@@ -41,7 +44,8 @@ const FIELDS: Array<{
 ]
 
 export function ContextTab(): JSX.Element {
-  const hydrated = useVaultStore((s) => s.data)
+  const stored = useVaultStore((s) => s.data)
+  const hydrated = useVaultStore((s) => s.hydrated)
   const storedDraft = useVaultStore((s) => s.draft)
   const setVaultState = useVaultStore((s) => s.setState)
   const setStoredDraft = useVaultStore((s) => s.setDraft)
@@ -55,10 +59,10 @@ export function ContextTab(): JSX.Element {
   }, [setVaultState])
 
   useEffect(() => {
-    if (storedDraft === null) setStoredDraft(hydrated)
-  }, [hydrated, setStoredDraft, storedDraft])
+    if (hydrated && storedDraft === null) setStoredDraft(stored)
+  }, [hydrated, setStoredDraft, stored, storedDraft])
 
-  const dirty = useMemo(() => !vaultEquals(draft, hydrated), [draft, hydrated])
+  const dirty = useMemo(() => !vaultEquals(draft, stored), [draft, stored])
 
   const updateField = (key: keyof Omit<VaultData, 'stories'>, value: string): void => {
     setStoredDraft({ ...draft, [key]: value })
@@ -76,7 +80,9 @@ export function ContextTab(): JSX.Element {
     try {
       const result = await window.api.vault.set(draft)
       if (!result.ok) return
-      setVaultState(draft)
+      const persisted = await window.api.vault.get()
+      setVaultState(persisted)
+      setStoredDraft(persisted)
     } finally {
       setSaving(false)
     }
@@ -84,14 +90,21 @@ export function ContextTab(): JSX.Element {
 
   const filled = FIELDS.filter((f) => draft[f.key].trim().length > 0).length
 
+  if (!hydrated || storedDraft === null) {
+    return (
+      <section className="pane">
+        <h3>Personal context</h3>
+        <p className="pane-lede">{LEDE}</p>
+        <div className="empty-box">Loading your saved context…</div>
+      </section>
+    )
+  }
+
   return (
     <>
       <section className="pane">
         <h3>Personal context</h3>
-        <p className="pane-lede">
-          Injected into every transcript and screen ask so answers use your real history instead of
-          plausible fiction. Stored locally and encrypted at rest.
-        </p>
+        <p className="pane-lede">{LEDE}</p>
         <div className="context-progress">
           <span>
             {filled} of {FIELDS.length} sections filled · {draft.stories.length}{' '}

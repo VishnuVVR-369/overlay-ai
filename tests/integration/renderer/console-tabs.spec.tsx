@@ -255,6 +255,33 @@ describe('Context tab', () => {
     await waitFor(() => expect(screen.getByText(/No stories yet/)).toBeTruthy())
   })
 
+  it('waits for the stored vault before showing an editable form', async () => {
+    renderConsole('context')
+    expect(screen.getByText('Loading your saved context…')).toBeTruthy()
+    expect(screen.queryByPlaceholderText(/Paste a short resume summary/)).toBeNull()
+
+    await waitFor(() => expect(screen.getByText(/No stories yet/)).toBeTruthy())
+    expect(useVaultStore.getState().draft).not.toBeNull()
+  })
+
+  it('adopts the vault the main process actually stored after a save', async () => {
+    renderConsole('context')
+    await waitFor(() => expect(screen.getByText(/No stories yet/)).toBeTruthy())
+
+    fireEvent.change(screen.getByPlaceholderText(/Paste a short resume summary/), {
+      target: { value: '  padded resume  ' },
+    })
+    fireEvent.click(screen.getByText('Add'))
+    fireEvent.click(screen.getByText('Save personal context'))
+
+    await waitFor(() => expect((screen.getByText('Saved') as HTMLButtonElement).disabled).toBe(true))
+    expect(
+      (screen.getByPlaceholderText(/Paste a short resume summary/) as HTMLTextAreaElement).value,
+    ).toBe('padded resume')
+    expect(screen.getByText(/No stories yet/)).toBeTruthy()
+    expect(useVaultStore.getState().data.resume).toBe('padded resume')
+  })
+
   it('preserves an unsaved draft while navigating between console tabs', async () => {
     const props = {
       tab: 'context' as ConsoleTab,

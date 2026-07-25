@@ -73,7 +73,7 @@ beforeEach(() => {
     expandedEntries: {},
     headlineFirst: true,
   })
-  useVaultStore.setState({ data: emptyVault(), hydrated: false })
+  useVaultStore.setState({ data: emptyVault(), draft: null, hydrated: false })
   useStatusStore.setState({ running: false, startedAt: null, micState: 'idle', systemState: 'idle' })
   useMockStore.setState({ status: { state: 'idle', paused: false } })
   useLlmStore.setState({ entries: [] })
