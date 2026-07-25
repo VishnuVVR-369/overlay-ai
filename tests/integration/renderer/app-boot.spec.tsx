@@ -60,7 +60,7 @@ beforeEach(() => {
   useTranscriptStore.setState({ segments: [], partials: {} })
   useLlmStore.setState({ entries: [] })
   useMockStore.setState({ status: { state: 'idle', paused: false } })
-  usePresetStore.setState({ active: 'behavioral', presets: [], hydrated: false })
+  usePresetStore.setState({ active: 'behavioral', presets: [], hydrated: false, drafts: {} })
   useAnswerStyleStore.setState({ active: 'concise', styles: [], hydrated: false })
 })
 

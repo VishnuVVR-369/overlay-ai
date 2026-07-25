@@ -85,6 +85,7 @@ beforeEach(() => {
       { id: 'coding', label: 'Coding', defaultPrompt: 'd', effectivePrompt: 'd', overridden: false },
     ],
     hydrated: true,
+    drafts: {},
   })
   useAnswerStyleStore.setState({
     active: 'concise',
@@ -292,6 +293,34 @@ describe('console navigation', () => {
     fireEvent.keyDown(resume, { key: ',', metaKey: true })
 
     expect(useUiStore.getState().consoleTab).toBe('setup')
+  })
+
+  it('keeps an unsaved system prompt across closing and reopening the console', async () => {
+    await bootApp()
+    act(() => useUiStore.getState().openConsole('prompts'))
+    const editor = await screen.findByRole('textbox', { name: 'System prompt for Behavioral' })
+    fireEvent.change(editor, { target: { value: 'a prompt I am still writing' } })
+
+    act(() => useUiStore.getState().closeConsole())
+    act(() => useUiStore.getState().openConsole('prompts'))
+
+    const reopened = (await screen.findByRole('textbox', {
+      name: 'System prompt for Behavioral',
+    })) as HTMLTextAreaElement
+    expect(reopened.value).toBe('a prompt I am still writing')
+  })
+
+  it('does not retain a typed API key across closing and reopening the console', async () => {
+    await bootApp()
+    act(() => useUiStore.getState().openConsole('setup'))
+    const key = (await screen.findByLabelText(/Groq/)) as HTMLInputElement
+    fireEvent.change(key, { target: { value: 'gsk_secret' } })
+
+    act(() => useUiStore.getState().closeConsole())
+    act(() => useUiStore.getState().openConsole('setup'))
+
+    const reopened = (await screen.findByLabelText(/Groq/)) as HTMLInputElement
+    expect(reopened.value).toBe('')
   })
 
   it('"?" toggles Help', async () => {

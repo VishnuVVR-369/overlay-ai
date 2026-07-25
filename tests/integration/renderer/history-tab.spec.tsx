@@ -81,6 +81,7 @@ beforeEach(() => {
       { id: 'behavioral', label: 'Behavioral', defaultPrompt: 'd', effectivePrompt: 'd', overridden: false },
     ],
     hydrated: true,
+    drafts: {},
   })
   useAnswerStyleStore.setState({
     active: 'concise',
