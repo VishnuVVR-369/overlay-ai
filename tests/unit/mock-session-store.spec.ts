@@ -142,6 +142,30 @@ describe('MockSessionStore', () => {
     expect(await store.get(incomplete.id)).toBeNull()
   })
 
+  it.each([
+    ['transcript', [null]],
+    ['rubric', [null]],
+    ['annotations', [null]],
+    ['strengths', [null]],
+    ['gaps', [{}]],
+    ['nextDrills', [1]],
+  ])('skips records with malformed nested %s elements', async (field, malformed) => {
+    const invalid = {
+      ...await store.save(basicInput()),
+      id: `invalid-${field}`,
+      [field]: malformed,
+    }
+    await fs.writeFile(
+      join(tmp.path, 'mock-sessions', `2-invalid-${field}.json`),
+      JSON.stringify({ version: 1, record: invalid }),
+      'utf-8',
+    )
+
+    const list = await store.list()
+    expect(list.map((item) => item.id)).not.toContain(invalid.id)
+    expect(await store.get(invalid.id)).toBeNull()
+  })
+
   it('truncates oversized transcripts on save', async () => {
     const huge: TranscriptSegment[] = Array.from({ length: 600 }, (_, i) => ({
       id: `t${i}`,

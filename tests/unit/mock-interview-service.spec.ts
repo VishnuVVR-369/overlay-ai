@@ -325,12 +325,9 @@ describe('MockInterviewService session persistence', () => {
     transcriptionMock.flattenForPrompt.mockReturnValue('Them: Q\nYou: A')
 
     const stopPromise = service.stop()
-    // Resolve the feedback request immediately (response.done arrives).
-    // The service stores feedback delta in feedbackText; we set it directly then resolve.
     testable.feedbackText = 'free-text feedback'
     testable.feedbackResolve?.()
     await stopPromise
-    await new Promise((r) => setTimeout(r, 0))
 
     expect(grader.grade).toHaveBeenCalledWith('oa-real', 'coding', expect.arrayContaining([
       expect.objectContaining({ id: 'a' }),
@@ -386,13 +383,120 @@ describe('MockInterviewService session persistence', () => {
     })
     testable.feedbackResolve?.()
     await stopPromise
-    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(grader.grade).toHaveBeenCalledWith(
       'oa',
       'behavioral',
       [expect.objectContaining({ id: 'late', text: 'Final answer' })],
     )
+  })
+
+  it('commits buffered audio and waits for its transcription before saving', async () => {
+    const grader = makeGrader({
+      rubric: [], annotations: [], strengths: [], gaps: [], nextDrills: [],
+    })
+    const sessions = makeSessions()
+    const service = new MockInterviewService({ grader, sessions: sessions.store as never })
+    const sent: string[] = []
+    const testable = service as unknown as {
+      ws: { readyState: number; send: (m: string) => void; close: () => void; terminate: () => void } | null
+      statusValue: { state: string; paused: boolean }
+      sessionId: string | null
+      sessionStartedAt: number
+      sessionConfig: unknown
+      promptContext: unknown
+      sessionApiKey: string | null
+      feedbackResolve: (() => void) | null
+      feedbackRequestPending: boolean
+      handleMessage(raw: string): void
+    }
+    testable.ws = { readyState: 1, send: (message) => sent.push(message), close: vi.fn(), terminate: vi.fn() }
+    testable.statusValue = { state: 'active', paused: false }
+    testable.sessionId = 'sess-final-turn'
+    testable.sessionStartedAt = 1000
+    testable.sessionConfig = { presetId: 'behavioral', durationMinutes: 30 }
+    testable.promptContext = { preset: undefined, vault: emptyVault() }
+    testable.sessionApiKey = 'oa'
+    transcriptionMock.flattenForPrompt.mockReturnValue('Them: Q\nYou: final answer')
+    transcriptionMock.snapshot.mockReturnValue({ segments: [], partials: {} })
+
+    service.ingest({ audioBase64: 'AAAA', sampleRate: 16000 })
+    const stopPromise = service.stop()
+    expect(sent.map((message) => JSON.parse(message) as { type: string })).toContainEqual({
+      type: 'input_audio_buffer.commit',
+    })
+    expect(sessions.store.save).not.toHaveBeenCalled()
+
+    testable.handleMessage(JSON.stringify({
+      type: 'input_audio_buffer.committed',
+      item_id: 'final-item',
+    }))
+    transcriptionMock.snapshot.mockReturnValue({
+      segments: [
+        { id: 'final', speaker: 'you', status: 'committed', text: 'final answer', startedAt: 1500 },
+      ],
+      partials: {},
+    })
+    testable.handleMessage(JSON.stringify({
+      type: 'conversation.item.input_audio_transcription.completed',
+      item_id: 'final-item',
+      transcript: 'final answer',
+    }))
+    await vi.waitFor(() => expect(testable.feedbackRequestPending).toBe(true))
+    testable.handleMessage(JSON.stringify({ type: 'response.done' }))
+    await stopPromise
+
+    expect(sessions.store.save).toHaveBeenCalledWith(expect.objectContaining({
+      transcript: [expect.objectContaining({ id: 'final', text: 'final answer' })],
+    }))
+  })
+
+  it('does not resolve stop until the session write completes', async () => {
+    let resolveSave: (value: unknown) => void = () => undefined
+    const sessions = makeSessions()
+    sessions.store.save = vi.fn((input: Record<string, unknown>) =>
+      new Promise((resolve) => {
+        resolveSave = () => resolve({ ...input, id: input.id as string })
+      }) as never,
+    )
+    const service = new MockInterviewService({
+      grader: makeGrader({ rubric: [], annotations: [], strengths: [], gaps: [], nextDrills: [] }),
+      sessions: sessions.store as never,
+    })
+    const testable = service as unknown as {
+      ws: { readyState: number; send: (m: string) => void; close: () => void; terminate: () => void } | null
+      statusValue: { state: string; paused: boolean }
+      sessionId: string | null
+      sessionStartedAt: number
+      sessionConfig: unknown
+      promptContext: unknown
+      sessionApiKey: string | null
+      feedbackResolve: (() => void) | null
+    }
+    testable.ws = { readyState: 1, send: vi.fn(), close: vi.fn(), terminate: vi.fn() }
+    testable.statusValue = { state: 'active', paused: false }
+    testable.sessionId = 'sess-durable'
+    testable.sessionStartedAt = 1000
+    testable.sessionConfig = { presetId: 'behavioral', durationMinutes: 30 }
+    testable.promptContext = { preset: undefined, vault: emptyVault() }
+    testable.sessionApiKey = 'oa'
+    transcriptionMock.flattenForPrompt.mockReturnValue('Them: Q')
+    transcriptionMock.snapshot.mockReturnValue({
+      segments: [{ id: 'q', speaker: 'them', status: 'committed', text: 'Q', startedAt: 1500 }],
+      partials: {},
+    })
+
+    let stopped = false
+    const stopPromise = service.stop().then(() => {
+      stopped = true
+    })
+    testable.feedbackResolve?.()
+    await vi.waitFor(() => expect(sessions.store.save).toHaveBeenCalled())
+    expect(stopped).toBe(false)
+
+    resolveSave(undefined)
+    await stopPromise
+    expect(stopped).toBe(true)
   })
 
   it('captureTranscriptSnapshot filters segments older than sessionStartedAt', () => {

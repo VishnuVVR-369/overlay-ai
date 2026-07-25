@@ -15,7 +15,39 @@ export function HistoryTab(): JSX.Element {
   const removeSummary = useMockSessionsStore((s) => s.removeSummary)
 
   useEffect(() => {
-    void window.api.mockSessions.list().then(setSummaries)
+    let cancelled = false
+    let current = useMockSessionsStore.getState().summaries
+    const upserts = new Map<string, MockSessionSummary>()
+    const removals = new Set<string>()
+    const unsubscribe = useMockSessionsStore.subscribe((state) => {
+      const previousById = new Map(current.map((summary) => [summary.id, summary]))
+      const nextById = new Map(state.summaries.map((summary) => [summary.id, summary]))
+      for (const id of previousById.keys()) {
+        if (!nextById.has(id)) {
+          upserts.delete(id)
+          removals.add(id)
+        }
+      }
+      for (const summary of state.summaries) {
+        if (previousById.get(summary.id) !== summary) {
+          removals.delete(summary.id)
+          upserts.set(summary.id, summary)
+        }
+      }
+      current = state.summaries
+    })
+    void window.api.mockSessions.list().then((summaries) => {
+      if (cancelled) return
+      unsubscribe()
+      const merged = new Map(summaries.map((summary) => [summary.id, summary]))
+      for (const id of removals) merged.delete(id)
+      for (const [id, summary] of upserts) merged.set(id, summary)
+      setSummaries([...merged.values()].sort((a, b) => b.startedAt - a.startedAt))
+    })
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
   }, [setSummaries])
 
   useEffect(() => {

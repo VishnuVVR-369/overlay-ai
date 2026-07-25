@@ -11,6 +11,7 @@ import { usePresetStore } from '@/state/preset-store'
 import { useAnswerStyleStore } from '@/state/answer-style-store'
 import { useVaultStore, emptyVault } from '@/state/vault-store'
 import { mockPlayback } from '@/audio/mock-playback'
+import { capture } from '@/audio/capture-controller'
 import { installFakeApi, createFakeApi, type FakeApi } from '../../helpers/fake-window-api'
 
 vi.mock('@/audio/capture-controller', () => ({
@@ -57,6 +58,7 @@ const ALL_KEYS = {
 let api: FakeApi
 
 beforeEach(() => {
+  vi.mocked(capture.stop).mockClear()
   vi.mocked(mockPlayback.stop).mockClear()
   vi.mocked(mockPlayback.playPcm16).mockClear()
   useUiStore.setState({
@@ -450,6 +452,24 @@ describe('main-process events', () => {
     act(() => api.__emit.mockPlaybackStop())
     expect(mockPlayback.stop).toHaveBeenCalled()
   })
+
+  it.each(['stopping', 'idle', 'error'] as const)(
+    'terminal mock status %s releases capture and playback',
+    async (state) => {
+      await bootApp()
+      vi.mocked(capture.stop).mockClear()
+      vi.mocked(mockPlayback.stop).mockClear()
+
+      act(() => api.__emit.mockStatus({
+        state,
+        paused: false,
+        ...(state === 'error' ? { message: 'socket closed' } : {}),
+      }))
+
+      expect(capture.stop).toHaveBeenCalledTimes(1)
+      expect(mockPlayback.stop).toHaveBeenCalledTimes(1)
+    },
+  )
 
   it('user-active pulse notifies main and throttles repeated activity', async () => {
     const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(2_000)

@@ -28,6 +28,7 @@ const REALTIME_URL = `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`
 const SAMPLE_RATE = 24000
 const MAX_SESSION_MS = 59 * 60 * 1000
 const FEEDBACK_TIMEOUT_MS = 5000
+const INPUT_TRANSCRIPT_TIMEOUT_MS = 5000
 
 export interface MockInterviewServiceEvents {
   status: (event: MockStatusEvent) => void
@@ -58,8 +59,13 @@ export class MockInterviewService extends EventEmitter {
   private currentResponseAudio = false
   private committedInputKeys = new Set<string>()
   private committedOutputKeys = new Set<string>()
+  private inputBufferHasAudio = false
+  private pendingInputTranscriptions = new Set<string>()
+  private inputTranscriptResolve: (() => void) | null = null
+  private inputTranscriptTimer: NodeJS.Timeout | null = null
   private sessionId: string | null = null
   private sessionStartedAt = 0
+  private stopPromise: Promise<void> | null = null
   private grader: GraderClient
   private sessions: MockSessionStore
 
@@ -102,6 +108,7 @@ export class MockInterviewService extends EventEmitter {
     this.sessionId = randomUUID()
     this.sessionStartedAt = startedAt
     this.resetEventDedupe()
+    this.resetInputTracking()
     this.configureSession(config, context)
     this.requestOpeningQuestion()
 
@@ -112,7 +119,17 @@ export class MockInterviewService extends EventEmitter {
     return this.status()
   }
 
-  async stop(): Promise<void> {
+  stop(): Promise<void> {
+    if (this.stopPromise) return this.stopPromise
+    const operation = this.performStop()
+    const tracked = operation.finally(() => {
+      if (this.stopPromise === tracked) this.stopPromise = null
+    })
+    this.stopPromise = tracked
+    return tracked
+  }
+
+  private async performStop(): Promise<void> {
     if (!this.ws) {
       this.setStatus({ state: 'idle', paused: false })
       return
@@ -124,15 +141,14 @@ export class MockInterviewService extends EventEmitter {
     const config = this.sessionConfig
     const context = this.promptContext
     const apiKey = this.sessionApiKey
+    const inputTranscript = this.flushInputTranscript()
+    if (inputTranscript) await inputTranscript
     await this.requestFeedback()
     const legacyFeedback = this.feedbackText.trim()
-    // Transcription completion events can still arrive while feedback is being
-    // requested. Snapshot at the last possible moment so the saved/grader input
-    // does not drop the candidate's final turn.
     const transcriptSnapshot = this.captureTranscriptSnapshot()
     this.close()
     if (sessionId && config && context && transcriptSnapshot.length > 0) {
-      void this.persistSession({
+      await this.persistSession({
         sessionId,
         startedAt,
         endedAt: Date.now(),
@@ -165,6 +181,7 @@ export class MockInterviewService extends EventEmitter {
 
   ingest(chunk: MockAudioChunkMessage): void {
     if (!this.ws || this.statusValue.state !== 'active') return
+    this.inputBufferHasAudio = true
     this.send({ type: 'input_audio_buffer.append', audio: chunk.audioBase64 })
   }
 
@@ -184,6 +201,7 @@ export class MockInterviewService extends EventEmitter {
     this.feedbackResolve = null
     this.clearFeedbackTimer()
     this.resetEventDedupe()
+    this.resetInputTracking()
     this.setStatus({ ...previous, state: 'connecting', message: 'Resetting mock interview context.' })
 
     const old = this.ws
@@ -233,6 +251,7 @@ export class MockInterviewService extends EventEmitter {
         if (this.ws !== ws) return
         this.clearTimer()
         this.clearFeedbackTimer()
+        this.finishInputTranscriptWait()
         if (this.statusValue.state !== 'idle') this.setStatus({ state: 'idle', paused: false })
         this.ws = null
       })
@@ -277,6 +296,19 @@ export class MockInterviewService extends EventEmitter {
   private captureTranscriptSnapshot(): TranscriptSegment[] {
     const snap = transcription.snapshot()
     return snap.segments.filter((seg) => seg.startedAt >= this.sessionStartedAt)
+  }
+
+  private flushInputTranscript(): Promise<void> | null {
+    if (!this.ws || (!this.inputBufferHasAudio && this.pendingInputTranscriptions.size === 0)) return null
+    if (this.inputBufferHasAudio) this.send({ type: 'input_audio_buffer.commit' })
+    return new Promise<void>((resolve) => {
+      this.inputTranscriptResolve = resolve
+      this.inputTranscriptTimer = setTimeout(resolve, INPUT_TRANSCRIPT_TIMEOUT_MS)
+      this.resolveInputTranscriptIfDrained()
+    }).finally(() => {
+      this.clearInputTranscriptTimer()
+      this.inputTranscriptResolve = null
+    })
   }
 
   private async persistSession(args: {
@@ -355,6 +387,14 @@ export class MockInterviewService extends EventEmitter {
       return
     }
 
+    if (type === 'input_audio_buffer.committed') {
+      this.inputBufferHasAudio = false
+      const itemId = typeof event.item_id === 'string' ? event.item_id : ''
+      if (itemId) this.pendingInputTranscriptions.add(itemId)
+      this.resolveInputTranscriptIfDrained()
+      return
+    }
+
     if (type === 'input_audio_buffer.speech_started' && this.currentResponseAudio) {
       this.cancelCurrentResponse()
       return
@@ -396,6 +436,16 @@ export class MockInterviewService extends EventEmitter {
       if (transcript && this.markCommitted(this.committedInputKeys, event, transcript)) {
         transcription.injectCommitted('you', transcript)
       }
+      const itemId = typeof event.item_id === 'string' ? event.item_id : ''
+      if (itemId) this.pendingInputTranscriptions.delete(itemId)
+      this.resolveInputTranscriptIfDrained()
+      return
+    }
+
+    if (type === 'conversation.item.input_audio_transcription.failed') {
+      const itemId = typeof event.item_id === 'string' ? event.item_id : ''
+      if (itemId) this.pendingInputTranscriptions.delete(itemId)
+      this.resolveInputTranscriptIfDrained()
       return
     }
 
@@ -483,6 +533,7 @@ export class MockInterviewService extends EventEmitter {
     this.feedbackRequestPending = false
     this.feedbackResolve?.()
     this.feedbackResolve = null
+    this.finishInputTranscriptWait()
     this.currentResponseAudio = false
     this.sessionApiKey = null
     this.sessionConfig = null
@@ -490,6 +541,7 @@ export class MockInterviewService extends EventEmitter {
     this.sessionId = null
     this.sessionStartedAt = 0
     this.resetEventDedupe()
+    this.resetInputTracking()
     const ws = this.ws
     this.ws = null
     if (ws && ws.readyState === WebSocket.OPEN) ws.close()
@@ -505,6 +557,27 @@ export class MockInterviewService extends EventEmitter {
   private clearFeedbackTimer(): void {
     if (this.feedbackTimer) clearTimeout(this.feedbackTimer)
     this.feedbackTimer = null
+  }
+
+  private resolveInputTranscriptIfDrained(): void {
+    if (this.inputBufferHasAudio || this.pendingInputTranscriptions.size > 0) return
+    this.inputTranscriptResolve?.()
+  }
+
+  private finishInputTranscriptWait(): void {
+    this.inputTranscriptResolve?.()
+    this.inputTranscriptResolve = null
+    this.clearInputTranscriptTimer()
+  }
+
+  private clearInputTranscriptTimer(): void {
+    if (this.inputTranscriptTimer) clearTimeout(this.inputTranscriptTimer)
+    this.inputTranscriptTimer = null
+  }
+
+  private resetInputTracking(): void {
+    this.inputBufferHasAudio = false
+    this.pendingInputTranscriptions.clear()
   }
 
   private setStatus(next: MockInterviewStatus): void {

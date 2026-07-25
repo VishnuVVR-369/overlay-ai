@@ -352,7 +352,13 @@ export function App(): JSX.Element {
       window.api.transcription.onUpdate(applyTranscript),
       window.api.transcription.onSocketStatus((evt) => setSocket(evt.stream, evt.state, evt.message)),
       window.api.transcription.onListenTrigger(() => void toggleRunning()),
-      window.api.mock.onStatus(setMockStatus),
+      window.api.mock.onStatus((status) => {
+        setMockStatus(status)
+        if (status.state === 'stopping' || status.state === 'idle' || status.state === 'error') {
+          capture.stop()
+          mockPlayback.stop()
+        }
+      }),
       window.api.mock.onAudioDelta((evt) => {
         void mockPlayback.playPcm16(evt.audioBase64, evt.sampleRate)
       }),

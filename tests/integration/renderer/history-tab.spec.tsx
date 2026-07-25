@@ -243,6 +243,48 @@ describe('History tab', () => {
     })
   })
 
+  it('merges sessionSaved updates that arrive while the initial list is pending', async () => {
+    let resolveList: (value: MockSessionSummary[]) => void = () => undefined
+    api.mockSessions.list = vi.fn(() => new Promise((resolve) => {
+      resolveList = resolve
+    }))
+    await bootApp()
+    openHistory()
+    await waitFor(() => expect(api.mockSessions.list).toHaveBeenCalled())
+
+    act(() => api.__emit.mockSessionSaved({
+      summary: summary({ id: 's-new', startedAt: 9_000 }),
+    }))
+    await act(async () => {
+      resolveList([summary({ id: 's-old', startedAt: 1_000 })])
+      await Promise.resolve()
+    })
+
+    expect(useMockSessionsStore.getState().summaries.map((item) => item.id)).toEqual(['s-new', 's-old'])
+  })
+
+  it('does not resurrect a deletion when a pending list response finishes', async () => {
+    useMockSessionsStore.setState({
+      summaries: [summary({ id: 's-delete', startedAt: 2_000 })],
+      loaded: true,
+    })
+    let resolveList: (value: MockSessionSummary[]) => void = () => undefined
+    api.mockSessions.list = vi.fn(() => new Promise((resolve) => {
+      resolveList = resolve
+    }))
+    await bootApp()
+    openHistory()
+    await waitFor(() => expect(api.mockSessions.list).toHaveBeenCalled())
+
+    act(() => useMockSessionsStore.getState().removeSummary('s-delete'))
+    await act(async () => {
+      resolveList([summary({ id: 's-delete', startedAt: 2_000 })])
+      await Promise.resolve()
+    })
+
+    expect(useMockSessionsStore.getState().summaries).toEqual([])
+  })
+
   it('Escape closes the console from the history tab', async () => {
     const { container } = await bootApp()
     openHistory()

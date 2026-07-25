@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { isPresetId } from '@shared/prompt'
 import type {
+  MockRubricDimension,
   MockRubricScore,
   MockSessionAnnotation,
   MockSessionRecord,
@@ -155,19 +156,82 @@ function isValidRecord(value: unknown): value is MockSessionRecord {
     typeof v.id === 'string' &&
     isPresetId(v.presetId) &&
     typeof v.presetLabel === 'string' &&
-    typeof v.durationMinutes === 'number' &&
-    typeof v.startedAt === 'number' &&
-    typeof v.endedAt === 'number' &&
-    (v.averageScore === null || typeof v.averageScore === 'number') &&
+    isFiniteNumber(v.durationMinutes) &&
+    isFiniteNumber(v.startedAt) &&
+    isFiniteNumber(v.endedAt) &&
+    (v.averageScore === null || isFiniteNumber(v.averageScore)) &&
     typeof v.graded === 'boolean' &&
-    Array.isArray(v.transcript) &&
+    isArrayOf(v.transcript, isTranscriptSegment) &&
     typeof v.legacyFeedback === 'string' &&
-    Array.isArray(v.rubric) &&
-    Array.isArray(v.annotations) &&
-    Array.isArray(v.strengths) &&
-    Array.isArray(v.gaps) &&
-    Array.isArray(v.nextDrills) &&
+    isArrayOf(v.rubric, isRubricScore) &&
+    isArrayOf(v.annotations, isSessionAnnotation) &&
+    isArrayOf(v.strengths, isString) &&
+    isArrayOf(v.gaps, isString) &&
+    isArrayOf(v.nextDrills, isString) &&
     (v.graderError === undefined || typeof v.graderError === 'string')
+  )
+}
+
+function isArrayOf<T>(value: unknown, predicate: (item: unknown) => item is T): value is T[] {
+  return Array.isArray(value) && value.every(predicate)
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string'
+}
+
+function isTranscriptSegment(value: unknown): value is TranscriptSegment {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return (
+    typeof v.id === 'string' &&
+    (v.speaker === 'you' || v.speaker === 'them') &&
+    (v.status === 'partial' || v.status === 'committed') &&
+    typeof v.text === 'string' &&
+    isFiniteNumber(v.startedAt) &&
+    (v.committedAt === undefined || isFiniteNumber(v.committedAt))
+  )
+}
+
+function isRubricScore(value: unknown): value is MockRubricScore {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return (
+    isRubricDimension(v.dimension) &&
+    typeof v.label === 'string' &&
+    isFiniteNumber(v.score) &&
+    v.score >= 1 &&
+    v.score <= 5 &&
+    typeof v.evidence === 'string'
+  )
+}
+
+function isRubricDimension(value: unknown): value is MockRubricDimension {
+  return (
+    value === 'clarification' ||
+    value === 'structure' ||
+    value === 'communication' ||
+    value === 'correctness' ||
+    value === 'starCompleteness' ||
+    value === 'tradeoffs' ||
+    value === 'complexity'
+  )
+}
+
+function isSessionAnnotation(value: unknown): value is MockSessionAnnotation {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  return (
+    isFiniteNumber(v.transcriptIndex) &&
+    Number.isInteger(v.transcriptIndex) &&
+    v.transcriptIndex >= 0 &&
+    (v.severity === 'good' || v.severity === 'warn' || v.severity === 'gap') &&
+    typeof v.note === 'string' &&
+    (v.betterAnswer === undefined || typeof v.betterAnswer === 'string')
   )
 }
 
