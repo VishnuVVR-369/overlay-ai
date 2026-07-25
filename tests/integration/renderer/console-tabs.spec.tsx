@@ -36,7 +36,7 @@ beforeEach(() => {
     headlineFirst: true,
   })
   useMockStore.setState({ status: { state: 'idle', paused: false } })
-  useVaultStore.setState({ data: emptyVault(), hydrated: false })
+  useVaultStore.setState({ data: emptyVault(), draft: null, hydrated: false })
   useMockSessionsStore.setState({
     summaries: [],
     loaded: false,
@@ -253,6 +253,28 @@ describe('Context tab', () => {
 
     fireEvent.click(screen.getByLabelText('Remove story 1'))
     await waitFor(() => expect(screen.getByText(/No stories yet/)).toBeTruthy())
+  })
+
+  it('preserves an unsaved draft while navigating between console tabs', async () => {
+    const props = {
+      tab: 'context' as ConsoleTab,
+      starting: false,
+      onSelect: vi.fn(),
+      onClose: vi.fn(),
+      onStartMock: vi.fn(),
+      onStopMock: vi.fn(),
+    }
+    const view = render(<Console {...props} />)
+    await waitFor(() => expect(screen.getByText(/No stories yet/)).toBeTruthy())
+    fireEvent.click(screen.getByText('Add'))
+    expect(screen.getByText('0 of 4 sections filled · 1 story')).toBeTruthy()
+
+    view.rerender(<Console {...props} tab="prompts" />)
+    view.rerender(<Console {...props} tab="context" />)
+
+    expect(screen.getByLabelText('Story 1 title')).toBeTruthy()
+    expect(screen.getByText('0 of 4 sections filled · 1 story')).toBeTruthy()
+    expect(screen.getByText('Save personal context')).toBeTruthy()
   })
 })
 

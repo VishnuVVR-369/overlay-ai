@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import type { VaultData, VaultStory } from '@shared/types'
-import { useVaultStore, emptyVault } from '../../state/vault-store'
+import { useVaultStore, emptyVault, vaultEquals } from '../../state/vault-store'
 
 const FIELDS: Array<{
   key: keyof Omit<VaultData, 'stories'>
@@ -42,29 +42,33 @@ const FIELDS: Array<{
 
 export function ContextTab(): JSX.Element {
   const hydrated = useVaultStore((s) => s.data)
+  const storedDraft = useVaultStore((s) => s.draft)
   const setVaultState = useVaultStore((s) => s.setState)
-  const [draft, setDraft] = useState<VaultData>(emptyVault())
+  const setStoredDraft = useVaultStore((s) => s.setDraft)
   const [saving, setSaving] = useState(false)
+  const draft = storedDraft ?? emptyVault()
 
   useEffect(() => {
     void window.api.vault.get().then((value) => {
-      setDraft(value)
       setVaultState(value)
     })
   }, [setVaultState])
 
   useEffect(() => {
-    setDraft(hydrated)
-  }, [hydrated])
+    if (storedDraft === null) setStoredDraft(hydrated)
+  }, [hydrated, setStoredDraft, storedDraft])
 
   const dirty = useMemo(() => !vaultEquals(draft, hydrated), [draft, hydrated])
 
   const updateField = (key: keyof Omit<VaultData, 'stories'>, value: string): void => {
-    setDraft((v) => ({ ...v, [key]: value }))
+    setStoredDraft({ ...draft, [key]: value })
   }
 
   const updateStory = (index: number, patch: Partial<VaultStory>): void => {
-    setDraft((v) => ({ ...v, stories: v.stories.map((s, i) => (i === index ? { ...s, ...patch } : s)) }))
+    setStoredDraft({
+      ...draft,
+      stories: draft.stories.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+    })
   }
 
   const save = async (): Promise<void> => {
@@ -72,6 +76,7 @@ export function ContextTab(): JSX.Element {
     try {
       const result = await window.api.vault.set(draft)
       if (!result.ok) return
+      setVaultState(draft)
     } finally {
       setSaving(false)
     }
@@ -120,7 +125,10 @@ export function ContextTab(): JSX.Element {
             className="btn btn-quiet"
             type="button"
             onClick={() =>
-              setDraft((v) => ({ ...v, stories: [...v.stories, { id: makeStoryId(), title: '', body: '' }] }))
+              setStoredDraft({
+                ...draft,
+                stories: [...draft.stories, { id: makeStoryId(), title: '', body: '' }],
+              })
             }
           >
             <Plus size={12} strokeWidth={2} />
@@ -146,7 +154,12 @@ export function ContextTab(): JSX.Element {
                 <button
                   className="icon-btn danger"
                   type="button"
-                  onClick={() => setDraft((v) => ({ ...v, stories: v.stories.filter((_, i) => i !== idx) }))}
+                  onClick={() =>
+                    setStoredDraft({
+                      ...draft,
+                      stories: draft.stories.filter((_, i) => i !== idx),
+                    })
+                  }
                   aria-label={`Remove story ${idx + 1}`}
                 >
                   <Trash2 size={13} strokeWidth={1.75} />
@@ -177,18 +190,4 @@ export function ContextTab(): JSX.Element {
 function makeStoryId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
   return `story-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function vaultEquals(a: VaultData, b: VaultData): boolean {
-  if (a.resume !== b.resume) return false
-  if (a.jobDescription !== b.jobDescription) return false
-  if (a.companyValues !== b.companyValues) return false
-  if (a.interviewerNotes !== b.interviewerNotes) return false
-  if (a.stories.length !== b.stories.length) return false
-  for (let i = 0; i < a.stories.length; i++) {
-    const x = a.stories[i]
-    const y = b.stories[i]
-    if (x.id !== y.id || x.title !== y.title || x.body !== y.body) return false
-  }
-  return true
 }

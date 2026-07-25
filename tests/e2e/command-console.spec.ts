@@ -60,3 +60,20 @@ test('Setup shortcuts remain available while typing personal context', async ({}
     await app.close()
   }
 })
+
+test('unsaved personal context survives console tab navigation', async () => {
+  const { app, page } = await launchApp()
+  try {
+    await page.getByRole('button', { name: 'Context', exact: true }).click()
+    await page.getByRole('button', { name: 'Add' }).click()
+    await expect(page.getByText('0 of 4 sections filled · 1 story')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Prompts' }).click()
+    await page.getByRole('button', { name: 'Context', exact: true }).click()
+
+    await expect(page.getByRole('textbox', { name: 'Story 1 title' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save personal context' })).toBeEnabled()
+  } finally {
+    await app.close()
+  }
+})
