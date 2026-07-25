@@ -70,7 +70,8 @@ export function ContextTab(): JSX.Element {
   const save = async (): Promise<void> => {
     setSaving(true)
     try {
-      await window.api.vault.set(draft)
+      const result = await window.api.vault.set(draft)
+      if (!result.ok) return
     } finally {
       setSaving(false)
     }

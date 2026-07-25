@@ -94,9 +94,9 @@ describe('MockSessionStore', () => {
     expect(await store.get('does-not-exist')).toBeNull()
   })
 
-  it('delete removes the file and invalidates the list cache', async () => {
+  it('delete removes the file from subsequent lists', async () => {
     const rec = await store.save(basicInput())
-    await store.list() // warm cache
+    await store.list()
     const ok = await store.delete(rec.id)
     expect(ok).toBe(true)
     const list = await store.list()
@@ -175,10 +175,21 @@ describe('MockSessionStore', () => {
       startedAt: i,
       committedAt: i + 1,
     }))
-    const rec = await store.save({ ...basicInput(), transcript: huge })
+    const rec = await store.save({
+      ...basicInput(),
+      transcript: huge,
+      annotations: [
+        { transcriptIndex: 50, severity: 'warn', note: 'discarded' },
+        { transcriptIndex: 100, severity: 'good', note: 'first retained' },
+        { transcriptIndex: 599, severity: 'gap', note: 'last retained' },
+      ],
+    })
     expect(rec.transcript).toHaveLength(500)
-    // Last segment kept
     expect(rec.transcript[rec.transcript.length - 1].text).toBe('turn 599')
+    expect(rec.annotations).toEqual([
+      expect.objectContaining({ transcriptIndex: 0, note: 'first retained' }),
+      expect.objectContaining({ transcriptIndex: 499, note: 'last retained' }),
+    ])
   })
 
   it('list() returns [] if directory does not exist (lazy init)', async () => {

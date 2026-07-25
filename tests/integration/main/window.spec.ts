@@ -18,7 +18,11 @@ vi.mock('electron', () => {
       handlers.set(event, next)
     }
     return {
-      webContents: { send: vi.fn() },
+      webContents: {
+        send: vi.fn(),
+        on: vi.fn((event: string, fn: (...args: unknown[]) => void) => add(`web:${event}`, fn)),
+        setWindowOpenHandler: vi.fn(),
+      },
       isDestroyed: vi.fn().mockReturnValue(false),
       isVisible: vi.fn().mockReturnValue(true),
       showInactive: vi.fn(),
@@ -202,6 +206,21 @@ describe('window mode helpers', () => {
     expect(created.setVisibleOnAllWorkspaces).toHaveBeenCalledWith(true, { visibleOnFullScreen: true })
     expect(created.setHiddenInMissionControl).toHaveBeenCalledWith(true)
     expect(created.setWindowButtonVisibility).toHaveBeenCalledWith(false)
+  })
+
+  it('blocks untrusted navigation and all renderer-created windows', async () => {
+    const { createOverlayWindow } = await load()
+    const created = createOverlayWindow() as unknown as FakeBrowserWindow
+    const preventDefault = vi.fn()
+    const navigationHandler = vi.mocked(created.webContents.on).mock.calls
+      .find(([event]) => event === 'will-navigate')?.[1] as ((event: { preventDefault(): void }, url: string) => void)
+
+    navigationHandler({ preventDefault }, 'https://attacker.example/')
+
+    expect(preventDefault).toHaveBeenCalled()
+    expect(created.webContents.setWindowOpenHandler).toHaveBeenCalled()
+    const openHandler = created.webContents.setWindowOpenHandler.mock.calls[0][0] as () => { action: string }
+    expect(openHandler()).toEqual({ action: 'deny' })
   })
 
   it('createOverlayWindow ready/focus events show inactive and broadcast focus state', async () => {

@@ -14,7 +14,7 @@ import type {
 } from '@shared/types'
 
 const FILE_VERSION = 1
-const MAX_TRANSCRIPT_SEGMENTS = 500
+export const MAX_TRANSCRIPT_SEGMENTS = 500
 const SESSIONS_SUBDIR = 'mock-sessions'
 
 interface PersistedSession {
@@ -43,17 +43,26 @@ export interface SaveInput {
 
 export class MockSessionStore {
   private dirPath = ''
-  private summariesCache: MockSessionSummary[] | null = null
 
   async load(): Promise<void> {
     this.dirPath = join(app.getPath('userData'), SESSIONS_SUBDIR)
     await fs.mkdir(this.dirPath, { recursive: true })
-    this.summariesCache = null
   }
 
   async save(input: SaveInput): Promise<MockSessionRecord> {
     if (!this.dirPath) await this.load()
     const id = input.id ?? randomUUID()
+    const transcriptOffset = Math.max(0, input.transcript.length - MAX_TRANSCRIPT_SEGMENTS)
+    const transcript = truncateMockTranscript(input.transcript)
+    const annotations = input.annotations
+      .filter((annotation) =>
+        annotation.transcriptIndex >= transcriptOffset &&
+        annotation.transcriptIndex < input.transcript.length,
+      )
+      .map((annotation) => ({
+        ...annotation,
+        transcriptIndex: annotation.transcriptIndex - transcriptOffset,
+      }))
     const record: MockSessionRecord = {
       id,
       presetId: input.presetId,
@@ -63,10 +72,10 @@ export class MockSessionStore {
       endedAt: input.endedAt,
       averageScore: input.averageScore,
       graded: input.graded,
-      transcript: input.transcript.slice(-MAX_TRANSCRIPT_SEGMENTS),
+      transcript,
       legacyFeedback: input.legacyFeedback,
       rubric: input.rubric,
-      annotations: input.annotations,
+      annotations,
       strengths: input.strengths,
       gaps: input.gaps,
       nextDrills: input.nextDrills,
@@ -75,12 +84,10 @@ export class MockSessionStore {
     const payload: PersistedSession = { version: FILE_VERSION, record }
     const filename = `${record.startedAt}-${id}.json`
     await fs.writeFile(join(this.dirPath, filename), JSON.stringify(payload, null, 2), 'utf-8')
-    this.summariesCache = null
     return record
   }
 
   async list(): Promise<MockSessionSummary[]> {
-    if (this.summariesCache) return this.summariesCache
     if (!this.dirPath) await this.load()
     let names: string[] = []
     try {
@@ -103,7 +110,6 @@ export class MockSessionStore {
       }
     }
     summaries.sort((a, b) => b.startedAt - a.startedAt)
-    this.summariesCache = summaries
     return summaries
   }
 
@@ -139,7 +145,6 @@ export class MockSessionStore {
     if (!match) return false
     try {
       await fs.unlink(join(this.dirPath, match))
-      this.summariesCache = null
       return true
     } catch {
       return false
@@ -148,6 +153,10 @@ export class MockSessionStore {
 }
 
 export const mockSessionStore = new MockSessionStore()
+
+export function truncateMockTranscript(transcript: TranscriptSegment[]): TranscriptSegment[] {
+  return transcript.slice(-MAX_TRANSCRIPT_SEGMENTS)
+}
 
 function isValidRecord(value: unknown): value is MockSessionRecord {
   if (!value || typeof value !== 'object') return false

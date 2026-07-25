@@ -21,7 +21,8 @@ import {
   type MockPromptContext,
 } from './mock-config'
 import { mockGrader, averageRubricScore, type GraderClient, type GraderResult } from './mock-grader'
-import { mockSessionStore, type MockSessionStore } from './mock-session-store'
+import { rubricDimensionsForPreset } from '@shared/mock-rubric'
+import { mockSessionStore, truncateMockTranscript, type MockSessionStore } from './mock-session-store'
 
 const REALTIME_MODEL = 'gpt-realtime-2'
 const REALTIME_URL = `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`
@@ -136,26 +137,26 @@ export class MockInterviewService extends EventEmitter {
   }
 
   private async performStop(): Promise<void> {
-    if (!this.ws) {
+    if (!this.sessionId || !this.sessionConfig || !this.promptContext) {
       this.setStatus({ state: 'idle', paused: false })
       return
     }
     this.setStatus({ ...this.statusValue, state: 'stopping', message: 'Stopping mock interview.' })
-    this.cancelCurrentResponse()
     const sessionId = this.sessionId
     const startedAt = this.sessionStartedAt
     const config = this.sessionConfig
     const context = this.promptContext
     const apiKey = this.sessionApiKey
-    const inputTranscript = this.flushInputTranscript()
-    if (inputTranscript) await inputTranscript
-    await this.requestFeedback()
+    if (this.ws) {
+      this.cancelCurrentResponse()
+      const inputTranscript = this.flushInputTranscript()
+      if (inputTranscript) await inputTranscript
+      await this.requestFeedback()
+    }
     const legacyFeedback = this.feedbackText.trim()
     const transcriptSnapshot = this.captureTranscriptSnapshot()
-    // Tear down transport state now, but remain visibly `stopping` until the
-    // transcript has been graded and durably written below.
     this.close(false)
-    if (sessionId && config && context && transcriptSnapshot.length > 0) {
+    if (transcriptSnapshot.length > 0) {
       await this.persistSession({
         sessionId,
         startedAt,
@@ -181,7 +182,7 @@ export class MockInterviewService extends EventEmitter {
     this.send({
       type: 'response.create',
       response: {
-        modalities: ['audio', 'text'],
+        output_modalities: ['audio'],
         instructions: 'Resume the mock interview with the next appropriate question or follow-up.',
       },
     })
@@ -204,10 +205,7 @@ export class MockInterviewService extends EventEmitter {
     this.cancelCurrentResponse()
     this.outputTranscript = ''
     this.feedbackText = ''
-    this.feedbackRequestPending = false
-    this.feedbackResolve?.()
-    this.feedbackResolve = null
-    this.clearFeedbackTimer()
+    this.finishFeedbackWait()
     this.resetEventDedupe()
     this.resetInputTracking()
     this.setStatus({ ...previous, state: 'connecting', message: 'Resetting mock interview context.' })
@@ -242,26 +240,36 @@ export class MockInterviewService extends EventEmitter {
         },
       })
       this.ws = ws
+      let opened = false
+      let settled = false
 
       const onOpen = (): void => {
-        ws.off('error', onError)
+        opened = true
+        settled = true
         resolve()
       }
       const onError = (err: Error): void => {
-        ws.off('open', onOpen)
-        if (this.ws === ws) this.ws = null
-        reject(err)
+        if (!opened) {
+          settled = true
+          ws.off('open', onOpen)
+          if (this.ws === ws) this.ws = null
+          reject(err)
+          return
+        }
+        this.handleTransportFailure(ws, err.message || 'OpenAI realtime connection failed.')
       }
       ws.once('open', onOpen)
-      ws.once('error', onError)
+      ws.on('error', onError)
       ws.on('message', (raw) => this.handleMessage(raw.toString()))
       ws.on('close', () => {
+        if (!settled) {
+          settled = true
+          ws.off('open', onOpen)
+          reject(new Error('OpenAI realtime connection closed before it opened.'))
+        }
         if (this.ws !== ws) return
-        this.clearTimer()
-        this.clearFeedbackTimer()
-        this.finishInputTranscriptWait()
-        if (this.statusValue.state !== 'idle') this.setStatus({ state: 'idle', paused: false })
         this.ws = null
+        this.handleUnexpectedDisconnect()
       })
     })
   }
@@ -285,7 +293,7 @@ export class MockInterviewService extends EventEmitter {
     this.send({
       type: 'response.create',
       response: {
-        modalities: ['text'],
+        output_modalities: ['text'],
         instructions: FEEDBACK_RESPONSE_INSTRUCTIONS,
       },
     })
@@ -349,13 +357,15 @@ export class MockInterviewService extends EventEmitter {
     transcript: TranscriptSegment[]
     legacyFeedback: string
   }): Promise<void> {
+    const transcript = truncateMockTranscript(args.transcript)
     let grade: GraderResult = { rubric: [], annotations: [], strengths: [], gaps: [], nextDrills: [] }
     let graded = false
     let graderError: string | undefined
     if (args.apiKey) {
       try {
-        grade = await this.grader.grade(args.apiKey, args.config.presetId, args.transcript)
-        graded = grade.rubric.length > 0
+        grade = await this.grader.grade(args.apiKey, args.config.presetId, transcript)
+        graded = hasCompleteRubric(args.config.presetId, grade.rubric)
+        if (!graded) graderError = 'Grading returned an incomplete rubric.'
       } catch (err) {
         graderError = (err as Error)?.message ?? 'Grading failed.'
       }
@@ -371,14 +381,14 @@ export class MockInterviewService extends EventEmitter {
         durationMinutes: args.config.durationMinutes,
         startedAt: args.startedAt,
         endedAt: args.endedAt,
-        transcript: args.transcript,
+        transcript,
         legacyFeedback: args.legacyFeedback,
         rubric: grade.rubric,
         annotations: grade.annotations,
         strengths: grade.strengths,
         gaps: grade.gaps,
         nextDrills: grade.nextDrills,
-        averageScore: averageRubricScore(grade.rubric),
+        averageScore: graded ? averageRubricScore(grade.rubric) : null,
         graded,
         ...(graderError ? { graderError } : {}),
       })
@@ -418,8 +428,13 @@ export class MockInterviewService extends EventEmitter {
         return
       }
       const message = readNestedString(event, ['error', 'message']) ?? 'OpenAI realtime error.'
-      this.setStatus({ ...this.statusValue, state: 'error', message })
-      this.emit('error', message)
+      const ws = this.ws
+      if (ws) {
+        this.handleTransportFailure(ws, message)
+      } else {
+        this.setStatus({ ...this.statusValue, state: 'error', message })
+        this.emit('error', message)
+      }
       return
     }
 
@@ -549,7 +564,7 @@ export class MockInterviewService extends EventEmitter {
     this.send({
       type: 'response.create',
       response: {
-        modalities: ['audio', 'text'],
+        output_modalities: ['audio'],
         instructions,
       },
     })
@@ -574,12 +589,10 @@ export class MockInterviewService extends EventEmitter {
 
   private close(publishIdle = true): void {
     this.clearTimer()
-    this.clearFeedbackTimer()
+    this.finishFeedbackWait()
     this.outputTranscript = ''
     this.feedbackText = ''
     this.feedbackRequestPending = false
-    this.feedbackResolve?.()
-    this.feedbackResolve = null
     this.finishInputTranscriptWait()
     this.currentResponseAudio = false
     this.sessionApiKey = null
@@ -604,6 +617,33 @@ export class MockInterviewService extends EventEmitter {
   private clearFeedbackTimer(): void {
     if (this.feedbackTimer) clearTimeout(this.feedbackTimer)
     this.feedbackTimer = null
+  }
+
+  private finishFeedbackWait(): void {
+    this.feedbackResolve?.()
+    this.feedbackResolve = null
+    this.clearFeedbackTimer()
+    this.feedbackRequestPending = false
+  }
+
+  private handleTransportFailure(ws: WebSocket, message: string): void {
+    if (this.ws !== ws) return
+    this.ws = null
+    if (ws.readyState !== WebSocket.CLOSED) ws.terminate()
+    this.setStatus({ ...this.statusValue, state: 'error', paused: false, message })
+    this.emit('error', message)
+    this.handleUnexpectedDisconnect()
+  }
+
+  private handleUnexpectedDisconnect(): void {
+    this.clearTimer()
+    this.finishFeedbackWait()
+    this.finishInputTranscriptWait()
+    if (this.sessionId) {
+      void this.stop()
+      return
+    }
+    this.setStatus({ state: 'idle', paused: false })
   }
 
   private resolveInputTranscriptIfDrained(): void {
@@ -654,3 +694,9 @@ function transcriptEventKey(event: Record<string, unknown>, transcript: string):
 }
 
 export const mockInterview = new MockInterviewService()
+
+function hasCompleteRubric(presetId: MockInterviewConfig['presetId'], rubric: GraderResult['rubric']): boolean {
+  const expected = rubricDimensionsForPreset(presetId).map((item) => item.dimension)
+  const actual = new Set(rubric.map((item) => item.dimension))
+  return rubric.length === expected.length && expected.every((dimension) => actual.has(dimension))
+}

@@ -3,6 +3,8 @@ import { vi } from 'vitest'
 
 export interface FakeWebContents extends EventEmitter {
   send: ReturnType<typeof vi.fn>
+  mainFrame: object
+  setWindowOpenHandler: ReturnType<typeof vi.fn>
 }
 
 export interface FakeBrowserWindow extends EventEmitter {
@@ -29,6 +31,8 @@ export function makeFakeWindow(): FakeBrowserWindow {
   const emitter = new EventEmitter()
   const wc = new EventEmitter() as FakeWebContents
   wc.send = vi.fn()
+  wc.mainFrame = {}
+  wc.setWindowOpenHandler = vi.fn()
   const win = emitter as FakeBrowserWindow
   win.webContents = wc
   win.isDestroyed = vi.fn().mockReturnValue(false)
@@ -65,9 +69,11 @@ export function makeIpcMainStub(): {
   send: (channel: string, ...args: unknown[]) => void
   registered: Map<string, (...args: unknown[]) => unknown>
   events: Map<string, Array<(...args: unknown[]) => void>>
+  setEvent: (event: unknown) => void
 } {
   const registered = new Map<string, (...args: unknown[]) => unknown>()
   const events = new Map<string, Array<(...args: unknown[]) => void>>()
+  let event: unknown = {}
   const ipcMain = {
     handle: vi.fn((channel: string, fn: (...args: unknown[]) => unknown) => {
       registered.set(channel, fn)
@@ -85,11 +91,14 @@ export function makeIpcMainStub(): {
   const invoke = async (channel: string, ...args: unknown[]): Promise<unknown> => {
     const fn = registered.get(channel)
     if (!fn) throw new Error(`No handler for ${channel}`)
-    return await fn({}, ...args)
+    return await fn(event, ...args)
   }
   const send = (channel: string, ...args: unknown[]): void => {
     const listeners = events.get(channel) ?? []
-    for (const l of listeners) l({}, ...args)
+    for (const l of listeners) l(event, ...args)
   }
-  return { ipcMain, invoke, send, registered, events }
+  const setEvent = (next: unknown): void => {
+    event = next
+  }
+  return { ipcMain, invoke, send, registered, events, setEvent }
 }

@@ -59,5 +59,8 @@ jobs:
       - name: Build production bundles
         run: npm run build
 
+      - name: Package Electron application
+        run: npm run package:e2e
+
       - name: Run Electron Playwright flows
         run: npm run test:e2e

@@ -94,15 +94,30 @@ describe('settings store', () => {
     }
   })
 
-  it('falls back to base64 when safeStorage is unavailable, and warns', async () => {
+  it('refuses to persist API keys when safeStorage is unavailable', async () => {
     electronState.encryptionAvailable = false
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const { settings } = await freshSettings()
     await settings.load()
-    await settings.update({ groqKey: 'plain-key' })
+    await expect(settings.update({ groqKey: 'plain-key' })).rejects.toThrow(/keychain encryption is unavailable/)
     expect(warn).toHaveBeenCalled()
-    const raw = await fs.readFile(join(temp.path, 'settings.json'), 'utf-8')
-    expect(raw).toContain(Buffer.from('plain-key', 'utf-8').toString('base64'))
+    await expect(fs.readFile(join(temp.path, 'settings.json'), 'utf-8')).rejects.toMatchObject({ code: 'ENOENT' })
+    warn.mockRestore()
+  })
+
+  it('refuses to persist vault data when safeStorage is unavailable', async () => {
+    electronState.encryptionAvailable = false
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const { settings } = await freshSettings()
+    await settings.load()
+    await expect(settings.setVault({
+      resume: 'private',
+      jobDescription: '',
+      companyValues: '',
+      interviewerNotes: '',
+      stories: [],
+    })).rejects.toThrow(/keychain encryption is unavailable/)
+    expect(settings.getVault().resume).toBe('')
     warn.mockRestore()
   })
 

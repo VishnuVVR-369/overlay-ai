@@ -280,6 +280,7 @@ beforeEach(async () => {
   transcriptionInstance.ingest.mockClear()
 
   win = makeFakeWindow()
+  ipcStub.setEvent({ sender: win.webContents, senderFrame: win.webContents.mainFrame })
 
   vi.resetModules()
   const { registerIpc } = await import('@main/ipc')
@@ -309,6 +310,27 @@ describe('IPC handler registration', () => {
     expect(ipcStub.events.has(IPC.audioChunk)).toBe(true)
     expect(ipcStub.events.has(IPC.mockAudioChunk)).toBe(true)
     expect(ipcStub.events.has(IPC.windowUserActive)).toBe(true)
+  })
+
+  it('rejects invokes and drops events from untrusted senders', async () => {
+    ipcStub.setEvent({ sender: new EventEmitter(), senderFrame: {} })
+    await expect(ipcStub.invoke(IPC.settingsGet)).rejects.toThrow('Unauthorized IPC sender')
+    ipcStub.send(IPC.audioChunk, { stream: 'mic', audioBase64: 'AAA', sampleRate: 16000 })
+    expect(transcriptionInstance.ingest).not.toHaveBeenCalled()
+  })
+
+  it('retargets trusted IPC without registering duplicate handlers', async () => {
+    const initialRegistrations = ipcStub.ipcMain.handle.mock.calls.length
+    const nextWindow = makeFakeWindow()
+    const { registerIpc } = await import('@main/ipc')
+    registerIpc(nextWindow as unknown as Parameters<typeof registerIpc>[0])
+    ipcStub.setEvent({
+      sender: nextWindow.webContents,
+      senderFrame: nextWindow.webContents.mainFrame,
+    })
+
+    expect(ipcStub.ipcMain.handle).toHaveBeenCalledTimes(initialRegistrations)
+    await expect(ipcStub.invoke(IPC.settingsGet)).resolves.toMatchObject({ groqKeySet: false })
   })
 })
 

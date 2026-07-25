@@ -19,6 +19,7 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test --config tests/e2e/playwright.config.ts",
+    "package:e2e": "electron-builder --mac dir --publish never",
     "dist:mac": "electron-vite build && electron-builder --mac --publish never",
     "dist:win": "electron-vite build && electron-builder --win --publish never"
   },

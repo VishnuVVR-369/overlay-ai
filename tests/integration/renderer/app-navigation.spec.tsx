@@ -58,6 +58,8 @@ const ALL_KEYS = {
 let api: FakeApi
 
 beforeEach(() => {
+  vi.mocked(capture.start).mockReset().mockResolvedValue({ micStarted: true, systemStarted: true, warnings: [] })
+  vi.mocked(capture.startMock).mockReset().mockResolvedValue({ micStarted: true, warnings: [] })
   vi.mocked(capture.stop).mockClear()
   vi.mocked(mockPlayback.stop).mockClear()
   vi.mocked(mockPlayback.playPcm16).mockClear()
@@ -214,6 +216,23 @@ describe('command palette', () => {
     fireEvent.click(screen.getByText('Stop listening'))
     await waitFor(() => expect(api.transcription.stop).toHaveBeenCalled())
     expect(useStatusStore.getState().running).toBe(false)
+  })
+
+  it('marks a failed capture side instead of presenting both streams as healthy', async () => {
+    vi.mocked(capture.start).mockResolvedValueOnce({
+      micStarted: false,
+      systemStarted: true,
+      warnings: ['Microphone capture failed: permission denied'],
+    })
+    await bootApp()
+    press('k', { metaKey: true })
+    fireEvent.click(screen.getByText('Start listening'))
+    await waitFor(() => expect(useStatusStore.getState().running).toBe(true))
+
+    expect(useStatusStore.getState()).toMatchObject({
+      micState: 'error',
+      micMessage: 'Microphone capture failed: permission denied',
+    })
   })
 
   it('hides the overlay through main rather than faking it in the renderer', async () => {

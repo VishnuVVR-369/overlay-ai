@@ -105,12 +105,18 @@ export function App(): JSX.Element {
       return
     }
     const captureResult = await capture.start()
+    if (!captureResult.micStarted) {
+      setSocket('mic', 'error', captureWarning(captureResult.warnings, 'Microphone'))
+    }
+    if (!captureResult.systemStarted) {
+      setSocket('system', 'error', captureWarning(captureResult.warnings, 'System audio'))
+    }
     if (!captureResult.micStarted && !captureResult.systemStarted) {
       await window.api.transcription.stop()
       return
     }
     setRunning(true)
-  }, [openSetup, running, setRunning])
+  }, [openSetup, running, setRunning, setSocket])
 
   const startMock = useCallback(
     async (config: MockInterviewConfig) => {
@@ -500,6 +506,10 @@ export function App(): JSX.Element {
       <Toaster />
     </div>
   )
+}
+
+function captureWarning(warnings: string[], source: string): string {
+  return warnings.find((warning) => warning.startsWith(source)) ?? `${source} capture did not start.`
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {

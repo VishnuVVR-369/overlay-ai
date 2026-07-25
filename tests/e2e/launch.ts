@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,6 +6,7 @@ import { _electron as electron, type ElectronApplication, type Page } from 'play
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, '..', '..')
+const productName = 'Overlay AI'
 
 export async function launchApp(): Promise<{ app: ElectronApplication; page: Page }> {
   // ELECTRON_RUN_AS_NODE turns the binary into plain node, which makes every
@@ -17,7 +18,8 @@ export async function launchApp(): Promise<{ app: ElectronApplication; page: Pag
 
   try {
     app = await electron.launch({
-      args: [resolve(repoRoot, 'out/main/index.js'), `--user-data-dir=${userDataDir}`],
+      executablePath: packagedExecutable(),
+      args: [`--user-data-dir=${userDataDir}`],
       cwd: repoRoot,
       env: { ...env, NODE_ENV: 'test' },
     })
@@ -30,4 +32,20 @@ export async function launchApp(): Promise<{ app: ElectronApplication; page: Pag
     rmSync(userDataDir, { recursive: true, force: true })
     throw error
   }
+}
+
+function packagedExecutable(): string {
+  const releaseDir = resolve(repoRoot, 'release')
+  if (!existsSync(releaseDir)) {
+    throw new Error('Packaged app not found. Run npm run build && npm run package:e2e first.')
+  }
+  const candidates = readdirSync(releaseDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith('mac'))
+    .map((entry) => join(releaseDir, entry.name, `${productName}.app`, 'Contents', 'MacOS', productName))
+    .filter(existsSync)
+    .sort()
+  if (candidates.length !== 1) {
+    throw new Error(`Expected one packaged app executable, found ${candidates.length}.`)
+  }
+  return candidates[0]
 }

@@ -1,10 +1,12 @@
 import { BrowserWindow, app, screen } from 'electron'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { IPC } from '@shared/ipc-channels'
 import type { WindowMode } from '@shared/types'
 
 const isDev = !app.isPackaged
 const RENDERER_DEV_URL = process.env['ELECTRON_RENDERER_URL']
+const RENDERER_FILE = join(__dirname, '../renderer/index.html')
 
 export const COMPACT_SIZE = { width: 400, height: 148 }
 export const NORMAL_SIZE = { width: 480, height: 640 }
@@ -58,6 +60,11 @@ export function createOverlayWindow(): BrowserWindow {
     }
   }
 
+  win.webContents.on('will-navigate', (event, navigationUrl) => {
+    if (!isAllowedNavigation(navigationUrl)) event.preventDefault()
+  })
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+
   win.on('blur', () => {
     if (!win.isDestroyed()) win.webContents.send(IPC.windowFocusState, { focused: false })
   })
@@ -70,10 +77,24 @@ export function createOverlayWindow(): BrowserWindow {
   if (isDev && RENDERER_DEV_URL) {
     void win.loadURL(RENDERER_DEV_URL)
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'))
+    void win.loadFile(RENDERER_FILE)
   }
 
   return win
+}
+
+function isAllowedNavigation(navigationUrl: string): boolean {
+  try {
+    const candidate = new URL(navigationUrl)
+    if (isDev && RENDERER_DEV_URL) {
+      return candidate.origin === new URL(RENDERER_DEV_URL).origin
+    }
+    candidate.hash = ''
+    candidate.search = ''
+    return candidate.href === pathToFileURL(RENDERER_FILE).href
+  } catch {
+    return false
+  }
 }
 
 export function toggleWindowVisibility(win: BrowserWindow): void {

@@ -28,19 +28,33 @@ export interface ShortcutSlot {
 export type ShortcutRegistration = Record<ShortcutId, ShortcutSlot>
 
 let lastRegistration: ShortcutRegistration | null = null
+let activeWindow: BrowserWindow | null = null
 
 export function registerShortcuts(win: BrowserWindow): ShortcutRegistration {
+  activeWindow = win
+  if (lastRegistration) return lastRegistration
+
   const send = (channel: string) => (): void => {
-    if (!win.isDestroyed()) win.webContents.send(channel)
+    const target = activeWindow
+    if (target && !target.isDestroyed()) target.webContents.send(channel)
   }
 
   const handlers: Record<ShortcutId, () => void> = {
     ask: send(IPC.llmTrigger),
     screenAsk: send(IPC.visionTrigger),
-    toggle: () => toggleWindowVisibility(win),
+    toggle: () => {
+      const target = activeWindow
+      if (target) toggleWindowVisibility(target)
+    },
     listen: send(IPC.listenTrigger),
-    hud: () => cycleHudSize(win),
-    panic: () => triggerPanic(win),
+    hud: () => {
+      const target = activeWindow
+      if (target) cycleHudSize(target)
+    },
+    panic: () => {
+      const target = activeWindow
+      if (target) triggerPanic(target)
+    },
   }
 
   const registration = {} as ShortcutRegistration
@@ -57,7 +71,7 @@ export function registerShortcuts(win: BrowserWindow): ShortcutRegistration {
     registration[id] = { ok, accelerator }
   }
 
-  app.on('will-quit', () => globalShortcut.unregisterAll())
+  app.once('will-quit', () => globalShortcut.unregisterAll())
 
   lastRegistration = registration
   return lastRegistration

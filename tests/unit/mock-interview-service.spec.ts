@@ -108,7 +108,7 @@ describe('MockInterviewService event handling', () => {
   })
 
   it('collects feedback text and emits it when the response is done', async () => {
-    const { service, testable } = makeService()
+    const { service, testable, sent } = makeService()
     const feedback = vi.fn()
     service.on('feedback', feedback)
 
@@ -121,6 +121,25 @@ describe('MockInterviewService event handling', () => {
     expect(feedback).toHaveBeenCalledWith(expect.objectContaining({
       text: 'Strengths: clear. Gaps: depth.',
     }))
+    expect(sent.map((message) => JSON.parse(message))).toContainEqual(expect.objectContaining({
+      type: 'response.create',
+      response: expect.objectContaining({ output_modalities: ['text'] }),
+    }))
+  })
+
+  it('requests audio-only interviewer responses with the current Realtime field', () => {
+    const { service, sent } = makeService()
+    const testable = service as unknown as { requestOpeningQuestion(): void }
+
+    testable.requestOpeningQuestion()
+
+    expect(sent.map((message) => JSON.parse(message))).toContainEqual({
+      type: 'response.create',
+      response: {
+        output_modalities: ['audio'],
+        instructions: 'Start the mock interview now. Ask only the first question.',
+      },
+    })
   })
 })
 
@@ -157,8 +176,10 @@ describe('MockInterviewService session persistence', () => {
 
   it('persistSession composes a record with grader output and emits sessionSaved', async () => {
     const rubric: MockRubricScore[] = [
+      { dimension: 'starCompleteness', label: 'STAR completeness', score: 4, evidence: 'complete' },
       { dimension: 'structure', label: 'Structure', score: 4, evidence: 'good' },
       { dimension: 'communication', label: 'Communication', score: 3, evidence: 'paced' },
+      { dimension: 'clarification', label: 'Clarification', score: 3, evidence: 'scoped' },
     ]
     const graderCalls: Array<{ presetId: PresetId; transcript: TranscriptSegment[] }> = []
     const grader = makeGrader({
@@ -201,6 +222,70 @@ describe('MockInterviewService session persistence', () => {
     expect(savedArg.rubric).toEqual(rubric)
     expect(sessionSaved).toHaveBeenCalledTimes(1)
     expect((sessionSaved.mock.calls[0][0] as { summary: { id: string } }).summary.id).toBe('sess-1')
+  })
+
+  it('does not mark a partial rubric graded or include it in the average', async () => {
+    const sessions = makeSessions()
+    const service = new MockInterviewService({
+      grader: makeGrader({
+        rubric: [{ dimension: 'structure', label: 'Structure', score: 5, evidence: 'clear' }],
+        annotations: [],
+        strengths: [],
+        gaps: [],
+        nextDrills: [],
+      }),
+      sessions: sessions.store as never,
+    })
+
+    await (service as unknown as { persistSession(args: unknown): Promise<void> }).persistSession({
+      sessionId: 'partial',
+      startedAt: 1,
+      endedAt: 2,
+      config: { presetId: 'behavioral', durationMinutes: 30 },
+      context: { preset: undefined, vault: emptyVault() },
+      apiKey: 'oa',
+      transcript: [{ id: 'a', speaker: 'you', status: 'committed', text: 'A', startedAt: 1 }],
+      legacyFeedback: '',
+    })
+
+    expect(sessions.store.save).toHaveBeenCalledWith(expect.objectContaining({
+      graded: false,
+      averageScore: null,
+      graderError: 'Grading returned an incomplete rubric.',
+    }))
+  })
+
+  it('grades the same transcript window that is persisted', async () => {
+    const calls: Array<{ presetId: PresetId; transcript: TranscriptSegment[] }> = []
+    const sessions = makeSessions()
+    const service = new MockInterviewService({
+      grader: makeGrader({ rubric: [], annotations: [], strengths: [], gaps: [], nextDrills: [] }, calls),
+      sessions: sessions.store as never,
+    })
+    const transcript: TranscriptSegment[] = Array.from({ length: 600 }, (_, index) => ({
+      id: `turn-${index}`,
+      speaker: index % 2 === 0 ? 'them' : 'you',
+      status: 'committed',
+      text: `turn ${index}`,
+      startedAt: index,
+    }))
+
+    await (service as unknown as { persistSession(args: unknown): Promise<void> }).persistSession({
+      sessionId: 'bounded',
+      startedAt: 1,
+      endedAt: 2,
+      config: { presetId: 'behavioral', durationMinutes: 30 },
+      context: { preset: undefined, vault: emptyVault() },
+      apiKey: 'oa',
+      transcript,
+      legacyFeedback: '',
+    })
+
+    expect(calls[0].transcript).toHaveLength(500)
+    expect(calls[0].transcript[0].id).toBe('turn-100')
+    expect(sessions.store.save).toHaveBeenCalledWith(expect.objectContaining({
+      transcript: calls[0].transcript,
+    }))
   })
 
   it('records graderError and still saves the session when grading throws', async () => {
@@ -286,7 +371,12 @@ describe('MockInterviewService session persistence', () => {
   it('stop() with a transcript dispatches grading + session save', async () => {
     const grader: GraderClient = {
       grade: vi.fn(async () => ({
-        rubric: [{ dimension: 'structure', label: 'Structure', score: 4, evidence: 'ok' }],
+        rubric: [
+          { dimension: 'clarification', label: 'Clarification', score: 4, evidence: 'ok' },
+          { dimension: 'correctness', label: 'Correctness', score: 4, evidence: 'ok' },
+          { dimension: 'complexity', label: 'Complexity', score: 4, evidence: 'ok' },
+          { dimension: 'communication', label: 'Communication', score: 4, evidence: 'ok' },
+        ],
         annotations: [], strengths: [], gaps: [], nextDrills: [],
       })),
     }
@@ -582,6 +672,84 @@ describe('MockInterviewService session persistence', () => {
     resolveSave(undefined)
     await stopPromise
     expect(stopped).toBe(true)
+    expect(service.status().state).toBe('idle')
+  })
+
+  it('finishes a pending stop and saves the transcript after transport loss', async () => {
+    const sessions = makeSessions()
+    const service = new MockInterviewService({
+      grader: makeGrader({ rubric: [], annotations: [], strengths: [], gaps: [], nextDrills: [] }),
+      sessions: sessions.store as never,
+    })
+    const testable = service as unknown as {
+      ws: { readyState: number; send: (m: string) => void; close: () => void; terminate: () => void } | null
+      statusValue: { state: string; paused: boolean }
+      sessionId: string | null
+      sessionStartedAt: number
+      sessionConfig: unknown
+      promptContext: unknown
+      sessionApiKey: string | null
+      feedbackRequestPending: boolean
+      handleUnexpectedDisconnect(): void
+    }
+    testable.ws = { readyState: 1, send: vi.fn(), close: vi.fn(), terminate: vi.fn() }
+    testable.statusValue = { state: 'active', paused: false }
+    testable.sessionId = 'sess-disconnected'
+    testable.sessionStartedAt = 1000
+    testable.sessionConfig = { presetId: 'behavioral', durationMinutes: 30 }
+    testable.promptContext = { preset: undefined, vault: emptyVault() }
+    testable.sessionApiKey = 'oa'
+    transcriptionMock.flattenForPrompt.mockReturnValue('Them: Q')
+    transcriptionMock.snapshot.mockReturnValue({
+      segments: [{ id: 'q', speaker: 'them', status: 'committed', text: 'Q', startedAt: 1500 }],
+      partials: {},
+    })
+
+    const stopPromise = service.stop()
+    await vi.waitFor(() => expect(testable.feedbackRequestPending).toBe(true))
+    testable.ws = null
+    testable.handleUnexpectedDisconnect()
+    await stopPromise
+
+    expect(sessions.store.save).toHaveBeenCalledWith(expect.objectContaining({ id: 'sess-disconnected' }))
+    expect(service.status().state).toBe('idle')
+  })
+
+  it('tears down and persists after a Realtime protocol error', async () => {
+    const sessions = makeSessions()
+    const service = new MockInterviewService({
+      grader: makeGrader({ rubric: [], annotations: [], strengths: [], gaps: [], nextDrills: [] }),
+      sessions: sessions.store as never,
+    })
+    const terminate = vi.fn()
+    const testable = service as unknown as {
+      ws: { readyState: number; send: (m: string) => void; terminate: () => void } | null
+      statusValue: { state: string; paused: boolean }
+      sessionId: string | null
+      sessionStartedAt: number
+      sessionConfig: unknown
+      promptContext: unknown
+      sessionApiKey: string | null
+      handleMessage(raw: string): void
+    }
+    testable.ws = { readyState: 1, send: vi.fn(), terminate }
+    testable.statusValue = { state: 'active', paused: false }
+    testable.sessionId = 'sess-error'
+    testable.sessionStartedAt = 1000
+    testable.sessionConfig = { presetId: 'behavioral', durationMinutes: 30 }
+    testable.promptContext = { preset: undefined, vault: emptyVault() }
+    testable.sessionApiKey = 'oa'
+    transcriptionMock.snapshot.mockReturnValue({
+      segments: [{ id: 'q', speaker: 'them', status: 'committed', text: 'Q', startedAt: 1500 }],
+      partials: {},
+    })
+    service.on('error', vi.fn())
+
+    testable.handleMessage(JSON.stringify({ type: 'error', error: { message: 'bad request' } }))
+    await vi.waitFor(() => expect(sessions.store.save).toHaveBeenCalled())
+
+    expect(terminate).toHaveBeenCalled()
+    expect(testable.ws).toBeNull()
     expect(service.status().state).toBe('idle')
   })
 

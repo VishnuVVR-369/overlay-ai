@@ -16,6 +16,9 @@ vi.mock('electron', () => ({
     on: (event: string, fn: () => void) => {
       if (event === 'will-quit') willQuitListeners.push(fn)
     },
+    once: (event: string, fn: () => void) => {
+      if (event === 'will-quit') willQuitListeners.push(fn)
+    },
   },
   globalShortcut: {
     register: (...args: [string, () => void]) => registerSpy(...args),
@@ -148,6 +151,20 @@ describe('global shortcuts', () => {
     const { registerShortcuts, getShortcutRegistration } = await load()
     const reg = registerShortcuts(asWin(makeFakeWindow()))
     expect(getShortcutRegistration()).toBe(reg)
+  })
+
+  it('retargets existing shortcut handlers when the window is recreated', async () => {
+    const { registerShortcuts } = await load('darwin')
+    const first = makeFakeWindow()
+    const second = makeFakeWindow()
+    registerShortcuts(asWin(first))
+    registerShortcuts(asWin(second))
+
+    callbacks.get('Cmd+\\')!()
+
+    expect(first.webContents.send).not.toHaveBeenCalled()
+    expect(second.webContents.send).toHaveBeenCalledWith(IPC.llmTrigger)
+    expect(registerSpy).toHaveBeenCalledTimes(6)
   })
 
   it('hooks app "will-quit" to unregister all shortcuts', async () => {

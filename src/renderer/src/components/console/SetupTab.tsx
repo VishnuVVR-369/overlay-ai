@@ -69,7 +69,8 @@ export function SetupTab(): JSX.Element {
       if (visionModel.trim() && visionModel.trim() !== status.visionModel) {
         update.visionModel = visionModel.trim()
       }
-      await window.api.settings.set(update)
+      const result = await window.api.settings.set(update)
+      if (!result.ok) return
       const next = await window.api.settings.get()
       setStatus(next)
       setElevenlabsKey('')

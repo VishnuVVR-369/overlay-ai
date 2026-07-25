@@ -59,7 +59,7 @@ class SettingsStore {
     this.encryptionAvailable = safeStorage.isEncryptionAvailable()
     this.vaultCache = null
     if (!this.encryptionAvailable) {
-      console.warn('[settings] safeStorage encryption not available; keys will be stored unencrypted base64.')
+      console.warn('[settings] safeStorage encryption not available; encrypted settings are unavailable.')
     }
     try {
       const raw = await fs.readFile(this.filePath, 'utf-8')
@@ -79,15 +79,15 @@ class SettingsStore {
       if (parsed && typeof parsed === 'object' && ACCEPTED_VERSIONS.includes(parsed.version ?? 0)) {
         this.cache = {
           version: FILE_VERSION,
-          elevenlabsKeyEnc: parsed.elevenlabsKeyEnc,
-          groqKeyEnc: parsed.groqKeyEnc,
-          openaiKeyEnc: parsed.openaiKeyEnc,
+          elevenlabsKeyEnc: this.encryptionAvailable ? parsed.elevenlabsKeyEnc : undefined,
+          groqKeyEnc: this.encryptionAvailable ? parsed.groqKeyEnc : undefined,
+          openaiKeyEnc: this.encryptionAvailable ? parsed.openaiKeyEnc : undefined,
           activePresetId: isPresetId(parsed.activePresetId) ? parsed.activePresetId : undefined,
           activeAnswerStyleId: isAnswerStyleId(parsed.activeAnswerStyleId) ? parsed.activeAnswerStyleId : undefined,
           presetOverrides: this.sanitizeOverrides(parsed.presetOverrides),
           visionProvider: this.sanitizeVisionProvider(parsed.visionProvider),
           visionModel: this.sanitizeVisionModel(parsed.visionModel),
-          vaultEnc: typeof parsed.vaultEnc === 'string' ? parsed.vaultEnc : undefined,
+          vaultEnc: this.encryptionAvailable && typeof parsed.vaultEnc === 'string' ? parsed.vaultEnc : undefined,
           headlineFirst: typeof parsed.headlineFirst === 'boolean' ? parsed.headlineFirst : undefined,
         }
       }
@@ -130,6 +130,9 @@ class SettingsStore {
   }
 
   async update(update: SettingsUpdate): Promise<void> {
+    const hasNewSecret = [update.elevenlabsKey, update.groqKey, update.openaiKey]
+      .some((value) => typeof value === 'string' && value.length > 0)
+    if (hasNewSecret) this.requireEncryption()
     if (update.elevenlabsKey !== undefined) {
       this.cache.elevenlabsKeyEnc = this.encrypt(update.elevenlabsKey)
     }
@@ -162,15 +165,13 @@ class SettingsStore {
 
   getVault(): VaultData {
     if (this.vaultCache) return this.vaultCache
-    if (!this.cache.vaultEnc) {
+    if (!this.encryptionAvailable || !this.cache.vaultEnc) {
       this.vaultCache = cloneEmptyVault()
       return this.vaultCache
     }
     try {
       const buf = Buffer.from(this.cache.vaultEnc, 'base64')
-      const json = this.encryptionAvailable
-        ? safeStorage.decryptString(buf)
-        : buf.toString('utf-8')
+      const json = safeStorage.decryptString(buf)
       const parsed = JSON.parse(json) as unknown
       this.vaultCache = sanitizeVault(parsed)
       return this.vaultCache
@@ -183,12 +184,15 @@ class SettingsStore {
 
   async setVault(value: VaultData): Promise<void> {
     const sanitized = sanitizeVault(value)
-    const json = JSON.stringify(sanitized)
-    if (this.encryptionAvailable) {
-      this.cache.vaultEnc = safeStorage.encryptString(json).toString('base64')
-    } else {
-      this.cache.vaultEnc = Buffer.from(json, 'utf-8').toString('base64')
+    if (isEmptyVault(sanitized)) {
+      this.cache.vaultEnc = undefined
+      this.vaultCache = sanitized
+      await this.persist()
+      return
     }
+    this.requireEncryption()
+    const json = JSON.stringify(sanitized)
+    this.cache.vaultEnc = safeStorage.encryptString(json).toString('base64')
     this.vaultCache = sanitized
     await this.persist()
   }
@@ -285,21 +289,25 @@ class SettingsStore {
 
   private encrypt(value: string): string {
     if (!value) return ''
-    if (this.encryptionAvailable) {
-      return safeStorage.encryptString(value).toString('base64')
-    }
-    return Buffer.from(value, 'utf-8').toString('base64')
+    this.requireEncryption()
+    return safeStorage.encryptString(value).toString('base64')
   }
 
   private decrypt(stored?: string): string | null {
     if (!stored) return null
+    if (!this.encryptionAvailable) return null
     try {
       const buf = Buffer.from(stored, 'base64')
-      if (this.encryptionAvailable) return safeStorage.decryptString(buf)
-      return buf.toString('utf-8')
+      return safeStorage.decryptString(buf)
     } catch (err) {
       console.warn('[settings] decrypt failed', err)
       return null
+    }
+  }
+
+  private requireEncryption(): void {
+    if (!this.encryptionAvailable) {
+      throw new Error('OS keychain encryption is unavailable. Secure data was not saved.')
     }
   }
 
@@ -313,6 +321,16 @@ export const settings = new SettingsStore()
 
 function cloneEmptyVault(): VaultData {
   return { ...EMPTY_VAULT, stories: [] }
+}
+
+function isEmptyVault(vault: VaultData): boolean {
+  return (
+    !vault.resume &&
+    !vault.jobDescription &&
+    !vault.companyValues &&
+    !vault.interviewerNotes &&
+    vault.stories.length === 0
+  )
 }
 
 export function sanitizeVault(input: unknown): VaultData {

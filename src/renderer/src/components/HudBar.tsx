@@ -34,6 +34,8 @@ export function HudBar({
   const startedAt = useStatusStore((s) => s.startedAt)
   const micState = useStatusStore((s) => s.micState)
   const systemState = useStatusStore((s) => s.systemState)
+  const micMessage = useStatusStore((s) => s.micMessage)
+  const systemMessage = useStatusStore((s) => s.systemMessage)
   const mock = useMockStore((s) => s.status)
   const streaming = useLlmStore((s) => s.entries[0]?.status === 'streaming')
   const transcriptOpen = useUiStore((s) => s.transcriptOpen)
@@ -72,9 +74,9 @@ export function HudBar({
         <span className="hud-state">{label}</span>
         {clock && <span className="hud-clock">{clock}</span>}
         {!mockLive && (
-          <span className="hud-signals" title={`You · ${micState} — Them · ${systemState}`}>
-            <Signal state={micState} label="You" />
-            <Signal state={systemState} label="Them" />
+          <span className="hud-signals" title={`You · ${micMessage ?? micState} — Them · ${systemMessage ?? systemState}`}>
+            <Signal state={micState} label="You" message={micMessage} />
+            <Signal state={systemState} label="Them" message={systemMessage} />
           </span>
         )}
       </div>
@@ -160,9 +162,9 @@ function PresetChip({ onOpenPrompts }: { onOpenPrompts: () => void }): JSX.Eleme
   )
 }
 
-function Signal({ state, label }: { state: SocketState; label: string }): JSX.Element {
+function Signal({ state, label, message }: { state: SocketState; label: string; message?: string }): JSX.Element {
   return (
-    <span className={`signal signal-${signalTone(state)}`} title={`${label} · ${state}`}>
+    <span className={`signal signal-${signalTone(state)}`} title={`${label} · ${message ?? state}`}>
       <span className="signal-dot" />
     </span>
   )

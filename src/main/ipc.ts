@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
+import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { IPC } from '@shared/ipc-channels'
 import type {
@@ -30,23 +31,35 @@ import { hideWindow, setMode } from './window'
 import { getShortcutRegistration } from './shortcuts'
 import { triggerPanic } from './panic'
 
-export function registerIpc(win: BrowserWindow): void {
-  ipcMain.handle(IPC.settingsGet, () => settings.status())
+let activeWindow: BrowserWindow | null = null
+let ipcRegistered = false
 
-  ipcMain.handle(IPC.settingsSet, async (_evt, update: SettingsUpdate) => {
-    await settings.update(update)
-    return { ok: true }
+export function registerIpc(win: BrowserWindow): void {
+  activeWindow = win
+  if (ipcRegistered) return
+  ipcRegistered = true
+
+  handleTrusted(IPC.settingsGet, () => settings.status())
+
+  handleTrusted(IPC.settingsSet, async (update: SettingsUpdate) => {
+    try {
+      await settings.update(update)
+      return { ok: true }
+    } catch (err) {
+      sendToastToActive({ level: 'error', message: (err as Error).message })
+      return { ok: false }
+    }
   })
 
-  ipcMain.handle(IPC.readinessCheck, (): ReadinessStatus => buildReadinessStatus())
+  handleTrusted(IPC.readinessCheck, (): ReadinessStatus => buildReadinessStatus())
 
-  ipcMain.handle(IPC.permStatus, () => getPermissionStatus())
-  ipcMain.handle(IPC.permRequestMic, () => requestMicAccess())
-  ipcMain.handle(IPC.permOpenScreenPrefs, () => openScreenRecordingPrefs())
+  handleTrusted(IPC.permStatus, () => getPermissionStatus())
+  handleTrusted(IPC.permRequestMic, () => requestMicAccess())
+  handleTrusted(IPC.permOpenScreenPrefs, () => openScreenRecordingPrefs())
 
-  ipcMain.handle(IPC.transcriptionStart, () => {
+  handleTrusted(IPC.transcriptionStart, () => {
     if (mockInterview.status().state !== 'idle') {
-      sendToast(win, { level: 'warn', message: 'Stop the mock interview before starting live transcription.' })
+      sendToastToActive({ level: 'warn', message: 'Stop the mock interview before starting live transcription.' })
       return { ok: false, reason: 'mock_active' }
     }
     const key = settings.getElevenLabsKey()
@@ -55,26 +68,26 @@ export function registerIpc(win: BrowserWindow): void {
     return { ok: true }
   })
 
-  ipcMain.handle(IPC.transcriptionStop, () => {
+  handleTrusted(IPC.transcriptionStop, () => {
     transcription.stop()
     return { ok: true }
   })
 
-  ipcMain.handle(IPC.transcriptionStatus, () => transcription.status())
+  handleTrusted(IPC.transcriptionStatus, () => transcription.status())
 
-  ipcMain.on(IPC.audioChunk, (_evt, chunk: AudioChunkMessage) => {
+  onTrusted(IPC.audioChunk, (chunk: AudioChunkMessage) => {
     transcription.ingest(chunk)
   })
 
-  ipcMain.handle(IPC.mockStart, async (_evt, config: MockInterviewConfig) => {
+  handleTrusted(IPC.mockStart, async (config: MockInterviewConfig) => {
     if (transcription.status().running) {
-      sendToast(win, { level: 'warn', message: 'Stop live transcription before starting a mock interview.' })
+      sendToastToActive({ level: 'warn', message: 'Stop live transcription before starting a mock interview.' })
       return { ok: false, reason: 'transcription_active' }
     }
     const key = settings.getOpenAIKey()
     if (!key) {
-      sendToast(win, { level: 'error', message: 'OpenAI API key not set. Open Settings to add it.' })
-      openSettings(win)
+      sendToastToActive({ level: 'error', message: 'OpenAI API key not set. Open Settings to add it.' })
+      openSettingsForActive()
       return { ok: false, reason: 'missing_openai_key' }
     }
     const presetState = settings.getPresetState()
@@ -88,56 +101,56 @@ export function registerIpc(win: BrowserWindow): void {
       return { ok: true, status }
     } catch (err: unknown) {
       const message = (err as Error).message ?? 'Mock interview failed to start.'
-      sendToast(win, { level: 'error', message })
+      sendToastToActive({ level: 'error', message })
       return { ok: false, reason: message }
     }
   })
 
-  ipcMain.handle(IPC.mockStop, async () => {
+  handleTrusted(IPC.mockStop, async () => {
     await mockInterview.stop()
     return { ok: true }
   })
 
-  ipcMain.handle(IPC.mockPause, () => {
+  handleTrusted(IPC.mockPause, () => {
     mockInterview.pause()
     return { ok: true }
   })
 
-  ipcMain.handle(IPC.mockResume, () => {
+  handleTrusted(IPC.mockResume, () => {
     mockInterview.resume()
     return { ok: true }
   })
 
-  ipcMain.handle(IPC.mockStatus, () => mockInterview.status())
+  handleTrusted(IPC.mockStatus, () => mockInterview.status())
 
-  ipcMain.on(IPC.mockAudioChunk, (_evt, chunk: MockAudioChunkMessage) => {
+  onTrusted(IPC.mockAudioChunk, (chunk: MockAudioChunkMessage) => {
     mockInterview.ingest(chunk)
   })
 
-  ipcMain.handle(IPC.mockSessionsList, () => mockSessionStore.list())
-  ipcMain.handle(IPC.mockSessionsGet, (_evt, id: unknown) => {
+  handleTrusted(IPC.mockSessionsList, () => mockSessionStore.list())
+  handleTrusted(IPC.mockSessionsGet, (id: unknown) => {
     if (typeof id !== 'string' || !id) return null
     return mockSessionStore.get(id)
   })
-  ipcMain.handle(IPC.mockSessionsDelete, async (_evt, id: unknown) => {
+  handleTrusted(IPC.mockSessionsDelete, async (id: unknown) => {
     if (typeof id !== 'string' || !id) return { ok: false }
     const ok = await mockSessionStore.delete(id)
     return { ok }
   })
 
-  ipcMain.handle(IPC.transcriptSnapshot, () => transcription.snapshot())
-  ipcMain.handle(IPC.transcriptClear, () => {
+  handleTrusted(IPC.transcriptSnapshot, () => transcription.snapshot())
+  handleTrusted(IPC.transcriptClear, () => {
     transcription.clear()
     if (mockInterview.status().state !== 'idle') void mockInterview.resetContext()
   })
 
-  ipcMain.handle(IPC.llmStart, async (): Promise<LlmStartResponse> => {
+  handleTrusted(IPC.llmStart, async (): Promise<LlmStartResponse> => {
     const key = settings.getGroqKey()
     if (!key) {
       const requestId = randomUUID()
-      sendToast(win, { level: 'error', message: 'Groq API key not set. Open Settings to add it.' })
-      openSettings(win)
-      deferSend(win, IPC.llmError, { requestId, message: 'Groq API key not set' })
+      sendToastToActive({ level: 'error', message: 'Groq API key not set. Open Settings to add it.' })
+      openSettingsForActive()
+      deferSendToActive(IPC.llmError, { requestId, message: 'Groq API key not set' })
       return { requestId, mode: 'transcript' }
     }
     const activeId = settings.getActivePresetId()
@@ -149,30 +162,30 @@ export function registerIpc(win: BrowserWindow): void {
     const transcript = transcription.flattenForPrompt()
     const requestId = randomUUID()
     void groq.streamAnswer(key, systemPrompt, transcript, {
-      onToken: (delta) => win.webContents.send(IPC.llmToken, { requestId, delta }),
-      onDone: (full, finishReason) => win.webContents.send(IPC.llmDone, { requestId, full, finishReason }),
-      onError: (message) => win.webContents.send(IPC.llmError, { requestId, message }),
+      onToken: (delta) => sendToActive(IPC.llmToken, { requestId, delta }),
+      onDone: (full, finishReason) => sendToActive(IPC.llmDone, { requestId, full, finishReason }),
+      onError: (message) => sendToActive(IPC.llmError, { requestId, message }),
     })
     return { requestId, mode: 'transcript' }
   })
 
-  ipcMain.handle(IPC.llmAbort, () => groq.abort())
+  handleTrusted(IPC.llmAbort, () => groq.abort())
 
-  ipcMain.handle(IPC.visionStart, async (): Promise<LlmStartResponse> => {
+  handleTrusted(IPC.visionStart, async (): Promise<LlmStartResponse> => {
     const requestId = randomUUID()
     const key = settings.getOpenAIKey()
     if (!key) {
-      sendToast(win, { level: 'error', message: 'OpenAI API key not set. Open Settings to add it.' })
-      openSettings(win)
-      deferSend(win, IPC.llmError, { requestId, message: 'OpenAI API key not set' })
+      sendToastToActive({ level: 'error', message: 'OpenAI API key not set. Open Settings to add it.' })
+      openSettingsForActive()
+      deferSendToActive(IPC.llmError, { requestId, message: 'OpenAI API key not set' })
       return { requestId, mode: 'screen' }
     }
 
     const perms = getPermissionStatus()
     if (perms.screen !== 'granted') {
-      sendToast(win, { level: 'error', message: 'Screen Recording permission is required for screen ask.' })
-      openSettings(win)
-      deferSend(win, IPC.llmError, { requestId, message: 'Screen Recording permission is required for screen ask' })
+      sendToastToActive({ level: 'error', message: 'Screen Recording permission is required for screen ask.' })
+      openSettingsForActive()
+      deferSendToActive(IPC.llmError, { requestId, message: 'Screen Recording permission is required for screen ask' })
       return { requestId, mode: 'screen' }
     }
 
@@ -181,8 +194,8 @@ export function registerIpc(win: BrowserWindow): void {
       imageDataUrl = (await captureActiveDisplay()).dataUrl
     } catch (err: unknown) {
       const message = (err as Error).message ?? 'Screen capture failed'
-      sendToast(win, { level: 'error', message })
-      deferSend(win, IPC.llmError, { requestId, message })
+      sendToastToActive({ level: 'error', message })
+      deferSendToActive(IPC.llmError, { requestId, message })
       return { requestId, mode: 'screen' }
     }
 
@@ -195,81 +208,86 @@ export function registerIpc(win: BrowserWindow): void {
     const transcript = transcription.flattenForPrompt()
     const model = settings.getVisionModel()
     void openaiVision.streamScreenAnswer(key, model, systemPrompt, transcript, imageDataUrl, {
-      onToken: (delta) => win.webContents.send(IPC.llmToken, { requestId, delta }),
-      onDone: (full, finishReason) => win.webContents.send(IPC.llmDone, { requestId, full, finishReason }),
-      onError: (message) => win.webContents.send(IPC.llmError, { requestId, message }),
+      onToken: (delta) => sendToActive(IPC.llmToken, { requestId, delta }),
+      onDone: (full, finishReason) => sendToActive(IPC.llmDone, { requestId, full, finishReason }),
+      onError: (message) => sendToActive(IPC.llmError, { requestId, message }),
     })
     return { requestId, mode: 'screen', imageDataUrl }
   })
 
-  ipcMain.handle(IPC.visionAbort, () => openaiVision.abort())
+  handleTrusted(IPC.visionAbort, () => openaiVision.abort())
 
-  ipcMain.handle(IPC.presetsGet, () => settings.getPresetState())
+  handleTrusted(IPC.presetsGet, () => settings.getPresetState())
 
-  ipcMain.handle(IPC.presetsSetActive, async (_evt, id: PresetId) => {
+  handleTrusted(IPC.presetsSetActive, async (id: PresetId) => {
     if (!isPresetId(id)) return { ok: false }
     await settings.setActivePresetId(id)
-    if (!win.isDestroyed()) win.webContents.send(IPC.presetsChanged, settings.getPresetState())
+    sendToActive(IPC.presetsChanged, settings.getPresetState())
     return { ok: true }
   })
 
-  ipcMain.handle(IPC.presetsSetOverride, async (_evt, update: PresetOverrideUpdate) => {
+  handleTrusted(IPC.presetsSetOverride, async (update: PresetOverrideUpdate) => {
     if (!update || !isPresetId(update.id)) return { ok: false }
     const prompt = update.prompt === null ? null : String(update.prompt)
     await settings.setPresetOverride(update.id, prompt)
-    if (!win.isDestroyed()) win.webContents.send(IPC.presetsChanged, settings.getPresetState())
+    sendToActive(IPC.presetsChanged, settings.getPresetState())
     return { ok: true }
   })
 
-  ipcMain.handle(IPC.answerStylesGet, () => settings.getAnswerStyleState())
+  handleTrusted(IPC.answerStylesGet, () => settings.getAnswerStyleState())
 
-  ipcMain.handle(IPC.answerStylesSetActive, async (_evt, id: AnswerStyleId) => {
+  handleTrusted(IPC.answerStylesSetActive, async (id: AnswerStyleId) => {
     if (!isAnswerStyleId(id)) return { ok: false }
     await settings.setActiveAnswerStyleId(id)
-    if (!win.isDestroyed()) win.webContents.send(IPC.answerStylesChanged, settings.getAnswerStyleState())
+    sendToActive(IPC.answerStylesChanged, settings.getAnswerStyleState())
     return { ok: true }
   })
 
-  ipcMain.handle(IPC.windowSetMode, (_evt, mode: WindowMode) => setMode(win, mode))
-  ipcMain.handle(IPC.windowHide, () => hideWindow(win))
-  ipcMain.on(IPC.windowUserActive, () => {
-    if (!win.isDestroyed()) win.webContents.send(IPC.windowFocusState, { focused: true })
+  handleTrusted(IPC.windowSetMode, (mode: WindowMode) => setMode(requireActiveWindow(), mode))
+  handleTrusted(IPC.windowHide, () => hideWindow(requireActiveWindow()))
+  onTrusted(IPC.windowUserActive, () => {
+    sendToActive(IPC.windowFocusState, { focused: true })
   })
-  ipcMain.handle(IPC.windowQuit, () => app.quit())
+  handleTrusted(IPC.windowQuit, () => app.quit())
 
-  ipcMain.handle(IPC.vaultGet, () => settings.getVault())
-  ipcMain.handle(IPC.vaultSet, async (_evt, payload: VaultData) => {
-    await settings.setVault(payload)
-    const next = settings.getVault()
-    if (!win.isDestroyed()) win.webContents.send(IPC.vaultChanged, next)
-    return { ok: true }
+  handleTrusted(IPC.vaultGet, () => settings.getVault())
+  handleTrusted(IPC.vaultSet, async (payload: VaultData) => {
+    try {
+      await settings.setVault(payload)
+      const next = settings.getVault()
+      sendToActive(IPC.vaultChanged, next)
+      return { ok: true }
+    } catch (err) {
+      sendToastToActive({ level: 'error', message: (err as Error).message })
+      return { ok: false }
+    }
   })
 
-  ipcMain.handle(IPC.panicRequest, () => triggerPanic(win))
+  handleTrusted(IPC.panicRequest, () => triggerPanic(requireActiveWindow()))
 
   transcription.on('update', (event) => {
-    if (!win.isDestroyed()) win.webContents.send(IPC.transcriptUpdate, event)
+    sendToActive(IPC.transcriptUpdate, event)
   })
   transcription.on('socketStatus', (event) => {
-    if (!win.isDestroyed()) win.webContents.send(IPC.socketStatus, event)
+    sendToActive(IPC.socketStatus, event)
   })
   mockInterview.on('status', (event) => {
-    if (!win.isDestroyed()) win.webContents.send(IPC.mockStatusChanged, event)
+    sendToActive(IPC.mockStatusChanged, event)
   })
   mockInterview.on('audioDelta', (event) => {
-    if (!win.isDestroyed()) win.webContents.send(IPC.mockAudioDelta, event)
+    sendToActive(IPC.mockAudioDelta, event)
   })
   mockInterview.on('feedback', (event) => {
-    if (!win.isDestroyed()) win.webContents.send(IPC.mockFeedback, event)
+    sendToActive(IPC.mockFeedback, event)
   })
   mockInterview.on('playbackStop', () => {
-    if (!win.isDestroyed()) win.webContents.send(IPC.mockPlaybackStop)
+    sendToActive(IPC.mockPlaybackStop)
   })
   mockInterview.on('sessionSaved', (event) => {
-    if (!win.isDestroyed()) win.webContents.send(IPC.mockSessionSaved, event)
+    sendToActive(IPC.mockSessionSaved, event)
   })
   mockInterview.on('error', (message) => {
-    sendToast(win, { level: 'error', message })
+    sendToastToActive({ level: 'error', message })
   })
 }
 
@@ -347,12 +365,61 @@ export function sendToast(win: BrowserWindow, toast: ToastEvent): void {
   if (!win.isDestroyed()) win.webContents.send(IPC.toast, toast)
 }
 
-function openSettings(win: BrowserWindow): void {
-  if (!win.isDestroyed()) win.webContents.send(IPC.settingsOpen)
+function handleTrusted<Args extends unknown[], Result>(
+  channel: string,
+  handler: (...args: Args) => Result,
+): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    assertTrustedSender(event)
+    return handler(...(args as Args))
+  })
 }
 
-function deferSend(win: BrowserWindow, channel: string, payload: unknown): void {
+function onTrusted<Args extends unknown[]>(channel: string, handler: (...args: Args) => void): void {
+  ipcMain.on(channel, (event, ...args) => {
+    if (!isTrustedSender(event)) return
+    handler(...(args as Args))
+  })
+}
+
+function assertTrustedSender(event: IpcMainInvokeEvent): void {
+  if (!isTrustedSender(event)) throw new Error('Unauthorized IPC sender.')
+}
+
+function isTrustedSender(event: IpcMainInvokeEvent | IpcMainEvent): boolean {
+  const win = activeWindow
+  return (
+    !!win &&
+    !win.isDestroyed() &&
+    event.sender === win.webContents &&
+    event.senderFrame === win.webContents.mainFrame
+  )
+}
+
+function requireActiveWindow(): BrowserWindow {
+  const win = activeWindow
+  if (!win || win.isDestroyed()) throw new Error('Overlay window is unavailable.')
+  return win
+}
+
+function sendToActive(channel: string, payload?: unknown): void {
+  const win = activeWindow
+  if (!win || win.isDestroyed()) return
+  if (payload === undefined) win.webContents.send(channel)
+  else win.webContents.send(channel, payload)
+}
+
+function sendToastToActive(toast: ToastEvent): void {
+  const win = activeWindow
+  if (win) sendToast(win, toast)
+}
+
+function openSettingsForActive(): void {
+  sendToActive(IPC.settingsOpen)
+}
+
+function deferSendToActive(channel: string, payload: unknown): void {
   setTimeout(() => {
-    if (!win.isDestroyed()) win.webContents.send(channel, payload)
+    sendToActive(channel, payload)
   }, 50)
 }
