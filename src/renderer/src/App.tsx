@@ -282,8 +282,8 @@ export function App(): JSX.Element {
         return
       }
 
-      // Settings is an app-level shortcut, so it must remain available while
-      // the user is editing a key, prompt, or personal-context field.
+      // Setup is a window-level navigation shortcut, so it must remain
+      // available while the user edits a key, prompt, or personal-context field.
       if (mod && !event.shiftKey && !event.altKey && event.key === ',') {
         event.preventDefault()
         openSetup()
