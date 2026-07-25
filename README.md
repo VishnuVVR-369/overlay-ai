@@ -9,7 +9,11 @@ A stealth live-interview assistant overlay built with Electron.
 - Continuously transcribes your microphone ("You") and system audio ("Them") via ElevenLabs Scribe v2 Realtime (~150 ms latency).
 - On `Cmd/Ctrl+\`, sends the full session transcript to Groq's `openai/gpt-oss-120b` and streams the answer back.
 - On `Cmd/Ctrl+Shift+\`, captures the active display, sends the screenshot plus transcript context to OpenAI's vision model, and streams the answer back.
-- On `Cmd/Ctrl+B`, toggles window visibility.
+- Keeps setup, personal context, prompts, mock practice, session history, and help in one tabbed command console.
+- Opens a searchable command palette with `Cmd/Ctrl+K`.
+- Cycles compact, normal, and wide layouts with `Cmd/Ctrl+Shift+E`.
+- On `Cmd/Ctrl+Shift+B`, toggles window visibility; `Cmd/Ctrl+Shift+Escape` stops capture, clears the session, and hides the overlay.
+- Runs voice mock interviews and saves their transcripts, rubric scores, feedback, and follow-up drills in History.
 
 ## Setup
 
@@ -23,7 +27,7 @@ A stealth live-interview assistant overlay built with Electron.
    npm run dev
    ```
 
-3. On first launch, paste your ElevenLabs, Groq, and OpenAI API keys in the Settings panel.
+3. On first launch, paste your ElevenLabs, Groq, and OpenAI API keys in the command console's Setup tab.
 
 ## Permissions (macOS)
 
