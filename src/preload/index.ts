@@ -159,7 +159,7 @@ const api: OverlayApi = {
     onFocusState: (h) => subscribe<WindowFocusState>(IPC.windowFocusState, h),
     onModeChanged: (h) => subscribe<WindowModeChangedEvent>(IPC.windowModeChanged, h),
     onVisibilityChanged: (h) => subscribe<WindowVisibilityChangedEvent>(IPC.windowVisibilityChanged, h),
-    quit: () => ipcRenderer.invoke(IPC.windowQuit) as Promise<void>,
+    quit: () => ipcRenderer.invoke(IPC.windowQuit) as Promise<{ ok: boolean }>,
   },
 }
 

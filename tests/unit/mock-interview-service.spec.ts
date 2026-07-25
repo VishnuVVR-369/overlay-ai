@@ -368,6 +368,47 @@ describe('MockInterviewService session persistence', () => {
     expect(sessionSaved).not.toHaveBeenCalled()
   })
 
+  it('rejects stop when the durable session write fails', async () => {
+    const sessions = makeSessions()
+    sessions.store.save = vi.fn(async () => {
+      throw new Error('disk full')
+    })
+    const service = new MockInterviewService({
+      grader: makeGrader({ rubric: [], annotations: [], strengths: [], gaps: [], nextDrills: [] }),
+      sessions: sessions.store as never,
+    })
+    const errors: string[] = []
+    service.on('error', (message) => errors.push(message))
+    const testable = service as unknown as {
+      ws: { readyState: number; send: (m: string) => void; close: () => void; terminate: () => void } | null
+      statusValue: { state: string; paused: boolean }
+      sessionId: string | null
+      sessionStartedAt: number
+      sessionConfig: unknown
+      promptContext: unknown
+      sessionApiKey: string | null
+      feedbackResolve: (() => void) | null
+    }
+    testable.ws = { readyState: 1, send: vi.fn(), close: vi.fn(), terminate: vi.fn() }
+    testable.statusValue = { state: 'active', paused: false }
+    testable.sessionId = 'sess-save-failure'
+    testable.sessionStartedAt = 1000
+    testable.sessionConfig = { presetId: 'behavioral', durationMinutes: 30 }
+    testable.promptContext = { preset: undefined, vault: emptyVault() }
+    testable.sessionApiKey = 'oa'
+    transcriptionMock.flattenForPrompt.mockReturnValue('Them: Q')
+    transcriptionMock.snapshot.mockReturnValue({
+      segments: [{ id: 'q', speaker: 'them', status: 'committed', text: 'Q', startedAt: 1500 }],
+      partials: {},
+    })
+
+    const stopPromise = service.stop()
+    testable.feedbackResolve?.()
+    await expect(stopPromise).rejects.toThrow(/Failed to save mock session: disk full/)
+    expect(errors).toContain('Failed to save mock session: disk full')
+    expect(service.status().state).toBe('idle')
+  })
+
   it('stop() with a transcript dispatches grading + session save', async () => {
     const grader: GraderClient = {
       grade: vi.fn(async () => ({

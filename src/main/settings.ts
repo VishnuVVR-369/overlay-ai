@@ -51,16 +51,15 @@ export const DEFAULT_HEADLINE_FIRST = true
 class SettingsStore {
   private cache: SettingsFile = { version: FILE_VERSION }
   private filePath = ''
-  private encryptionAvailable = false
+  private encryptionAvailable: boolean | null = null
   private vaultCache: VaultData | null = null
 
   async load(): Promise<void> {
     this.filePath = join(app.getPath('userData'), 'settings.json')
-    this.encryptionAvailable = safeStorage.isEncryptionAvailable()
+    // Querying safeStorage can synchronously block on the macOS keychain. Keep
+    // startup independent of it and probe only when encrypted data is used.
+    this.encryptionAvailable = null
     this.vaultCache = null
-    if (!this.encryptionAvailable) {
-      console.warn('[settings] safeStorage encryption not available; encrypted settings are unavailable.')
-    }
     try {
       const raw = await fs.readFile(this.filePath, 'utf-8')
       const parsed = JSON.parse(raw) as {
@@ -79,15 +78,15 @@ class SettingsStore {
       if (parsed && typeof parsed === 'object' && ACCEPTED_VERSIONS.includes(parsed.version ?? 0)) {
         this.cache = {
           version: FILE_VERSION,
-          elevenlabsKeyEnc: this.encryptionAvailable ? parsed.elevenlabsKeyEnc : undefined,
-          groqKeyEnc: this.encryptionAvailable ? parsed.groqKeyEnc : undefined,
-          openaiKeyEnc: this.encryptionAvailable ? parsed.openaiKeyEnc : undefined,
+          elevenlabsKeyEnc: typeof parsed.elevenlabsKeyEnc === 'string' ? parsed.elevenlabsKeyEnc : undefined,
+          groqKeyEnc: typeof parsed.groqKeyEnc === 'string' ? parsed.groqKeyEnc : undefined,
+          openaiKeyEnc: typeof parsed.openaiKeyEnc === 'string' ? parsed.openaiKeyEnc : undefined,
           activePresetId: isPresetId(parsed.activePresetId) ? parsed.activePresetId : undefined,
           activeAnswerStyleId: isAnswerStyleId(parsed.activeAnswerStyleId) ? parsed.activeAnswerStyleId : undefined,
           presetOverrides: this.sanitizeOverrides(parsed.presetOverrides),
           visionProvider: this.sanitizeVisionProvider(parsed.visionProvider),
           visionModel: this.sanitizeVisionModel(parsed.visionModel),
-          vaultEnc: this.encryptionAvailable && typeof parsed.vaultEnc === 'string' ? parsed.vaultEnc : undefined,
+          vaultEnc: typeof parsed.vaultEnc === 'string' ? parsed.vaultEnc : undefined,
           headlineFirst: typeof parsed.headlineFirst === 'boolean' ? parsed.headlineFirst : undefined,
         }
       }
@@ -165,10 +164,11 @@ class SettingsStore {
 
   getVault(): VaultData {
     if (this.vaultCache) return this.vaultCache
-    if (!this.encryptionAvailable || !this.cache.vaultEnc) {
+    if (!this.cache.vaultEnc) {
       this.vaultCache = cloneEmptyVault()
       return this.vaultCache
     }
+    if (!this.checkEncryptionAvailable()) return cloneEmptyVault()
     try {
       const buf = Buffer.from(this.cache.vaultEnc, 'base64')
       const json = safeStorage.decryptString(buf)
@@ -295,7 +295,7 @@ class SettingsStore {
 
   private decrypt(stored?: string): string | null {
     if (!stored) return null
-    if (!this.encryptionAvailable) return null
+    if (!this.checkEncryptionAvailable()) return null
     try {
       const buf = Buffer.from(stored, 'base64')
       return safeStorage.decryptString(buf)
@@ -306,9 +306,22 @@ class SettingsStore {
   }
 
   private requireEncryption(): void {
-    if (!this.encryptionAvailable) {
+    if (!this.checkEncryptionAvailable()) {
       throw new Error('OS keychain encryption is unavailable. Secure data was not saved.')
     }
+  }
+
+  private checkEncryptionAvailable(): boolean {
+    try {
+      this.encryptionAvailable = safeStorage.isEncryptionAvailable()
+    } catch (err) {
+      this.encryptionAvailable = false
+      console.warn('[settings] safeStorage availability check failed', err)
+    }
+    if (!this.encryptionAvailable) {
+      console.warn('[settings] safeStorage encryption not available; encrypted settings are unavailable.')
+    }
+    return this.encryptionAvailable
   }
 
   private async persist(): Promise<void> {

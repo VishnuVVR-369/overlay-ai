@@ -233,6 +233,37 @@ describe('command palette', () => {
       micState: 'error',
       micMessage: 'Microphone capture failed: permission denied',
     })
+
+    act(() => api.__emit.socketStatus({ stream: 'mic', state: 'open' }))
+    expect(useStatusStore.getState()).toMatchObject({
+      micState: 'error',
+      micMessage: 'Microphone capture failed: permission denied',
+    })
+  })
+
+  it('keeps both capture errors visible when stopping unusable sockets', async () => {
+    vi.mocked(capture.start).mockResolvedValueOnce({
+      micStarted: false,
+      systemStarted: false,
+      warnings: [
+        'Microphone capture failed: permission denied',
+        'System audio capture failed: permission denied',
+      ],
+    })
+    await bootApp()
+    press('k', { metaKey: true })
+    fireEvent.click(screen.getByText('Start listening'))
+    await waitFor(() => expect(api.transcription.stop).toHaveBeenCalled())
+
+    act(() => {
+      api.__emit.socketStatus({ stream: 'mic', state: 'closed' })
+      api.__emit.socketStatus({ stream: 'system', state: 'closed' })
+    })
+    expect(useStatusStore.getState()).toMatchObject({
+      running: false,
+      micState: 'error',
+      systemState: 'error',
+    })
   })
 
   it('hides the overlay through main rather than faking it in the renderer', async () => {

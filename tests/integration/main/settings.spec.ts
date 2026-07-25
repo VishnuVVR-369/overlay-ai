@@ -19,7 +19,7 @@ vi.mock('electron', () => ({
     isPackaged: false,
   },
   safeStorage: {
-    isEncryptionAvailable: () => electronState.encryptionAvailable,
+    isEncryptionAvailable: vi.fn(() => electronState.encryptionAvailable),
     encryptString: (s: string) => Buffer.from('enc:' + s, 'utf-8'),
     decryptString: (b: Buffer) => b.toString('utf-8').replace(/^enc:/, ''),
   },
@@ -36,6 +36,7 @@ beforeEach(() => {
   temp = makeTempUserData()
   electronState.userDataDir = temp.path
   electronState.encryptionAvailable = true
+  vi.clearAllMocks()
 })
 
 afterEach(() => {
@@ -45,7 +46,9 @@ afterEach(() => {
 describe('settings store', () => {
   it('starts with everything unset and default vision settings', async () => {
     const { settings } = await freshSettings()
+    const { safeStorage } = await import('electron')
     await settings.load()
+    expect(safeStorage.isEncryptionAvailable).not.toHaveBeenCalled()
     expect(settings.status()).toMatchObject({
       elevenlabsKeySet: false,
       groqKeySet: false,
@@ -92,6 +95,36 @@ describe('settings store', () => {
         openaiKeySet: true,
       })
     }
+  })
+
+  it('preserves encrypted fields when the keychain is temporarily unavailable', async () => {
+    {
+      const { settings } = await freshSettings()
+      await settings.load()
+      await settings.update({ elevenlabsKey: 'el-key', openaiKey: 'oa-key' })
+      await settings.setVault({
+        resume: 'private resume',
+        jobDescription: '',
+        companyValues: '',
+        interviewerNotes: '',
+        stories: [],
+      })
+    }
+    const before = JSON.parse(await fs.readFile(join(temp.path, 'settings.json'), 'utf-8'))
+
+    electronState.encryptionAvailable = false
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    {
+      const { settings } = await freshSettings()
+      await settings.load()
+      await settings.setActivePresetId('coding')
+    }
+    const after = JSON.parse(await fs.readFile(join(temp.path, 'settings.json'), 'utf-8'))
+
+    expect(after.elevenlabsKeyEnc).toBe(before.elevenlabsKeyEnc)
+    expect(after.openaiKeyEnc).toBe(before.openaiKeyEnc)
+    expect(after.vaultEnc).toBe(before.vaultEnc)
+    warn.mockRestore()
   })
 
   it('refuses to persist API keys when safeStorage is unavailable', async () => {

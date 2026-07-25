@@ -24,6 +24,7 @@ interface LlmState {
 }
 
 const pendingDeltas = new Map<string, string>()
+const MAX_RETAINED_SCREENSHOTS = 3
 let rafHandle: number | null = null
 
 function flushDeltas(set: (fn: (s: LlmState) => Partial<LlmState>) => void): void {
@@ -43,12 +44,22 @@ function flushDeltas(set: (fn: (s: LlmState) => Partial<LlmState>) => void): voi
 export const useLlmStore = create<LlmState>((set) => ({
   entries: [],
   startEntry: (requestId, mode = 'transcript', imageDataUrl) =>
-    set((state) => ({
-      entries: [
-        { requestId, mode, imageDataUrl, text: '', chunks: [], status: 'streaming', startedAt: Date.now() },
-        ...state.entries,
-      ],
-    })),
+    set((state) => {
+      let retainedScreenshots = imageDataUrl ? 1 : 0
+      const priorEntries = state.entries.map((entry) => {
+        if (!entry.imageDataUrl) return entry
+        retainedScreenshots += 1
+        return retainedScreenshots <= MAX_RETAINED_SCREENSHOTS
+          ? entry
+          : { ...entry, imageDataUrl: undefined }
+      })
+      return {
+        entries: [
+          { requestId, mode, imageDataUrl, text: '', chunks: [], status: 'streaming', startedAt: Date.now() },
+          ...priorEntries,
+        ],
+      }
+    }),
   appendToken: (requestId, delta) => {
     pendingDeltas.set(requestId, (pendingDeltas.get(requestId) ?? '') + delta)
     if (rafHandle === null) {

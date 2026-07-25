@@ -107,8 +107,13 @@ export function registerIpc(win: BrowserWindow): void {
   })
 
   handleTrusted(IPC.mockStop, async () => {
-    await mockInterview.stop()
-    return { ok: true }
+    try {
+      await mockInterview.stop()
+      return { ok: true }
+    } catch (err) {
+      sendToastToActive({ level: 'error', message: (err as Error).message })
+      return { ok: false }
+    }
   })
 
   handleTrusted(IPC.mockPause, () => {
@@ -248,7 +253,20 @@ export function registerIpc(win: BrowserWindow): void {
   onTrusted(IPC.windowUserActive, () => {
     sendToActive(IPC.windowFocusState, { focused: true })
   })
-  handleTrusted(IPC.windowQuit, () => app.quit())
+  handleTrusted(IPC.windowQuit, async () => {
+    transcription.stop()
+    try {
+      await mockInterview.stop()
+      app.quit()
+      return { ok: true }
+    } catch (err) {
+      sendToastToActive({
+        level: 'error',
+        message: `Could not save the active mock interview. Overlay AI is still open. ${(err as Error).message}`,
+      })
+      return { ok: false }
+    }
+  })
 
   handleTrusted(IPC.vaultGet, () => settings.getVault())
   handleTrusted(IPC.vaultSet, async (payload: VaultData) => {

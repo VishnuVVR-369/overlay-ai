@@ -256,7 +256,8 @@ beforeEach(async () => {
   groqStreamSpy.mockClear()
   visionStreamSpy.mockClear()
   mockStartSpy.mockClear()
-  mockStopSpy.mockClear()
+  mockStopSpy.mockReset()
+  mockStopSpy.mockResolvedValue(undefined)
   mockPauseSpy.mockClear()
   mockResumeSpy.mockClear()
   mockIngestSpy.mockClear()
@@ -640,8 +641,21 @@ describe('window IPC', () => {
   })
 
   it('window:quit calls app.quit()', async () => {
-    await ipcStub.invoke(IPC.windowQuit)
+    expect(await ipcStub.invoke(IPC.windowQuit)).toEqual({ ok: true })
+    expect(mockStopSpy).toHaveBeenCalled()
+    expect(transcriptionInstance.stop).toHaveBeenCalled()
     expect(appQuitSpy).toHaveBeenCalled()
+  })
+
+  it('window:quit stays open and reports a failed mock-session save', async () => {
+    mockStopSpy.mockRejectedValueOnce(new Error('disk full'))
+
+    expect(await ipcStub.invoke(IPC.windowQuit)).toEqual({ ok: false })
+    expect(appQuitSpy).not.toHaveBeenCalled()
+    expect(win.webContents.send).toHaveBeenCalledWith(
+      IPC.toast,
+      expect.objectContaining({ level: 'error', message: expect.stringMatching(/still open.*disk full/) }),
+    )
   })
 })
 

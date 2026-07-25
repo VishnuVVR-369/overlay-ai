@@ -338,7 +338,7 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
       onFocusState: (h) => subscribe<WindowFocusState>(listeners.focus, h),
       onModeChanged: (h) => subscribe<WindowModeChangedEvent>(listeners.modeChanged, h),
       onVisibilityChanged: (h) => subscribe<WindowVisibilityChangedEvent>(listeners.visibilityChanged, h),
-      quit: vi.fn(async () => undefined),
+      quit: vi.fn(async () => ({ ok: true })),
     },
     __emit: {
       transcriptUpdate: (e) => listeners.transcriptUpdate.forEach((l) => l(e)),

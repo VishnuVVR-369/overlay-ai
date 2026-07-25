@@ -405,7 +405,9 @@ export class MockInterviewService extends EventEmitter {
         },
       })
     } catch (err) {
-      this.emit('error', `Failed to save mock session: ${(err as Error)?.message ?? 'unknown'}`)
+      const message = `Failed to save mock session: ${(err as Error)?.message ?? 'unknown'}`
+      this.emit('error', message)
+      throw new Error(message, { cause: err })
     }
   }
 

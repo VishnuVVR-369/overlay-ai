@@ -360,7 +360,7 @@ export interface OverlayApi {
     onFocusState(handler: (event: WindowFocusState) => void): () => void
     onModeChanged(handler: (event: WindowModeChangedEvent) => void): () => void
     onVisibilityChanged(handler: (event: WindowVisibilityChangedEvent) => void): () => void
-    quit(): Promise<void>
+    quit(): Promise<{ ok: boolean }>
   }
 }
 

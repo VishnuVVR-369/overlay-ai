@@ -21,7 +21,7 @@ import { usePresetStore } from './state/preset-store'
 import { useAnswerStyleStore } from './state/answer-style-store'
 import { useVaultStore } from './state/vault-store'
 import type { CommandId } from './commands'
-import type { MockInterviewConfig, WindowMode } from '@shared/types'
+import type { MockInterviewConfig, StreamTag, WindowMode } from '@shared/types'
 
 /** Commands that map straight onto a console tab. */
 const TAB_FOR_COMMAND: Partial<Record<CommandId, ConsoleTab>> = {
@@ -37,6 +37,7 @@ export function App(): JSX.Element {
   const [mounted, setMounted] = useState(false)
   const [mockStarting, setMockStarting] = useState(false)
   const [confirmingQuit, setConfirmingQuit] = useState(false)
+  const captureFailuresRef = useRef<Partial<Record<StreamTag, string>>>({})
 
   const upsertSessionSummary = useMockSessionsStore((s) => s.upsertSummary)
   const applyTranscript = useTranscriptStore((s) => s.apply)
@@ -90,6 +91,7 @@ export function App(): JSX.Element {
   const toggleRunning = useCallback(async () => {
     if (running) {
       capture.stop()
+      captureFailuresRef.current = {}
       await window.api.transcription.stop()
       setRunning(false)
       return
@@ -99,6 +101,7 @@ export function App(): JSX.Element {
       openSetup()
       return
     }
+    captureFailuresRef.current = {}
     const result = await window.api.transcription.start()
     if (!result.ok) {
       if (result.reason === 'missing_key') openSetup()
@@ -106,10 +109,14 @@ export function App(): JSX.Element {
     }
     const captureResult = await capture.start()
     if (!captureResult.micStarted) {
-      setSocket('mic', 'error', captureWarning(captureResult.warnings, 'Microphone'))
+      const message = captureWarning(captureResult.warnings, 'Microphone')
+      captureFailuresRef.current.mic = message
+      setSocket('mic', 'error', message)
     }
     if (!captureResult.systemStarted) {
-      setSocket('system', 'error', captureWarning(captureResult.warnings, 'System audio'))
+      const message = captureWarning(captureResult.warnings, 'System audio')
+      captureFailuresRef.current.system = message
+      setSocket('system', 'error', message)
     }
     if (!captureResult.micStarted && !captureResult.systemStarted) {
       await window.api.transcription.stop()
@@ -182,6 +189,7 @@ export function App(): JSX.Element {
 
   const panicReset = useCallback(() => {
     capture.stop()
+    captureFailuresRef.current = {}
     mockPlayback.stop()
     useTranscriptStore.getState().reset()
     useLlmStore.getState().clear()
@@ -356,7 +364,14 @@ export function App(): JSX.Element {
   useEffect(() => {
     const subs = [
       window.api.transcription.onUpdate(applyTranscript),
-      window.api.transcription.onSocketStatus((evt) => setSocket(evt.stream, evt.state, evt.message)),
+      window.api.transcription.onSocketStatus((evt) => {
+        const captureFailure = captureFailuresRef.current[evt.stream]
+        if (captureFailure) {
+          setSocket(evt.stream, 'error', captureFailure)
+          return
+        }
+        setSocket(evt.stream, evt.state, evt.message)
+      }),
       window.api.transcription.onListenTrigger(() => void toggleRunning()),
       window.api.mock.onStatus((status) => {
         setMockStatus(status)
@@ -498,7 +513,7 @@ export function App(): JSX.Element {
       <ConfirmDialog
         open={confirmingQuit}
         title="Quit Overlay?"
-        body="This closes both transcription sockets, releases the global shortcuts, and drops the current transcript."
+        body="This closes both transcription sockets and releases the global shortcuts. An active mock interview is saved before exit."
         confirmLabel="Quit"
         onCancel={() => setConfirmingQuit(false)}
         onConfirm={() => void window.api.window.quit()}

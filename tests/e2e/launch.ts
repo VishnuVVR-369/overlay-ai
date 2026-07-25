@@ -39,6 +39,17 @@ function packagedExecutable(): string {
   if (!existsSync(releaseDir)) {
     throw new Error('Packaged app not found. Run npm run build && npm run package:e2e first.')
   }
+  const architectureDir = process.arch === 'arm64' ? 'mac-arm64' : 'mac'
+  const architectureMatch = join(
+    releaseDir,
+    architectureDir,
+    `${productName}.app`,
+    'Contents',
+    'MacOS',
+    productName,
+  )
+  if (existsSync(architectureMatch)) return architectureMatch
+
   const candidates = readdirSync(releaseDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith('mac'))
     .map((entry) => join(releaseDir, entry.name, `${productName}.app`, 'Contents', 'MacOS', productName))

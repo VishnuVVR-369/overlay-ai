@@ -87,6 +87,28 @@ describe('llm store', () => {
     expect(e[0]).toMatchObject({ requestId: 'r1', mode: 'transcript', status: 'streaming' })
   })
 
+  it('bounds retained native screenshots while preserving answer history', () => {
+    for (let index = 1; index <= 5; index += 1) {
+      useLlmStore.getState().startEntry(
+        `screen-${index}`,
+        'screen',
+        `data:image/png;base64,${'x'.repeat(index)}`,
+      )
+      useLlmStore.getState().finishEntry(`screen-${index}`, `answer ${index}`)
+    }
+
+    const entries = useLlmStore.getState().entries
+    expect(entries).toHaveLength(5)
+    expect(entries.filter((entry) => entry.imageDataUrl)).toHaveLength(3)
+    expect(entries.map((entry) => entry.text)).toEqual([
+      'answer 5',
+      'answer 4',
+      'answer 3',
+      'answer 2',
+      'answer 1',
+    ])
+  })
+
   it('finishEntry sets done with full text', () => {
     useLlmStore.getState().startEntry('r1', 'transcript')
     useLlmStore.getState().finishEntry('r1', 'final answer')
