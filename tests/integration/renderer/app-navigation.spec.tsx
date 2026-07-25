@@ -310,6 +310,24 @@ describe('console navigation', () => {
     expect(reopened.value).toBe('a prompt I am still writing')
   })
 
+  it('keeps unsaved personal context across closing and reopening the console', async () => {
+    await bootApp()
+    act(() => useUiStore.getState().openConsole('context'))
+    const resume = (await screen.findByRole('textbox', {
+      name: /Resume \/ background/,
+    })) as HTMLTextAreaElement
+    fireEvent.change(resume, { target: { value: 'Candidate background' } })
+
+    act(() => useUiStore.getState().closeConsole())
+    act(() => useUiStore.getState().openConsole('context'))
+
+    const reopened = (await screen.findByRole('textbox', {
+      name: /Resume \/ background/,
+    })) as HTMLTextAreaElement
+    expect(reopened.value).toBe('Candidate background')
+    expect(api.vault.set).not.toHaveBeenCalled()
+  })
+
   it('does not retain a typed API key across closing and reopening the console', async () => {
     await bootApp()
     act(() => useUiStore.getState().openConsole('setup'))

@@ -61,7 +61,7 @@ test('Setup shortcuts remain available while typing personal context', async ({}
   }
 })
 
-test('unsaved personal context survives console tab navigation', async () => {
+test('unsaved personal context survives navigation and reopening the console', async ({}, testInfo) => {
   const { app, page } = await launchApp()
   try {
     await page.getByRole('button', { name: 'Context', exact: true }).click()
@@ -75,6 +75,16 @@ test('unsaved personal context survives console tab navigation', async () => {
 
     await expect(page.getByRole('textbox', { name: 'Story 1 title' })).toHaveValue('Payments migration')
     await expect(page.getByRole('button', { name: 'Save personal context' })).toBeEnabled()
+
+    await page.getByRole('button', { name: 'Close console' }).click()
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+,' : 'Control+,')
+    await page.getByRole('button', { name: 'Context', exact: true }).click()
+
+    await expect(page.getByRole('textbox', { name: 'Story 1 title' })).toHaveValue('Payments migration')
+    await expect(page.getByRole('button', { name: 'Save personal context' })).toBeEnabled()
+    await expect(page.evaluate(() => window.api.vault.get())).resolves.toMatchObject({ stories: [] })
+    await page.getByRole('textbox', { name: 'Story 1 title' }).scrollIntoViewIfNeeded()
+    await page.screenshot({ path: testInfo.outputPath('context-draft-after-reopen.png') })
   } finally {
     await app.close()
   }
