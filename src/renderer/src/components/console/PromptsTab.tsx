@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { AnswerStyleId, PresetId } from '@shared/types'
 import { usePresetStore, findPreset } from '../../state/preset-store'
 import { useAnswerStyleStore } from '../../state/answer-style-store'
@@ -12,16 +12,17 @@ export function PromptsTab(): JSX.Element {
   const headlineFirst = useUiStore((s) => s.headlineFirst)
   const setHeadlineFirst = useUiStore((s) => s.setHeadlineFirst)
 
+  const drafts = usePresetStore((s) => s.drafts)
+  const setPresetDraft = usePresetStore((s) => s.setDraft)
+  const clearPresetDraft = usePresetStore((s) => s.clearDraft)
+
   const [editingId, setEditingId] = useState<PresetId | null>(null)
-  const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
 
   const selectedId = editingId ?? activePresetId
   const selected = useMemo(() => findPreset(presets, selectedId), [presets, selectedId])
 
-  useEffect(() => {
-    if (selected) setDraft(selected.effectivePrompt)
-  }, [selected?.id, selected?.effectivePrompt])
+  const draft = selected ? (drafts[selected.id] ?? selected.effectivePrompt) : ''
 
   const dirty = !!selected && draft !== selected.effectivePrompt
   const matchesDefault = !!selected && draft.trim() === selected.defaultPrompt.trim()
@@ -31,6 +32,7 @@ export function PromptsTab(): JSX.Element {
     setSaving(true)
     try {
       await window.api.presets.setOverride({ id: selected.id, prompt: matchesDefault ? null : draft })
+      clearPresetDraft(selected.id)
     } finally {
       setSaving(false)
     }
@@ -41,6 +43,7 @@ export function PromptsTab(): JSX.Element {
     setSaving(true)
     try {
       await window.api.presets.setOverride({ id: selected.id, prompt: null })
+      clearPresetDraft(selected.id)
     } finally {
       setSaving(false)
     }
@@ -124,7 +127,7 @@ export function PromptsTab(): JSX.Element {
           <textarea
             className="prompt-editor"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => setPresetDraft(selected.id, e.target.value)}
             rows={12}
             spellCheck={false}
             aria-label={`System prompt for ${selected.label}`}

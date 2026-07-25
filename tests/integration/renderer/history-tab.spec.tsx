@@ -69,7 +69,7 @@ let api: FakeApi
 
 beforeEach(() => {
   useUiStore.setState({ mode: 'normal', consoleTab: null, paletteOpen: false, transcriptOpen: true, focused: true, permStatus: { mic: 'granted', screen: 'granted' }, expandedEntries: {}, headlineFirst: true })
-  useVaultStore.setState({ data: emptyVault(), hydrated: false })
+  useVaultStore.setState({ data: emptyVault(), draft: null, hydrated: false })
   useStatusStore.setState({ running: false, startedAt: null, micState: 'idle', systemState: 'idle' })
   useMockStore.setState({ status: { state: 'idle', paused: false } })
   useMockSessionsStore.setState({ summaries: [], loaded: false, selectedId: null, selectedRecord: null, loadingRecord: false })
@@ -81,6 +81,7 @@ beforeEach(() => {
       { id: 'behavioral', label: 'Behavioral', defaultPrompt: 'd', effectivePrompt: 'd', overridden: false },
     ],
     hydrated: true,
+    drafts: {},
   })
   useAnswerStyleStore.setState({
     active: 'concise',

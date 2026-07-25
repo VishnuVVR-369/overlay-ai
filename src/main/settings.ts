@@ -23,6 +23,7 @@ import {
   isAnswerStyleId,
   isPresetId,
 } from '@shared/prompt'
+import { VAULT_LIMITS } from '@shared/vault'
 
 interface SettingsFile {
   version: 5
@@ -40,10 +41,10 @@ interface SettingsFile {
 
 const FILE_VERSION = 5
 const ACCEPTED_VERSIONS = [1, 2, 3, 4, 5]
-const VAULT_FIELD_CAP = 8000
-const VAULT_STORY_TITLE_CAP = 120
-const VAULT_STORY_BODY_CAP = 2000
-const VAULT_STORIES_MAX = 25
+const VAULT_FIELD_CAP = VAULT_LIMITS.fieldChars
+const VAULT_STORY_TITLE_CAP = VAULT_LIMITS.storyTitleChars
+const VAULT_STORY_BODY_CAP = VAULT_LIMITS.storyBodyChars
+const VAULT_STORIES_MAX = VAULT_LIMITS.storiesMax
 export const DEFAULT_VISION_PROVIDER: VisionProvider = 'openai'
 export const DEFAULT_VISION_MODEL = 'gpt-5.1'
 export const DEFAULT_HEADLINE_FIRST = true
