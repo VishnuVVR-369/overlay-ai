@@ -282,6 +282,14 @@ export function App(): JSX.Element {
         return
       }
 
+      // Settings is an app-level shortcut, so it must remain available while
+      // the user is editing a key, prompt, or personal-context field.
+      if (mod && !event.shiftKey && !event.altKey && event.key === ',') {
+        event.preventDefault()
+        openSetup()
+        return
+      }
+
       if (event.key === 'Escape') {
         if (confirmingQuit) {
           event.preventDefault()
@@ -301,12 +309,6 @@ export function App(): JSX.Element {
       }
 
       if (isEditableTarget(event.target)) return
-
-      if (mod && !event.shiftKey && !event.altKey && event.key === ',') {
-        event.preventDefault()
-        openSetup()
-        return
-      }
 
       if (mod || event.altKey || event.repeat || isCompact) return
 

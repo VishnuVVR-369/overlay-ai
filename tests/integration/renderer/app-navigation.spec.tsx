@@ -281,6 +281,19 @@ describe('console navigation', () => {
     expect(useUiStore.getState().consoleTab).toBe('setup')
   })
 
+  it('Cmd+, opens Setup while typing in a personal-context field', async () => {
+    await bootApp()
+    act(() => useUiStore.getState().openConsole('context'))
+    const resume = await screen.findByRole('textbox', {
+      name: /Resume \/ background/,
+    })
+    resume.focus()
+
+    fireEvent.keyDown(resume, { key: ',', metaKey: true })
+
+    expect(useUiStore.getState().consoleTab).toBe('setup')
+  })
+
   it('"?" toggles Help', async () => {
     await bootApp()
     press('?')
