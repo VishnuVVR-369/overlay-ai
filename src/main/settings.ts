@@ -26,9 +26,7 @@ import {
 import { VAULT_LIMITS } from '@shared/vault'
 
 interface SettingsFile {
-  version: 5
-  elevenlabsKeyEnc?: string
-  groqKeyEnc?: string
+  version: 6
   openaiKeyEnc?: string
   activePresetId?: PresetId
   activeAnswerStyleId?: AnswerStyleId
@@ -39,8 +37,8 @@ interface SettingsFile {
   headlineFirst?: boolean
 }
 
-const FILE_VERSION = 5
-const ACCEPTED_VERSIONS = [1, 2, 3, 4, 5]
+const FILE_VERSION = 6
+const ACCEPTED_VERSIONS = [1, 2, 3, 4, 5, 6]
 const VAULT_FIELD_CAP = VAULT_LIMITS.fieldChars
 const VAULT_STORY_TITLE_CAP = VAULT_LIMITS.storyTitleChars
 const VAULT_STORY_BODY_CAP = VAULT_LIMITS.storyBodyChars
@@ -65,8 +63,6 @@ class SettingsStore {
       const raw = await fs.readFile(this.filePath, 'utf-8')
       const parsed = JSON.parse(raw) as {
         version?: number
-        elevenlabsKeyEnc?: string
-        groqKeyEnc?: string
         openaiKeyEnc?: string
         activePresetId?: unknown
         activeAnswerStyleId?: unknown
@@ -79,8 +75,6 @@ class SettingsStore {
       if (parsed && typeof parsed === 'object' && ACCEPTED_VERSIONS.includes(parsed.version ?? 0)) {
         this.cache = {
           version: FILE_VERSION,
-          elevenlabsKeyEnc: typeof parsed.elevenlabsKeyEnc === 'string' ? parsed.elevenlabsKeyEnc : undefined,
-          groqKeyEnc: typeof parsed.groqKeyEnc === 'string' ? parsed.groqKeyEnc : undefined,
           openaiKeyEnc: typeof parsed.openaiKeyEnc === 'string' ? parsed.openaiKeyEnc : undefined,
           activePresetId: isPresetId(parsed.activePresetId) ? parsed.activePresetId : undefined,
           activeAnswerStyleId: isAnswerStyleId(parsed.activeAnswerStyleId) ? parsed.activeAnswerStyleId : undefined,
@@ -99,22 +93,12 @@ class SettingsStore {
 
   status(): SettingsStatus {
     return {
-      elevenlabsKeySet: !!this.cache.elevenlabsKeyEnc,
-      groqKeySet: !!this.cache.groqKeyEnc,
       openaiKeySet: !!this.cache.openaiKeyEnc,
       visionProvider: this.getVisionProvider(),
       visionModel: this.getVisionModel(),
       headlineFirst: this.getHeadlineFirst(),
       vault: this.getVaultStatus(),
     }
-  }
-
-  getElevenLabsKey(): string | null {
-    return this.decrypt(this.cache.elevenlabsKeyEnc)
-  }
-
-  getGroqKey(): string | null {
-    return this.decrypt(this.cache.groqKeyEnc)
   }
 
   getOpenAIKey(): string | null {
@@ -130,15 +114,9 @@ class SettingsStore {
   }
 
   async update(update: SettingsUpdate): Promise<void> {
-    const hasNewSecret = [update.elevenlabsKey, update.groqKey, update.openaiKey]
+    const hasNewSecret = [update.openaiKey]
       .some((value) => typeof value === 'string' && value.length > 0)
     if (hasNewSecret) this.requireEncryption()
-    if (update.elevenlabsKey !== undefined) {
-      this.cache.elevenlabsKeyEnc = this.encrypt(update.elevenlabsKey)
-    }
-    if (update.groqKey !== undefined) {
-      this.cache.groqKeyEnc = this.encrypt(update.groqKey)
-    }
     if (update.openaiKey !== undefined) {
       this.cache.openaiKeyEnc = this.encrypt(update.openaiKey)
     }

@@ -1,10 +1,11 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { startScribeMock, type ScribeMockHandle } from '../../helpers/scribe-mock-server'
+import {
+  startOpenAITranscriptionMock,
+  type OpenAITranscriptionMockHandle,
+} from '../../helpers/openai-transcription-mock-server'
 
 vi.mock('ws', async () => {
   const { WebSocket } = await import('mock-socket')
-  // mock-socket WebSocket is already CloseEvent-emitting EventTarget; the real `ws` lib uses EventEmitter API.
-  // Wrap mock-socket so .on('open'), .on('message'), .on('close') and .send work as expected by elevenlabs-socket.ts
   class CompatSocket {
     private inner: InstanceType<typeof WebSocket>
     public bufferedAmount = 0
@@ -44,14 +45,14 @@ vi.mock('ws', async () => {
   return { default: CompatSocket, WebSocket: CompatSocket }
 })
 
-let scribe: ScribeMockHandle
+let realtime: OpenAITranscriptionMockHandle
 
 beforeEach(() => {
-  scribe = startScribeMock()
+  realtime = startOpenAITranscriptionMock()
 })
 
 afterEach(async () => {
-  scribe.stop()
+  realtime.stop()
   await new Promise((r) => setTimeout(r, 5))
 })
 
@@ -82,7 +83,7 @@ describe('TranscriptionService', () => {
     await waitFor(() => states.filter((s) => s.state === 'open').length === 2)
     expect(states.filter((s) => s.state === 'open').map((s) => s.stream).sort()).toEqual(['mic', 'system'])
     expect(svc.status().running).toBe(true)
-    svc.stop()
+    await svc.stop()
   })
 
   it('routes mic audio chunks to the mic socket only and system chunks to system socket only', async () => {
@@ -92,18 +93,21 @@ describe('TranscriptionService', () => {
     await waitFor(() => svc.status().micState === 'open' && svc.status().systemState === 'open')
     const seen: { client: number; payload: object }[] = []
     let i = 0
-    for (const c of scribe.clients) {
+    for (const c of realtime.clients) {
       const idx = i++
       ;(c as unknown as { on: (e: string, f: (data: unknown) => void) => void }).on('message', (data) => {
         seen.push({ client: idx, payload: JSON.parse(data as string) })
       })
     }
-    svc.ingest({ stream: 'mic', audioBase64: 'AAAA', sampleRate: 16000 })
-    svc.ingest({ stream: 'system', audioBase64: 'BBBB', sampleRate: 16000 })
+    svc.ingest({ stream: 'mic', audioBase64: 'AAAA', sampleRate: 24000 })
+    svc.ingest({ stream: 'system', audioBase64: 'BBBB', sampleRate: 24000 })
     await waitFor(() => seen.length >= 2)
-    const audios = seen.map((s) => (s.payload as { audio_base_64: string }).audio_base_64).sort()
+    const audios = seen
+      .filter((s) => (s.payload as { type?: string }).type === 'input_audio_buffer.append')
+      .map((s) => (s.payload as { audio: string }).audio)
+      .sort()
     expect(audios).toEqual(['AAAA', 'BBBB'])
-    svc.stop()
+    svc.stopImmediately()
   })
 
   it('partial messages from each socket emit transcript updates with the correct speaker', async () => {
@@ -113,10 +117,11 @@ describe('TranscriptionService', () => {
     svc.on('update', (e) => updates.push({ speaker: e.speaker, kind: e.kind, text: e.text }))
     svc.start('test-key')
     await waitFor(() => svc.status().micState === 'open' && svc.status().systemState === 'open')
-    scribe.sendPartial('hello partial')
+    realtime.sendCommitted('partial-1')
+    realtime.sendDelta('partial-1', 'hello partial')
     await waitFor(() => updates.length >= 2)
     expect(updates.filter((u) => u.kind === 'partial').map((u) => u.speaker).sort()).toEqual(['them', 'you'])
-    svc.stop()
+    svc.stopImmediately()
   })
 
   it('committed messages with text become committed segments', async () => {
@@ -124,11 +129,12 @@ describe('TranscriptionService', () => {
     const svc = new TranscriptionService()
     svc.start('test-key')
     await waitFor(() => svc.status().micState === 'open')
-    scribe.sendCommitted('committed text')
+    realtime.sendCommitted('committed-1')
+    realtime.sendCompleted('committed-1', 'committed text')
     await waitFor(() => svc.snapshot().segments.length >= 2)
     const speakers = svc.snapshot().segments.map((s) => s.speaker).sort()
     expect(speakers).toEqual(['them', 'you'])
-    svc.stop()
+    await svc.stop()
   })
 
   it('stop() resets running and tears down both sockets', async () => {
@@ -136,8 +142,25 @@ describe('TranscriptionService', () => {
     const svc = new TranscriptionService()
     svc.start('test-key')
     await waitFor(() => svc.status().micState === 'open')
-    svc.stop()
+    await svc.stop()
     expect(svc.status().running).toBe(false)
+  })
+
+  it('panic cancels draining sockets and suppresses late transcript callbacks', async () => {
+    const { TranscriptionService } = await loadService()
+    const svc = new TranscriptionService()
+    svc.start('test-key')
+    await waitFor(() => svc.status().micState === 'open' && svc.status().systemState === 'open')
+    svc.ingest({ stream: 'mic', audioBase64: 'AAAA', sampleRate: 24000 })
+    const stopping = svc.stop()
+    await waitFor(() => realtime.received.some((event) => (event as { type?: string }).type === 'input_audio_buffer.commit'))
+    realtime.sendCommitted('late-item')
+    svc.stopImmediately()
+    svc.clear()
+    realtime.sendCompleted('late-item', 'must not return')
+    await stopping
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(svc.snapshot()).toEqual({ segments: [], partials: {} })
   })
 
   it('start() is idempotent: a second call while running is a no-op', async () => {
@@ -145,11 +168,11 @@ describe('TranscriptionService', () => {
     const svc = new TranscriptionService()
     svc.start('k')
     await waitFor(() => svc.status().micState === 'open')
-    const beforeCount = scribe.clients.size
+    const beforeCount = realtime.clients.size
     svc.start('k')
     await new Promise((r) => setTimeout(r, 30))
-    expect(scribe.clients.size).toBe(beforeCount)
-    svc.stop()
+    expect(realtime.clients.size).toBe(beforeCount)
+    await svc.stop()
   })
 
   it('clear() empties the transcript snapshot', async () => {
@@ -157,17 +180,18 @@ describe('TranscriptionService', () => {
     const svc = new TranscriptionService()
     svc.start('k')
     await waitFor(() => svc.status().micState === 'open')
-    scribe.sendCommitted('one')
+    realtime.sendCommitted('one')
+    realtime.sendCompleted('one', 'one')
     await waitFor(() => svc.snapshot().segments.length >= 2)
     svc.clear()
     expect(svc.snapshot().segments).toHaveLength(0)
-    svc.stop()
+    await svc.stop()
   })
 
   it('stop() and clear() before start() are no-ops (panic-during-idle is safe)', async () => {
     const { TranscriptionService } = await loadService()
     const svc = new TranscriptionService()
-    expect(() => svc.stop()).not.toThrow()
+    await expect(svc.stop()).resolves.toBeUndefined()
     expect(() => svc.clear()).not.toThrow()
     expect(svc.status().running).toBe(false)
     expect(svc.snapshot().segments).toHaveLength(0)
@@ -178,8 +202,8 @@ describe('TranscriptionService', () => {
     const svc = new TranscriptionService()
     svc.start('k')
     await waitFor(() => svc.status().micState === 'open')
-    svc.stop()
-    expect(() => svc.stop()).not.toThrow()
+    await svc.stop()
+    await expect(svc.stop()).resolves.toBeUndefined()
     expect(svc.status().running).toBe(false)
   })
 
@@ -188,11 +212,12 @@ describe('TranscriptionService', () => {
     const svc = new TranscriptionService()
     svc.start('k')
     await waitFor(() => svc.status().micState === 'open' && svc.status().systemState === 'open')
-    scribe.sendCommitted('hi')
+    realtime.sendCommitted('hi')
+    realtime.sendCompleted('hi', 'hi')
     await waitFor(() => svc.snapshot().segments.length >= 2)
     const flat = svc.flattenForPrompt()
     expect(flat).toMatch(/You: hi/)
     expect(flat).toMatch(/Them: hi/)
-    svc.stop()
+    await svc.stop()
   })
 })

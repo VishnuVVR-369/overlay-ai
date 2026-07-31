@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { launchApp } from './launch'
 
 test.describe('e2e transcription status', () => {
-  test('transcription:start without an ElevenLabs key returns missing_key reason', async () => {
+  test('transcription:start without an OpenAI key returns missing_openai_key reason', async () => {
     const { app, page } = await launchApp()
     await page.waitForSelector('.app-root, .app-compact', { timeout: 10_000 })
     const result = await page.evaluate(async () => {
@@ -10,7 +10,7 @@ test.describe('e2e transcription status', () => {
       return await api.transcription.start()
     })
     expect(result.ok).toBe(false)
-    expect(result.reason).toBe('missing_key')
+    expect(result.reason).toBe('missing_openai_key')
     await app.close()
   })
 

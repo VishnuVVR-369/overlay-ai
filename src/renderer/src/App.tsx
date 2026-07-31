@@ -97,14 +97,14 @@ export function App(): JSX.Element {
       return
     }
     const status = await window.api.settings.get()
-    if (!status.elevenlabsKeySet || !status.groqKeySet) {
+    if (!status.openaiKeySet) {
       openSetup()
       return
     }
     captureFailuresRef.current = {}
     const result = await window.api.transcription.start()
     if (!result.ok) {
-      if (result.reason === 'missing_key') openSetup()
+      if (result.reason === 'missing_openai_key') openSetup()
       return
     }
     const captureResult = await capture.start()
@@ -335,7 +335,7 @@ export function App(): JSX.Element {
   // Boot: settings + presets + permissions
   useEffect(() => {
     void window.api.settings.get().then((status) => {
-      if (!status.elevenlabsKeySet || !status.groqKeySet || !status.openaiKeySet) {
+      if (!status.openaiKeySet) {
         openSetup()
       }
       setHeadlineFirst(status.headlineFirst)

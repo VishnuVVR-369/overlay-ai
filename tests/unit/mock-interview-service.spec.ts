@@ -552,7 +552,7 @@ describe('MockInterviewService session persistence', () => {
     transcriptionMock.flattenForPrompt.mockReturnValue('Them: Q\nYou: final answer')
     transcriptionMock.snapshot.mockReturnValue({ segments: [], partials: {} })
 
-    service.ingest({ audioBase64: 'AAAA', sampleRate: 16000 })
+    service.ingest({ audioBase64: 'AAAA', sampleRate: 24000 })
     const stopPromise = service.stop()
     expect(sent.map((message) => JSON.parse(message) as { type: string })).toContainEqual(expect.objectContaining({
       type: 'input_audio_buffer.commit',
@@ -619,7 +619,7 @@ describe('MockInterviewService session persistence', () => {
       partials: {},
     })
 
-    service.ingest({ audioBase64: 'AAAA', sampleRate: 16000 })
+    service.ingest({ audioBase64: 'AAAA', sampleRate: 24000 })
     const stopPromise = service.stop()
     const markerId = testable.inputDrainMarkerId
     expect(markerId).toMatch(/^shutdown-drain-/)

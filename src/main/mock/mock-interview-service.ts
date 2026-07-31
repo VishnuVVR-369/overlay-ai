@@ -24,7 +24,7 @@ import { mockGrader, averageRubricScore, type GraderClient, type GraderResult } 
 import { rubricDimensionsForPreset } from '@shared/mock-rubric'
 import { mockSessionStore, truncateMockTranscript, type MockSessionStore } from './mock-session-store'
 
-const REALTIME_MODEL = 'gpt-realtime-2'
+const REALTIME_MODEL = 'gpt-realtime-2.1'
 const REALTIME_URL = `wss://api.openai.com/v1/realtime?model=${REALTIME_MODEL}`
 const SAMPLE_RATE = 24000
 const MAX_SESSION_MS = 59 * 60 * 1000
@@ -545,7 +545,7 @@ export class MockInterviewService extends EventEmitter {
         instructions: buildMockInstructions(config, context),
         audio: {
           input: {
-            format: { type: 'audio/pcm', rate: 16000 },
+            format: { type: 'audio/pcm', rate: SAMPLE_RATE },
             transcription: {
               model: 'gpt-realtime-whisper',
               language: 'en',

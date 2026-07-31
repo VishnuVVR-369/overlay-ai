@@ -2,8 +2,8 @@ import { PCM16_WORKLET_SOURCE } from './pcm16-worklet'
 import { arrayBufferToBase64 } from './encode'
 import { useAudioLevelsStore } from '../state/audio-levels-store'
 
-const TARGET_RATE = 16000
-const FRAME_SIZE = 4000 // 250 ms @ 16 kHz
+const TARGET_RATE = 24000
+const FRAME_SIZE = 6000 // 250 ms @ 24 kHz
 const ANALYSER_FFT = 256
 const LEVEL_TICK_MS = 33 // ~30 Hz
 

@@ -92,13 +92,13 @@ describe('Setup tab', () => {
     api.__state.readiness = {
       checkedAt: 1,
       checks: [
-        { id: 'a', label: 'Groq key', level: 'fail', detail: 'Missing.' },
+        { id: 'a', label: 'OpenAI key', level: 'fail', detail: 'Missing.' },
         { id: 'b', label: 'Mic', level: 'pass', detail: 'Granted.' },
       ],
     }
     renderConsole('setup')
     await waitFor(() => expect(screen.getByText('1 thing is blocking a live interview.')).toBeTruthy())
-    expect(screen.getByText('Groq key')).toBeTruthy()
+    expect(screen.getByText('OpenAI key')).toBeTruthy()
   })
 
   it('says so plainly when nothing is blocking', async () => {
@@ -117,17 +117,17 @@ describe('Setup tab', () => {
     const save = await waitFor(() => screen.getByText('Save keys') as HTMLButtonElement)
     expect(save.disabled).toBe(true)
 
-    fireEvent.change(screen.getByPlaceholderText('gsk_…'), { target: { value: 'gsk_live' } })
+    fireEvent.change(screen.getByPlaceholderText('sk-…'), { target: { value: 'sk-live' } })
     await waitFor(() => expect((screen.getByText('Save keys') as HTMLButtonElement).disabled).toBe(false))
   })
 
   it('sends only the fields that were filled in, then clears them', async () => {
     renderConsole('setup')
     await waitFor(() => screen.getByText('Save keys'))
-    fireEvent.change(screen.getByPlaceholderText('gsk_…'), { target: { value: 'gsk_live' } })
+    fireEvent.change(screen.getByPlaceholderText('sk-…'), { target: { value: 'sk-live' } })
     fireEvent.click(screen.getByText('Save keys'))
 
-    await waitFor(() => expect(api.settings.set).toHaveBeenCalledWith({ groqKey: 'gsk_live' }))
+    await waitFor(() => expect(api.settings.set).toHaveBeenCalledWith({ openaiKey: 'sk-live' }))
     await waitFor(() =>
       expect((screen.getByPlaceholderText(/paste to replace/) as HTMLInputElement).value).toBe(''),
     )
@@ -136,7 +136,7 @@ describe('Setup tab', () => {
   it('re-runs the readiness check after saving, so the summary cannot go stale', async () => {
     renderConsole('setup')
     await waitFor(() => expect(api.readiness.check).toHaveBeenCalledTimes(1))
-    fireEvent.change(screen.getByPlaceholderText('gsk_…'), { target: { value: 'gsk_live' } })
+    fireEvent.change(screen.getByPlaceholderText('sk-…'), { target: { value: 'sk-live' } })
     fireEvent.click(screen.getByText('Save keys'))
     await waitFor(() => expect(api.readiness.check).toHaveBeenCalledTimes(2))
   })

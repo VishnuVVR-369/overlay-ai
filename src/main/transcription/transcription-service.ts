@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { speakerForStream, type AudioChunkMessage, type SocketState, type SocketStatusEvent, type Speaker, type StreamTag, type TranscriptSnapshot, type TranscriptUpdate } from '@shared/types'
-import { ScribeRealtimeSocket } from './elevenlabs-socket'
+import { OpenAIRealtimeTranscriptionSocket } from './openai-transcription-socket'
 import { TranscriptStore } from './transcript-store'
 
 export interface TranscriptionServiceEvents {
@@ -9,8 +9,10 @@ export interface TranscriptionServiceEvents {
 }
 
 export class TranscriptionService extends EventEmitter {
-  private mic: ScribeRealtimeSocket | null = null
-  private system: ScribeRealtimeSocket | null = null
+  private mic: OpenAIRealtimeTranscriptionSocket | null = null
+  private system: OpenAIRealtimeTranscriptionSocket | null = null
+  private drainingSockets = new Set<OpenAIRealtimeTranscriptionSocket>()
+  private suppressedSockets = new WeakSet<OpenAIRealtimeTranscriptionSocket>()
   private store = new TranscriptStore()
   private running = false
   private micState: SocketState = 'idle'
@@ -33,12 +35,35 @@ export class TranscriptionService extends EventEmitter {
     this.system.connect(apiKey)
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     this.running = false
-    this.mic?.close()
-    this.system?.close()
+    const sockets = new Set(this.drainingSockets)
+    if (this.mic) sockets.add(this.mic)
+    if (this.system) sockets.add(this.system)
     this.mic = null
     this.system = null
+    for (const socket of sockets) this.drainingSockets.add(socket)
+    await Promise.all([...sockets].map(async (socket) => {
+      try {
+        await socket.close()
+      } finally {
+        this.drainingSockets.delete(socket)
+      }
+    }))
+  }
+
+  stopImmediately(): void {
+    this.running = false
+    const sockets = new Set(this.drainingSockets)
+    if (this.mic) sockets.add(this.mic)
+    if (this.system) sockets.add(this.system)
+    this.mic = null
+    this.system = null
+    this.drainingSockets.clear()
+    for (const socket of sockets) {
+      this.suppressedSockets.add(socket)
+      socket.closeImmediately()
+    }
   }
 
   ingest(chunk: AudioChunkMessage): void {
@@ -72,17 +97,19 @@ export class TranscriptionService extends EventEmitter {
     return { running: this.running, micState: this.micState, systemState: this.systemState }
   }
 
-  private makeSocket(stream: StreamTag, _apiKey: string): ScribeRealtimeSocket {
-    const sock = new ScribeRealtimeSocket(stream)
+  private makeSocket(stream: StreamTag, _apiKey: string): OpenAIRealtimeTranscriptionSocket {
+    const sock = new OpenAIRealtimeTranscriptionSocket(stream)
     const speaker = speakerForStream(stream)
 
-    sock.on('partial', (text) => {
-      const update = this.store.applyPartial(speaker, text)
+    sock.on('partial', (text, itemId) => {
+      if (this.suppressedSockets.has(sock)) return
+      const update = this.store.applyPartial(speaker, text, itemId)
       this.emit('update', update)
     })
 
-    sock.on('committed', (text) => {
-      const update = this.store.applyCommitted(speaker, text)
+    sock.on('committed', (text, itemId) => {
+      if (this.suppressedSockets.has(sock)) return
+      const update = this.store.applyCommitted(speaker, text, itemId)
       this.emit('update', update)
     })
 

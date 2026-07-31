@@ -29,7 +29,6 @@
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@shikijs/rehype": "^1.29.2",
     "electron-audio-loopback": "^1.0.4",
-    "groq-sdk": "^0.7.0",
     "lucide-react": "^0.460.0",
     "openai": "^6.35.0",
     "react-markdown": "^9.1.0",

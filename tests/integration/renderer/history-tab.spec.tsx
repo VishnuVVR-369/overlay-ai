@@ -90,7 +90,7 @@ beforeEach(() => {
   })
   api = installFakeApi(createFakeApi({
     settings: {
-      elevenlabsKeySet: true, groqKeySet: true, openaiKeySet: true,
+      openaiKeySet: true,
       visionProvider: 'openai', visionModel: 'gpt-5.1', headlineFirst: true,
       vault: { hasResume: false, hasJobDescription: false, hasCompanyValues: false, hasInterviewerNotes: false, storiesCount: 0 },
     },

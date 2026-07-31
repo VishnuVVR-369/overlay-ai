@@ -26,8 +26,6 @@ vi.mock('@/markdown/StreamingBody', () => ({
 }))
 
 const ALL_KEYS = {
-  elevenlabsKeySet: true,
-  groqKeySet: true,
   openaiKeySet: true,
   visionProvider: 'openai',
   visionModel: 'gpt-5.1',
@@ -76,8 +74,8 @@ describe('App boot', () => {
     })
   })
 
-  it('lands on the Setup tab at boot when any key is missing', async () => {
-    api = installFakeApi(createFakeApi({ settings: { ...ALL_KEYS, groqKeySet: false } }))
+  it('lands on the Setup tab at boot when the OpenAI key is missing', async () => {
+    api = installFakeApi(createFakeApi({ settings: { ...ALL_KEYS, openaiKeySet: false } }))
     render(<App />)
     await waitFor(() => expect(useUiStore.getState().consoleTab).toBe('setup'))
   })

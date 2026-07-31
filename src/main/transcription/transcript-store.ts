@@ -4,24 +4,32 @@ import type { Speaker, TranscriptSegment, TranscriptSnapshot, TranscriptUpdate }
 export class TranscriptStore {
   private segments: TranscriptSegment[] = []
   private partials: { you?: TranscriptSegment; them?: TranscriptSegment } = {}
+  private partialItemIds: { you?: string; them?: string } = {}
 
-  applyPartial(speaker: Speaker, text: string): TranscriptUpdate {
-    const existing = this.partials[speaker]
+  applyPartial(speaker: Speaker, text: string, itemId?: string): TranscriptUpdate {
+    const existing = !itemId || this.partialItemIds[speaker] === itemId
+      ? this.partials[speaker]
+      : undefined
     const startedAt = existing?.startedAt ?? Date.now()
     const id = existing?.id ?? randomUUID()
     const seg: TranscriptSegment = { id, speaker, status: 'partial', text, startedAt }
     this.partials[speaker] = seg
+    this.partialItemIds[speaker] = itemId
     return { speaker, kind: 'partial', segmentId: id, text, startedAt }
   }
 
-  applyCommitted(speaker: Speaker, text: string): TranscriptUpdate {
-    const existing = this.partials[speaker]
+  applyCommitted(speaker: Speaker, text: string, itemId?: string): TranscriptUpdate {
+    const matchesPartial = !itemId || this.partialItemIds[speaker] === itemId
+    const existing = matchesPartial ? this.partials[speaker] : undefined
     const startedAt = existing?.startedAt ?? Date.now()
     const id = existing?.id ?? randomUUID()
     const committedAt = Date.now()
     const seg: TranscriptSegment = { id, speaker, status: 'committed', text, startedAt, committedAt }
     this.segments.push(seg)
-    this.partials[speaker] = undefined
+    if (matchesPartial) {
+      this.partials[speaker] = undefined
+      this.partialItemIds[speaker] = undefined
+    }
     return { speaker, kind: 'committed', segmentId: id, text, startedAt, committedAt }
   }
 
@@ -35,6 +43,7 @@ export class TranscriptStore {
   clear(): void {
     this.segments = []
     this.partials = {}
+    this.partialItemIds = {}
   }
 
   /** Flatten committed segments into "Them: ...\nYou: ..." lines, merging consecutive same-speaker turns. */

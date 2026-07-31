@@ -50,8 +50,6 @@ describe('settings store', () => {
     await settings.load()
     expect(safeStorage.isEncryptionAvailable).not.toHaveBeenCalled()
     expect(settings.status()).toMatchObject({
-      elevenlabsKeySet: false,
-      groqKeySet: false,
       openaiKeySet: false,
       visionProvider: 'openai',
       visionModel: 'gpt-5.1',
@@ -69,29 +67,25 @@ describe('settings store', () => {
   it('writes settings.json on first update', async () => {
     const { settings } = await freshSettings()
     await settings.load()
-    await settings.update({ elevenlabsKey: 'el-key' })
+    await settings.update({ openaiKey: 'oa-key' })
     const raw = await fs.readFile(join(temp.path, 'settings.json'), 'utf-8')
     const parsed = JSON.parse(raw)
-    expect(parsed.version).toBe(5)
-    expect(parsed.elevenlabsKeyEnc).toBeDefined()
-    expect(raw).not.toContain('el-key')
+    expect(parsed.version).toBe(6)
+    expect(parsed.openaiKeyEnc).toBeDefined()
+    expect(raw).not.toContain('oa-key')
   })
 
   it('round-trips API keys across a process restart with safeStorage available', async () => {
     {
       const { settings } = await freshSettings()
       await settings.load()
-      await settings.update({ elevenlabsKey: 'el-key', groqKey: 'gr-key', openaiKey: 'oa-key' })
+      await settings.update({ openaiKey: 'oa-key' })
     }
     {
       const { settings } = await freshSettings()
       await settings.load()
-      expect(settings.getElevenLabsKey()).toBe('el-key')
-      expect(settings.getGroqKey()).toBe('gr-key')
       expect(settings.getOpenAIKey()).toBe('oa-key')
       expect(settings.status()).toMatchObject({
-        elevenlabsKeySet: true,
-        groqKeySet: true,
         openaiKeySet: true,
       })
     }
@@ -101,7 +95,7 @@ describe('settings store', () => {
     {
       const { settings } = await freshSettings()
       await settings.load()
-      await settings.update({ elevenlabsKey: 'el-key', openaiKey: 'oa-key' })
+      await settings.update({ openaiKey: 'oa-key' })
       await settings.setVault({
         resume: 'private resume',
         jobDescription: '',
@@ -121,7 +115,6 @@ describe('settings store', () => {
     }
     const after = JSON.parse(await fs.readFile(join(temp.path, 'settings.json'), 'utf-8'))
 
-    expect(after.elevenlabsKeyEnc).toBe(before.elevenlabsKeyEnc)
     expect(after.openaiKeyEnc).toBe(before.openaiKeyEnc)
     expect(after.vaultEnc).toBe(before.vaultEnc)
     warn.mockRestore()
@@ -132,7 +125,7 @@ describe('settings store', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const { settings } = await freshSettings()
     await settings.load()
-    await expect(settings.update({ groqKey: 'plain-key' })).rejects.toThrow(/keychain encryption is unavailable/)
+    await expect(settings.update({ openaiKey: 'plain-key' })).rejects.toThrow(/keychain encryption is unavailable/)
     expect(warn).toHaveBeenCalled()
     await expect(fs.readFile(join(temp.path, 'settings.json'), 'utf-8')).rejects.toMatchObject({ code: 'ENOENT' })
     warn.mockRestore()
@@ -157,11 +150,10 @@ describe('settings store', () => {
   it('partial updates do not clobber other fields', async () => {
     const { settings } = await freshSettings()
     await settings.load()
-    await settings.update({ elevenlabsKey: 'el', groqKey: 'gr', openaiKey: 'oa' })
-    await settings.update({ groqKey: 'gr2' })
-    expect(settings.getElevenLabsKey()).toBe('el')
-    expect(settings.getGroqKey()).toBe('gr2')
+    await settings.update({ openaiKey: 'oa' })
+    await settings.update({ visionModel: 'custom-model' })
     expect(settings.getOpenAIKey()).toBe('oa')
+    expect(settings.getVisionModel()).toBe('custom-model')
   })
 
   it('rejects unknown vision providers, accepts "openai"', async () => {
@@ -186,11 +178,11 @@ describe('settings store', () => {
   it('status() never includes raw key material', async () => {
     const { settings } = await freshSettings()
     await settings.load()
-    await settings.update({ elevenlabsKey: 'el-secret', groqKey: 'gr-secret', openaiKey: 'oa-secret' })
+    await settings.update({ openaiKey: 'oa-secret' })
     const status = settings.status()
     const json = JSON.stringify(status)
     expect(json).not.toContain('secret')
-    expect(json).not.toContain('el-key')
+    expect(json).not.toContain('oa-secret')
   })
 
   it('treats corrupt JSON as empty and does not throw', async () => {
@@ -199,7 +191,7 @@ describe('settings store', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const { settings } = await freshSettings()
     await expect(settings.load()).resolves.toBeUndefined()
-    expect(settings.status().elevenlabsKeySet).toBe(false)
+    expect(settings.status().openaiKeySet).toBe(false)
     warn.mockRestore()
   })
 
@@ -372,11 +364,16 @@ describe('settings store', () => {
     }
   })
 
-  it('migration: a v4 file with no vault or headlineFirst loads and reports defaults', async () => {
+  it('migration: a v5 file keeps the OpenAI key and drops retired provider keys on the next write', async () => {
     await fs.mkdir(temp.path, { recursive: true })
     await fs.writeFile(
       join(temp.path, 'settings.json'),
-      JSON.stringify({ version: 4, elevenlabsKeyEnc: 'enc:abc' }),
+      JSON.stringify({
+        version: 5,
+        elevenlabsKeyEnc: 'enc:legacy-elevenlabs',
+        groqKeyEnc: 'enc:legacy-groq',
+        openaiKeyEnc: Buffer.from('enc:openai', 'utf-8').toString('base64'),
+      }),
       'utf-8',
     )
     const { settings } = await freshSettings()
@@ -384,15 +381,19 @@ describe('settings store', () => {
     expect(settings.getHeadlineFirst()).toBe(true)
     expect(settings.getVault().stories).toHaveLength(0)
     expect(settings.status().vault.storiesCount).toBe(0)
+    expect(settings.getOpenAIKey()).toBe('openai')
+    await settings.setHeadlineFirst(false)
+    const migrated = JSON.parse(await fs.readFile(join(temp.path, 'settings.json'), 'utf-8'))
+    expect(migrated.version).toBe(6)
+    expect(migrated.elevenlabsKeyEnc).toBeUndefined()
+    expect(migrated.groqKeyEnc).toBeUndefined()
   })
 
   it('settings.update with only headlineFirst persists without clobbering keys', async () => {
     const { settings } = await freshSettings()
     await settings.load()
-    await settings.update({ elevenlabsKey: 'el', groqKey: 'gr', openaiKey: 'oa' })
+    await settings.update({ openaiKey: 'oa' })
     await settings.update({ headlineFirst: false })
-    expect(settings.getElevenLabsKey()).toBe('el')
-    expect(settings.getGroqKey()).toBe('gr')
     expect(settings.getOpenAIKey()).toBe('oa')
     expect(settings.getHeadlineFirst()).toBe(false)
   })

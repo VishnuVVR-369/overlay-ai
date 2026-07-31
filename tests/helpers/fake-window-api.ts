@@ -120,8 +120,6 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
 
   const state: FakeApi['__state'] = {
     settings: {
-      elevenlabsKeySet: false,
-      groqKeySet: false,
       openaiKeySet: false,
       visionProvider: 'openai',
       visionModel: 'gpt-5.1',
@@ -157,7 +155,7 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
     readiness: {
       checkedAt: 1,
       checks: [
-        { id: 'groq-key', label: 'Groq key', level: 'fail', detail: 'Missing.' },
+        { id: 'openai-key', label: 'OpenAI key', level: 'fail', detail: 'Missing.' },
       ],
     },
     transcriptionStartResult: { ok: true },
@@ -207,8 +205,6 @@ export function createFakeApi(overrides?: Partial<FakeApi['__state']>): FakeApi 
       get: vi.fn(async () => state.settings),
       set: vi.fn(async (u: SettingsUpdate) => {
         state.settingsUpdates.push(u)
-        if (u.elevenlabsKey !== undefined) state.settings.elevenlabsKeySet = !!u.elevenlabsKey
-        if (u.groqKey !== undefined) state.settings.groqKeySet = !!u.groqKey
         if (u.openaiKey !== undefined) state.settings.openaiKeySet = !!u.openaiKey
         if (u.visionModel !== undefined && u.visionModel.trim()) state.settings.visionModel = u.visionModel.trim()
         if (u.headlineFirst !== undefined) state.settings.headlineFirst = !!u.headlineFirst

@@ -4,8 +4,6 @@ import type { ReadinessStatus, SettingsStatus } from '@shared/types'
 import { useUiStore } from '../../state/ui-store'
 
 const EMPTY_STATUS: SettingsStatus = {
-  elevenlabsKeySet: false,
-  groqKeySet: false,
   openaiKeySet: false,
   visionProvider: 'openai',
   visionModel: 'gpt-5.1',
@@ -21,8 +19,6 @@ const EMPTY_STATUS: SettingsStatus = {
 
 export function SetupTab(): JSX.Element {
   const [status, setStatus] = useState<SettingsStatus>(EMPTY_STATUS)
-  const [elevenlabsKey, setElevenlabsKey] = useState('')
-  const [groqKey, setGroqKey] = useState('')
   const [openaiKey, setOpenaiKey] = useState('')
   const [visionModel, setVisionModel] = useState(EMPTY_STATUS.visionModel)
   const [saving, setSaving] = useState(false)
@@ -57,14 +53,12 @@ export function SetupTab(): JSX.Element {
   }, [setPermStatus])
 
   const dirty =
-    Boolean(elevenlabsKey || groqKey || openaiKey) || visionModel.trim() !== status.visionModel
+    Boolean(openaiKey) || visionModel.trim() !== status.visionModel
 
   const save = async (): Promise<void> => {
     setSaving(true)
     try {
       const update: Record<string, string> = {}
-      if (elevenlabsKey.trim()) update.elevenlabsKey = elevenlabsKey.trim()
-      if (groqKey.trim()) update.groqKey = groqKey.trim()
       if (openaiKey.trim()) update.openaiKey = openaiKey.trim()
       if (visionModel.trim() && visionModel.trim() !== status.visionModel) {
         update.visionModel = visionModel.trim()
@@ -73,8 +67,6 @@ export function SetupTab(): JSX.Element {
       if (!result.ok) return
       const next = await window.api.settings.get()
       setStatus(next)
-      setElevenlabsKey('')
-      setGroqKey('')
       setOpenaiKey('')
       setVisionModel(next.visionModel)
     } finally {
@@ -119,24 +111,8 @@ export function SetupTab(): JSX.Element {
         <h3>API keys</h3>
         <p className="pane-lede">Encrypted with the OS keychain and never sent anywhere but their own provider.</p>
         <KeyField
-          label="ElevenLabs"
-          note="Realtime transcription"
-          saved={status.elevenlabsKeySet}
-          placeholder="sk_…"
-          value={elevenlabsKey}
-          onChange={setElevenlabsKey}
-        />
-        <KeyField
-          label="Groq"
-          note="Transcript answers"
-          saved={status.groqKeySet}
-          placeholder="gsk_…"
-          value={groqKey}
-          onChange={setGroqKey}
-        />
-        <KeyField
           label="OpenAI"
-          note="Screen ask and mock interviews"
+          note="Transcription, answers, screen ask, and mock interviews"
           saved={status.openaiKeySet}
           placeholder="sk-…"
           value={openaiKey}
