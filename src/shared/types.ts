@@ -41,8 +41,6 @@ export interface ReadinessStatus {
 }
 
 export interface SettingsStatus {
-  elevenlabsKeySet: boolean
-  groqKeySet: boolean
   openaiKeySet: boolean
   visionProvider: VisionProvider
   visionModel: string
@@ -51,8 +49,6 @@ export interface SettingsStatus {
 }
 
 export interface SettingsUpdate {
-  elevenlabsKey?: string
-  groqKey?: string
   openaiKey?: string
   visionProvider?: VisionProvider
   visionModel?: string

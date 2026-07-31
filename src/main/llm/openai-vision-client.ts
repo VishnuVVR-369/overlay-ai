@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import OpenAI from 'openai'
 import type { ResponseStreamEvent } from 'openai/resources/responses/responses'
-import type { StreamCallbacks } from './groq-client'
+import type { StreamCallbacks } from './openai-answer-client'
 
 const VISION_INSTRUCTIONS = `You are answering a live technical interview screen ask.
 

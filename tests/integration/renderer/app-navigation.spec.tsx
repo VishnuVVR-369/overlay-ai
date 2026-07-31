@@ -40,8 +40,6 @@ vi.mock('@/markdown/StreamingBody', () => ({
 }))
 
 const ALL_KEYS = {
-  elevenlabsKeySet: true,
-  groqKeySet: true,
   openaiKeySet: true,
   visionProvider: 'openai',
   visionModel: 'gpt-5.1',
@@ -331,13 +329,13 @@ describe('console navigation', () => {
   it('does not retain a typed API key across closing and reopening the console', async () => {
     await bootApp()
     act(() => useUiStore.getState().openConsole('setup'))
-    const key = (await screen.findByLabelText(/Groq/)) as HTMLInputElement
-    fireEvent.change(key, { target: { value: 'gsk_secret' } })
+    const key = (await screen.findByLabelText(/OpenAI/)) as HTMLInputElement
+    fireEvent.change(key, { target: { value: 'sk-secret' } })
 
     act(() => useUiStore.getState().closeConsole())
     act(() => useUiStore.getState().openConsole('setup'))
 
-    const reopened = (await screen.findByLabelText(/Groq/)) as HTMLInputElement
+    const reopened = (await screen.findByLabelText(/OpenAI/)) as HTMLInputElement
     expect(reopened.value).toBe('')
   })
 

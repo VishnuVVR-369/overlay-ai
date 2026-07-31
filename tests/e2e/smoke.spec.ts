@@ -53,8 +53,6 @@ test.describe('e2e smoke', () => {
       const api = (window as unknown as { api: { settings: { get: () => Promise<Record<string, unknown>> } } }).api
       return await api.settings.get()
     })
-    expect(status).toHaveProperty('elevenlabsKeySet')
-    expect(status).toHaveProperty('groqKeySet')
     expect(status).toHaveProperty('openaiKeySet')
     expect(JSON.stringify(status)).not.toMatch(/sk-|sk_|gsk_/)
     await app.close()

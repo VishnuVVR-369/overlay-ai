@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { speakerForStream, type AudioChunkMessage, type SocketState, type SocketStatusEvent, type Speaker, type StreamTag, type TranscriptSnapshot, type TranscriptUpdate } from '@shared/types'
-import { ScribeRealtimeSocket } from './elevenlabs-socket'
+import { OpenAIRealtimeTranscriptionSocket } from './openai-transcription-socket'
 import { TranscriptStore } from './transcript-store'
 
 export interface TranscriptionServiceEvents {
@@ -9,8 +9,8 @@ export interface TranscriptionServiceEvents {
 }
 
 export class TranscriptionService extends EventEmitter {
-  private mic: ScribeRealtimeSocket | null = null
-  private system: ScribeRealtimeSocket | null = null
+  private mic: OpenAIRealtimeTranscriptionSocket | null = null
+  private system: OpenAIRealtimeTranscriptionSocket | null = null
   private store = new TranscriptStore()
   private running = false
   private micState: SocketState = 'idle'
@@ -72,8 +72,8 @@ export class TranscriptionService extends EventEmitter {
     return { running: this.running, micState: this.micState, systemState: this.systemState }
   }
 
-  private makeSocket(stream: StreamTag, _apiKey: string): ScribeRealtimeSocket {
-    const sock = new ScribeRealtimeSocket(stream)
+  private makeSocket(stream: StreamTag, _apiKey: string): OpenAIRealtimeTranscriptionSocket {
+    const sock = new OpenAIRealtimeTranscriptionSocket(stream)
     const speaker = speakerForStream(stream)
 
     sock.on('partial', (text) => {

@@ -21,7 +21,7 @@ import { composeSystemPrompt, isAnswerStyleId, isPresetId } from '@shared/prompt
 import { settings } from './settings'
 import { getPermissionStatus, openScreenRecordingPrefs, requestMicAccess } from './permissions'
 import { transcription } from './transcription/transcription-service'
-import { groq } from './llm/groq-client'
+import { openaiAnswer } from './llm/openai-answer-client'
 import { openaiVision } from './llm/openai-vision-client'
 import { mockInterview } from './mock/mock-interview-service'
 import { sanitizeMockConfig } from './mock/mock-config'
@@ -62,8 +62,8 @@ export function registerIpc(win: BrowserWindow): void {
       sendToastToActive({ level: 'warn', message: 'Stop the mock interview before starting live transcription.' })
       return { ok: false, reason: 'mock_active' }
     }
-    const key = settings.getElevenLabsKey()
-    if (!key) return { ok: false, reason: 'missing_key' }
+    const key = settings.getOpenAIKey()
+    if (!key) return { ok: false, reason: 'missing_openai_key' }
     transcription.start(key)
     return { ok: true }
   })
@@ -150,12 +150,12 @@ export function registerIpc(win: BrowserWindow): void {
   })
 
   handleTrusted(IPC.llmStart, async (): Promise<LlmStartResponse> => {
-    const key = settings.getGroqKey()
+    const key = settings.getOpenAIKey()
     if (!key) {
       const requestId = randomUUID()
-      sendToastToActive({ level: 'error', message: 'Groq API key not set. Open Settings to add it.' })
+      sendToastToActive({ level: 'error', message: 'OpenAI API key not set. Open Settings to add it.' })
       openSettingsForActive()
-      deferSendToActive(IPC.llmError, { requestId, message: 'Groq API key not set' })
+      deferSendToActive(IPC.llmError, { requestId, message: 'OpenAI API key not set' })
       return { requestId, mode: 'transcript' }
     }
     const activeId = settings.getActivePresetId()
@@ -166,7 +166,7 @@ export function registerIpc(win: BrowserWindow): void {
     })
     const transcript = transcription.flattenForPrompt()
     const requestId = randomUUID()
-    void groq.streamAnswer(key, systemPrompt, transcript, {
+    void openaiAnswer.streamAnswer(key, systemPrompt, transcript, {
       onToken: (delta) => sendToActive(IPC.llmToken, { requestId, delta }),
       onDone: (full, finishReason) => sendToActive(IPC.llmDone, { requestId, full, finishReason }),
       onError: (message) => sendToActive(IPC.llmError, { requestId, message }),
@@ -174,7 +174,7 @@ export function registerIpc(win: BrowserWindow): void {
     return { requestId, mode: 'transcript' }
   })
 
-  handleTrusted(IPC.llmAbort, () => groq.abort())
+  handleTrusted(IPC.llmAbort, () => openaiAnswer.abort())
 
   handleTrusted(IPC.visionStart, async (): Promise<LlmStartResponse> => {
     const requestId = randomUUID()
@@ -316,22 +316,12 @@ function buildReadinessStatus(): ReadinessStatus {
   const shortcuts = getShortcutRegistration()
   const checks: ReadinessCheck[] = [
     {
-      id: 'elevenlabs-key',
-      label: 'ElevenLabs key',
-      level: status.elevenlabsKeySet ? 'pass' : 'fail',
-      detail: status.elevenlabsKeySet ? 'Saved for realtime transcription.' : 'Missing. Add it before starting transcription.',
-    },
-    {
-      id: 'groq-key',
-      label: 'Groq key',
-      level: status.groqKeySet ? 'pass' : 'fail',
-      detail: status.groqKeySet ? 'Saved for transcript answers.' : 'Missing. Transcript answers cannot run.',
-    },
-    {
       id: 'openai-key',
       label: 'OpenAI key',
-      level: status.openaiKeySet ? 'pass' : 'warn',
-      detail: status.openaiKeySet ? 'Saved for screen ask.' : 'Missing. Screen ask will be unavailable.',
+      level: status.openaiKeySet ? 'pass' : 'fail',
+      detail: status.openaiKeySet
+        ? 'Saved for realtime transcription, transcript answers, screen ask, and mock interviews.'
+        : 'Missing. Add it before using live AI features.',
     },
     {
       id: 'mic-permission',

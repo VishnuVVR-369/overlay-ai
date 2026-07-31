@@ -72,7 +72,7 @@ export const COMMANDS: CommandDef[] = [
     keys: [mod(), '\\'],
     label: () => 'Ask from transcript',
     hint: 'Answer the interviewer’s most recent question using the running transcript.',
-    keywords: ['answer', 'groq', 'question'],
+    keywords: ['answer', 'openai', 'question'],
   },
   {
     id: 'screenAsk',
@@ -149,7 +149,7 @@ export const COMMANDS: CommandDef[] = [
     keys: [mod(), ','],
     label: () => 'Setup & API keys',
     hint: 'Readiness check, API keys, and microphone / screen permissions.',
-    keywords: ['settings', 'preferences', 'config', 'elevenlabs', 'groq', 'openai'],
+    keywords: ['settings', 'preferences', 'config', 'openai'],
   },
   {
     id: 'context',

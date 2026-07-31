@@ -22,16 +22,12 @@ const emptyVault = () => ({
 
 const settingsState = {
   status: {
-    elevenlabsKeySet: false,
-    groqKeySet: false,
     openaiKeySet: false,
     visionProvider: 'openai',
     visionModel: 'gpt-5.1',
     headlineFirst: true,
     vault: { hasResume: false, hasJobDescription: false, hasCompanyValues: false, hasInterviewerNotes: false, storiesCount: 0 },
   },
-  elevenlabsKey: null as string | null,
-  groqKey: null as string | null,
   openaiKey: null as string | null,
   activePresetId: 'behavioral' as 'behavioral' | 'coding' | 'system-design' | 'negotiation',
   activeAnswerStyleId: 'concise' as 'concise' | 'think-aloud' | 'clarify' | 'edge-cases' | 'complexity',
@@ -69,8 +65,6 @@ vi.mock('@main/settings', () => ({
         settingsState.status.headlineFirst = u.headlineFirst
       }
     }),
-    getElevenLabsKey: () => settingsState.elevenlabsKey,
-    getGroqKey: () => settingsState.groqKey,
     getOpenAIKey: () => settingsState.openaiKey,
     getActivePresetId: () => settingsState.activePresetId,
     getActiveAnswerStyleId: () => settingsState.activeAnswerStyleId,
@@ -134,7 +128,7 @@ vi.mock('@main/transcription/transcription-service', () => ({
   transcription: transcriptionInstance,
 }))
 
-const groqStreamSpy = vi.fn(async (
+const answerStreamSpy = vi.fn(async (
   _key: string,
   _system: string,
   _transcript: string,
@@ -144,12 +138,12 @@ const groqStreamSpy = vi.fn(async (
   cb.onDone('x', 'stop')
   return 'rid'
 })
-const groqAbortSpy = vi.fn()
+const answerAbortSpy = vi.fn()
 
-vi.mock('@main/llm/groq-client', () => ({
-  groq: {
-    streamAnswer: (...args: Parameters<typeof groqStreamSpy>) => groqStreamSpy(...args),
-    abort: () => groqAbortSpy(),
+vi.mock('@main/llm/openai-answer-client', () => ({
+  openaiAnswer: {
+    streamAnswer: (...args: Parameters<typeof answerStreamSpy>) => answerStreamSpy(...args),
+    abort: () => answerAbortSpy(),
   },
 }))
 
@@ -228,8 +222,6 @@ beforeEach(async () => {
   ipcStub.ipcMain.handle.mockClear()
   ipcStub.ipcMain.on.mockClear()
   appQuitSpy.mockReset()
-  settingsState.elevenlabsKey = null
-  settingsState.groqKey = null
   settingsState.openaiKey = null
   settingsState.activeAnswerStyleId = 'concise'
   settingsState.answerStyleState = {
@@ -240,8 +232,6 @@ beforeEach(async () => {
     ],
   }
   settingsState.status = {
-    elevenlabsKeySet: false,
-    groqKeySet: false,
     openaiKeySet: false,
     visionProvider: 'openai',
     visionModel: 'gpt-5.1',
@@ -253,7 +243,8 @@ beforeEach(async () => {
   settingsState.vault = emptyVault()
   settingsState.vaultUpdates = []
   triggerPanicSpy.mockClear()
-  groqStreamSpy.mockClear()
+  answerStreamSpy.mockClear()
+  answerAbortSpy.mockClear()
   visionStreamSpy.mockClear()
   mockStartSpy.mockClear()
   mockStopSpy.mockReset()
@@ -316,7 +307,7 @@ describe('IPC handler registration', () => {
   it('rejects invokes and drops events from untrusted senders', async () => {
     ipcStub.setEvent({ sender: new EventEmitter(), senderFrame: {} })
     await expect(ipcStub.invoke(IPC.settingsGet)).rejects.toThrow('Unauthorized IPC sender')
-    ipcStub.send(IPC.audioChunk, { stream: 'mic', audioBase64: 'AAA', sampleRate: 16000 })
+    ipcStub.send(IPC.audioChunk, { stream: 'mic', audioBase64: 'AAA', sampleRate: 24000 })
     expect(transcriptionInstance.ingest).not.toHaveBeenCalled()
   })
 
@@ -331,19 +322,19 @@ describe('IPC handler registration', () => {
     })
 
     expect(ipcStub.ipcMain.handle).toHaveBeenCalledTimes(initialRegistrations)
-    await expect(ipcStub.invoke(IPC.settingsGet)).resolves.toMatchObject({ groqKeySet: false })
+    await expect(ipcStub.invoke(IPC.settingsGet)).resolves.toMatchObject({ openaiKeySet: false })
   })
 })
 
 describe('settings IPC', () => {
   it('settings:get returns the current status', async () => {
-    settingsState.status.groqKeySet = true
-    expect(await ipcStub.invoke(IPC.settingsGet)).toMatchObject({ groqKeySet: true })
+    settingsState.status.openaiKeySet = true
+    expect(await ipcStub.invoke(IPC.settingsGet)).toMatchObject({ openaiKeySet: true })
   })
 
   it('settings:set forwards the update to the settings store', async () => {
-    await ipcStub.invoke(IPC.settingsSet, { groqKey: 'gk' })
-    expect(settingsState.updates[0]).toEqual({ groqKey: 'gk' })
+    await ipcStub.invoke(IPC.settingsSet, { openaiKey: 'sk-openai' })
+    expect(settingsState.updates[0]).toEqual({ openaiKey: 'sk-openai' })
   })
 })
 
@@ -355,37 +346,36 @@ describe('permissions IPC', () => {
 
 describe('readiness IPC', () => {
   it('readiness:check returns local setup checks', async () => {
-    settingsState.status = { elevenlabsKeySet: true, groqKeySet: true, openaiKeySet: false, visionProvider: 'openai', visionModel: 'gpt-5.1' }
+    settingsState.status = { openaiKeySet: true, visionProvider: 'openai', visionModel: 'gpt-5.1' }
     const result = await ipcStub.invoke(IPC.readinessCheck) as { checks: Array<{ id: string; level: string }> }
-    expect(result.checks.find((c) => c.id === 'elevenlabs-key')?.level).toBe('pass')
-    expect(result.checks.find((c) => c.id === 'openai-key')?.level).toBe('warn')
+    expect(result.checks.find((c) => c.id === 'openai-key')?.level).toBe('pass')
     expect(result.checks.find((c) => c.id === 'global-shortcuts')?.level).toBe('pass')
   })
 })
 
 describe('transcription IPC', () => {
-  it('transcription:start refuses with reason "missing_key" when ElevenLabs key is unset', async () => {
-    settingsState.elevenlabsKey = null
-    expect(await ipcStub.invoke(IPC.transcriptionStart)).toEqual({ ok: false, reason: 'missing_key' })
+  it('transcription:start refuses with reason "missing_openai_key" when the OpenAI key is unset', async () => {
+    settingsState.openaiKey = null
+    expect(await ipcStub.invoke(IPC.transcriptionStart)).toEqual({ ok: false, reason: 'missing_openai_key' })
     expect(transcriptionInstance.start).not.toHaveBeenCalled()
   })
 
   it('transcription:start passes the key to the service when set', async () => {
-    settingsState.elevenlabsKey = 'el-key'
+    settingsState.openaiKey = 'sk-openai'
     expect(await ipcStub.invoke(IPC.transcriptionStart)).toEqual({ ok: true })
-    expect(transcriptionInstance.start).toHaveBeenCalledWith('el-key')
+    expect(transcriptionInstance.start).toHaveBeenCalledWith('sk-openai')
   })
 
   it('transcription:start refuses while mock interview is active', async () => {
     mockStatusSpy.mockReturnValueOnce({ state: 'active', paused: false })
-    settingsState.elevenlabsKey = 'el-key'
+    settingsState.openaiKey = 'sk-openai'
     expect(await ipcStub.invoke(IPC.transcriptionStart)).toEqual({ ok: false, reason: 'mock_active' })
     expect(transcriptionInstance.start).not.toHaveBeenCalled()
   })
 
   it('audio:chunk forwards to transcription.ingest with stream tag', () => {
-    ipcStub.send(IPC.audioChunk, { stream: 'mic', audioBase64: 'AAA', sampleRate: 16000 })
-    expect(transcriptionInstance.ingest).toHaveBeenCalledWith({ stream: 'mic', audioBase64: 'AAA', sampleRate: 16000 })
+    ipcStub.send(IPC.audioChunk, { stream: 'mic', audioBase64: 'AAA', sampleRate: 24000 })
+    expect(transcriptionInstance.ingest).toHaveBeenCalledWith({ stream: 'mic', audioBase64: 'AAA', sampleRate: 24000 })
   })
 
   it('transcript:clear resets the store', async () => {
@@ -438,8 +428,8 @@ describe('mock interview IPC', () => {
   })
 
   it('mock audio chunks and controls proxy to the service', async () => {
-    ipcStub.send(IPC.mockAudioChunk, { audioBase64: 'AAA', sampleRate: 16000 })
-    expect(mockIngestSpy).toHaveBeenCalledWith({ audioBase64: 'AAA', sampleRate: 16000 })
+    ipcStub.send(IPC.mockAudioChunk, { audioBase64: 'AAA', sampleRate: 24000 })
+    expect(mockIngestSpy).toHaveBeenCalledWith({ audioBase64: 'AAA', sampleRate: 24000 })
     await ipcStub.invoke(IPC.mockPause)
     await ipcStub.invoke(IPC.mockResume)
     await ipcStub.invoke(IPC.mockStop)
@@ -504,33 +494,33 @@ describe('mock sessions IPC', () => {
 })
 
 describe('llm IPC', () => {
-  it('llm:start with no Groq key sends a toast, opens settings, and emits a deferred error', async () => {
+  it('llm:start with no OpenAI key sends a toast, opens settings, and emits a deferred error', async () => {
     vi.useFakeTimers()
-    settingsState.groqKey = null
+    settingsState.openaiKey = null
     const r = await ipcStub.invoke(IPC.llmStart) as { requestId: string; mode: string }
     expect(r.mode).toBe('transcript')
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.toast, expect.objectContaining({ level: 'error' }))
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.settingsOpen)
-    expect(groqStreamSpy).not.toHaveBeenCalled()
+    expect(answerStreamSpy).not.toHaveBeenCalled()
     vi.advanceTimersByTime(60)
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.llmError, expect.objectContaining({ requestId: r.requestId }))
     vi.useRealTimers()
   })
 
-  it('llm:start with Groq key streams tokens and finishes', async () => {
-    settingsState.groqKey = 'gr'
+  it('llm:start with an OpenAI key streams tokens and finishes', async () => {
+    settingsState.openaiKey = 'sk-openai'
     const r = await ipcStub.invoke(IPC.llmStart) as { requestId: string }
-    expect(groqStreamSpy).toHaveBeenCalled()
-    expect(groqStreamSpy.mock.calls[0][1]).toContain('Answer style: Concise')
+    expect(answerStreamSpy).toHaveBeenCalled()
+    expect(answerStreamSpy.mock.calls[0][1]).toContain('Answer style: Concise')
     // Allow microtasks for sync-ish callback
     await new Promise((r2) => setTimeout(r2, 0))
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.llmToken, expect.objectContaining({ requestId: r.requestId, delta: 'x' }))
     expect(win.webContents.send).toHaveBeenCalledWith(IPC.llmDone, expect.objectContaining({ requestId: r.requestId, full: 'x' }))
   })
 
-  it('llm:abort proxies to the Groq client', async () => {
+  it('llm:abort proxies to the OpenAI answer client', async () => {
     await ipcStub.invoke(IPC.llmAbort)
-    expect(groqAbortSpy).toHaveBeenCalled()
+    expect(answerAbortSpy).toHaveBeenCalled()
   })
 })
 
@@ -684,7 +674,7 @@ describe('panic IPC', () => {
 
 describe('headline-first + vault prompt injection', () => {
   it('llm:start composes the system prompt with vault contents + headline directive', async () => {
-    settingsState.groqKey = 'gr'
+    settingsState.openaiKey = 'sk-openai'
     settingsState.vault = {
       resume: 'My resume',
       jobDescription: '',
@@ -694,8 +684,8 @@ describe('headline-first + vault prompt injection', () => {
     }
     settingsState.headlineFirst = true
     await ipcStub.invoke(IPC.llmStart)
-    expect(groqStreamSpy).toHaveBeenCalled()
-    const systemPrompt = groqStreamSpy.mock.calls[0][1] as string
+    expect(answerStreamSpy).toHaveBeenCalled()
+    const systemPrompt = answerStreamSpy.mock.calls[0][1] as string
     expect(systemPrompt).toContain('headline answer')
     expect(systemPrompt).toContain('Personal context')
     expect(systemPrompt).toContain('Stripe migration')
@@ -703,10 +693,10 @@ describe('headline-first + vault prompt injection', () => {
   })
 
   it('llm:start omits the headline directive when headlineFirst is false', async () => {
-    settingsState.groqKey = 'gr'
+    settingsState.openaiKey = 'sk-openai'
     settingsState.headlineFirst = false
     await ipcStub.invoke(IPC.llmStart)
-    const systemPrompt = groqStreamSpy.mock.calls[0][1] as string
+    const systemPrompt = answerStreamSpy.mock.calls[0][1] as string
     expect(systemPrompt).not.toContain('headline answer')
   })
 

@@ -137,7 +137,7 @@ describe('CaptureController', () => {
     expect(nodes.length).toBeGreaterThanOrEqual(2)
     const buf = new Int16Array([1, 2, 3]).buffer
     nodes[0].port.onmessage?.({ data: buf } as MessageEvent<ArrayBuffer>)
-    expect(fakeApi.transcription.sendAudio).toHaveBeenCalledWith(expect.objectContaining({ stream: 'mic', sampleRate: 16000 }))
+    expect(fakeApi.transcription.sendAudio).toHaveBeenCalledWith(expect.objectContaining({ stream: 'mic', sampleRate: 24000 }))
     capture.stop()
   })
 
