@@ -6,15 +6,15 @@ A stealth live-interview assistant overlay built with Electron.
 
 - Stays invisible to screen sharing (Zoom, Meet, Teams) on macOS 14.4+ and Windows 10 v2004+.
 - Hidden from dock (macOS), taskbar, and Alt-Tab (Windows).
-- Continuously transcribes your microphone ("You") and system audio ("Them") via OpenAI GPT Live Transcribe.
-- On `Cmd/Ctrl+\`, sends the full session transcript to OpenAI and streams the answer back.
+- Continuously transcribes your microphone ("You") and system audio ("Them") as 24 kHz PCM through separate server-side OpenAI GPT Live Transcribe WebSocket sessions.
+- On `Cmd/Ctrl+\`, sends the full session transcript to OpenAI Responses using `gpt-5.6-sol` with low reasoning and streams the answer back.
 - On `Cmd/Ctrl+Shift+\`, captures the active display, sends the screenshot plus transcript context to OpenAI's vision model, and streams the answer back.
 - Keeps setup, personal context, prompts, mock practice, session history, and help in one tabbed command console.
 - Keeps unsaved personal-context and system-prompt drafts while you navigate or reopen the console; personal context persists only after you save it, and API-key inputs are never retained as drafts.
 - Opens a searchable command palette with `Cmd/Ctrl+K`.
 - Cycles compact, normal, and wide layouts with `Cmd/Ctrl+Shift+E`.
 - On `Cmd/Ctrl+Shift+B`, toggles window visibility; `Cmd/Ctrl+Shift+Escape` stops capture, clears the session, and hides the overlay.
-- Runs voice mock interviews and saves their transcripts, rubric scores, feedback, and follow-up drills in History.
+- Runs voice mock interviews with `gpt-realtime-2.1` and saves their transcripts, rubric scores, feedback, and follow-up drills in History.
 
 ## Setup
 
