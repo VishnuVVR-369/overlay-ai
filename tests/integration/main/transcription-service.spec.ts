@@ -146,6 +146,23 @@ describe('TranscriptionService', () => {
     expect(svc.status().running).toBe(false)
   })
 
+  it('panic cancels draining sockets and suppresses late transcript callbacks', async () => {
+    const { TranscriptionService } = await loadService()
+    const svc = new TranscriptionService()
+    svc.start('test-key')
+    await waitFor(() => svc.status().micState === 'open' && svc.status().systemState === 'open')
+    svc.ingest({ stream: 'mic', audioBase64: 'AAAA', sampleRate: 24000 })
+    const stopping = svc.stop()
+    await waitFor(() => realtime.received.some((event) => (event as { type?: string }).type === 'input_audio_buffer.commit'))
+    realtime.sendCommitted('late-item')
+    svc.stopImmediately()
+    svc.clear()
+    realtime.sendCompleted('late-item', 'must not return')
+    await stopping
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(svc.snapshot()).toEqual({ segments: [], partials: {} })
+  })
+
   it('start() is idempotent: a second call while running is a no-op', async () => {
     const { TranscriptionService } = await loadService()
     const svc = new TranscriptionService()

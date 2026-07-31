@@ -11,6 +11,8 @@ export interface TranscriptionServiceEvents {
 export class TranscriptionService extends EventEmitter {
   private mic: OpenAIRealtimeTranscriptionSocket | null = null
   private system: OpenAIRealtimeTranscriptionSocket | null = null
+  private drainingSockets = new Set<OpenAIRealtimeTranscriptionSocket>()
+  private suppressedSockets = new WeakSet<OpenAIRealtimeTranscriptionSocket>()
   private store = new TranscriptStore()
   private running = false
   private micState: SocketState = 'idle'
@@ -35,19 +37,33 @@ export class TranscriptionService extends EventEmitter {
 
   async stop(): Promise<void> {
     this.running = false
-    const mic = this.mic
-    const system = this.system
+    const sockets = new Set(this.drainingSockets)
+    if (this.mic) sockets.add(this.mic)
+    if (this.system) sockets.add(this.system)
     this.mic = null
     this.system = null
-    await Promise.all([mic?.close(), system?.close()])
+    for (const socket of sockets) this.drainingSockets.add(socket)
+    await Promise.all([...sockets].map(async (socket) => {
+      try {
+        await socket.close()
+      } finally {
+        this.drainingSockets.delete(socket)
+      }
+    }))
   }
 
   stopImmediately(): void {
     this.running = false
-    this.mic?.closeImmediately()
-    this.system?.closeImmediately()
+    const sockets = new Set(this.drainingSockets)
+    if (this.mic) sockets.add(this.mic)
+    if (this.system) sockets.add(this.system)
     this.mic = null
     this.system = null
+    this.drainingSockets.clear()
+    for (const socket of sockets) {
+      this.suppressedSockets.add(socket)
+      socket.closeImmediately()
+    }
   }
 
   ingest(chunk: AudioChunkMessage): void {
@@ -86,11 +102,13 @@ export class TranscriptionService extends EventEmitter {
     const speaker = speakerForStream(stream)
 
     sock.on('partial', (text, itemId) => {
+      if (this.suppressedSockets.has(sock)) return
       const update = this.store.applyPartial(speaker, text, itemId)
       this.emit('update', update)
     })
 
     sock.on('committed', (text, itemId) => {
+      if (this.suppressedSockets.has(sock)) return
       const update = this.store.applyCommitted(speaker, text, itemId)
       this.emit('update', update)
     })

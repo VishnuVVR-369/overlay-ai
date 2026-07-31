@@ -30,6 +30,15 @@ describe('transcript store (renderer)', () => {
     expect(s.partials.you).toBeUndefined()
   })
 
+  it('keeps a newer speaker partial when an older segment commits', () => {
+    useTranscriptStore.getState().apply({ speaker: 'them', kind: 'partial', segmentId: 'older', text: 'old', startedAt: 1 })
+    useTranscriptStore.getState().apply({ speaker: 'them', kind: 'partial', segmentId: 'newer', text: 'new', startedAt: 2 })
+    useTranscriptStore.getState().apply({ speaker: 'them', kind: 'committed', segmentId: 'older', text: 'old final', startedAt: 1, committedAt: 3 })
+    const s = useTranscriptStore.getState()
+    expect(s.segments).toHaveLength(1)
+    expect(s.partials.them).toMatchObject({ id: 'newer', text: 'new' })
+  })
+
   it('reset() clears everything', () => {
     useTranscriptStore.getState().apply({ speaker: 'you', kind: 'committed', segmentId: 'p', text: 'a', startedAt: 1, committedAt: 2 })
     useTranscriptStore.getState().reset()

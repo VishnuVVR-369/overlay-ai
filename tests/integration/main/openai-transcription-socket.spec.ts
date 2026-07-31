@@ -157,6 +157,40 @@ describe('OpenAIRealtimeTranscriptionSocket', () => {
     expect(states.at(-1)).toBe('closed')
   })
 
+  it('uses the VAD-disabled session barrier before accepting the final commit acknowledgement', async () => {
+    const { OpenAIRealtimeTranscriptionSocket } = await loadSocket()
+    const socket = new OpenAIRealtimeTranscriptionSocket('mic')
+    const committed: string[] = []
+    socket.on('committed', (text) => committed.push(text))
+    socket.connect('key')
+    await waitFor(() => realtime.received.length > 0)
+    socket.send('AAAA', 24000)
+    realtime.queueBeforeNextSessionUpdated({
+      type: 'input_audio_buffer.committed',
+      item_id: 'vad-item',
+      previous_item_id: null,
+    })
+    let closed = false
+    const closing = socket.close().then(() => { closed = true })
+    await waitFor(() => realtime.received.some((event) => (event as { type?: string }).type === 'input_audio_buffer.commit'))
+    realtime.sendCompleted('vad-item', 'Earlier words.')
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(closed).toBe(false)
+    expect(committed).toEqual(['Earlier words.'])
+    realtime.sendCommitted('final-item', 'vad-item')
+    realtime.sendCompleted('final-item', 'Final words.')
+    await closing
+    expect(committed).toEqual(['Earlier words.', 'Final words.'])
+    const drainUpdateIndex = realtime.received.findIndex((event) => (
+      (event as { type?: string; session?: { audio?: { input?: { turn_detection?: unknown } } } }).type === 'session.update'
+      && (event as { session?: { audio?: { input?: { turn_detection?: unknown } } } })
+        .session?.audio?.input?.turn_detection === null
+    ))
+    const commitIndex = realtime.received.findIndex((event) => (event as { type?: string }).type === 'input_audio_buffer.commit')
+    expect(drainUpdateIndex).toBeGreaterThanOrEqual(0)
+    expect(commitIndex).toBeGreaterThan(drainUpdateIndex)
+  })
+
   it('bounds ordinary drain time and keeps panic shutdown immediate', async () => {
     const { OpenAIRealtimeTranscriptionSocket } = await loadSocket()
     const graceful = new OpenAIRealtimeTranscriptionSocket('mic', 25)

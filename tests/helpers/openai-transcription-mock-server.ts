@@ -5,6 +5,7 @@ export interface OpenAITranscriptionMockHandle {
   server: Server
   clients: Set<MockClient>
   received: object[]
+  queueBeforeNextSessionUpdated: (payload: object) => void
   sendCommitted: (itemId: string, previousItemId?: string | null) => void
   sendDelta: (itemId: string, delta: string) => void
   sendCompleted: (itemId: string, transcript: string) => void
@@ -19,14 +20,16 @@ export function startOpenAITranscriptionMock(
   const server = new Server(url, { mock: false, selectProtocol: () => '' })
   const clients = new Set<MockClient>()
   const received: object[] = []
+  const beforeNextSessionUpdated: object[] = []
   server.on('connection', (socket) => {
     const client = socket as unknown as MockClient
     clients.add(client)
     socket.on('message', (raw) => {
-      const payload = JSON.parse(raw as string) as { type?: string }
+      const payload = JSON.parse(raw as string) as { type?: string; session?: object }
       received.push(payload)
       if (payload.type === 'session.update') {
-        socket.send(JSON.stringify({ type: 'session.updated', session: { type: 'transcription' } }))
+        for (const event of beforeNextSessionUpdated.splice(0)) socket.send(JSON.stringify(event))
+        socket.send(JSON.stringify({ type: 'session.updated', session: payload.session }))
       }
     })
     socket.on('close', () => clients.delete(client))
@@ -42,6 +45,7 @@ export function startOpenAITranscriptionMock(
     server,
     clients,
     received,
+    queueBeforeNextSessionUpdated: (payload) => beforeNextSessionUpdated.push(payload),
     sendCommitted: (itemId, previousItemId = null) => broadcast({
       type: 'input_audio_buffer.committed',
       item_id: itemId,

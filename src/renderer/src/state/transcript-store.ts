@@ -38,7 +38,7 @@ export const useTranscriptStore = create<TranscriptState>((set) => ({
         committedAt: update.committedAt,
       }
       const partials = { ...state.partials }
-      partials[speaker] = undefined
+      if (partials[speaker]?.id === update.segmentId) partials[speaker] = undefined
       return {
         segments: [...state.segments, segment],
         partials,
