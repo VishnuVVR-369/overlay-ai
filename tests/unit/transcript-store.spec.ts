@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { TranscriptStore } from '@main/transcription/transcript-store'
 
 describe('TranscriptStore', () => {
+  it('does not clear a newer item partial when an older item commits', () => {
+    const s = new TranscriptStore()
+    s.applyPartial('them', 'older', 'item-1')
+    const newer = s.applyPartial('them', 'newer', 'item-2')
+    const committed = s.applyCommitted('them', 'older final', 'item-1')
+    expect(committed.segmentId).not.toBe(newer.segmentId)
+    expect(s.snapshot().partials.them).toMatchObject({ id: newer.segmentId, text: 'newer' })
+  })
+
   it('starts empty with no segments and no partials', () => {
     const s = new TranscriptStore()
     const snap = s.snapshot()

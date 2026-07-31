@@ -33,10 +33,19 @@ export class TranscriptionService extends EventEmitter {
     this.system.connect(apiKey)
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     this.running = false
-    this.mic?.close()
-    this.system?.close()
+    const mic = this.mic
+    const system = this.system
+    this.mic = null
+    this.system = null
+    await Promise.all([mic?.close(), system?.close()])
+  }
+
+  stopImmediately(): void {
+    this.running = false
+    this.mic?.closeImmediately()
+    this.system?.closeImmediately()
     this.mic = null
     this.system = null
   }
@@ -76,13 +85,13 @@ export class TranscriptionService extends EventEmitter {
     const sock = new OpenAIRealtimeTranscriptionSocket(stream)
     const speaker = speakerForStream(stream)
 
-    sock.on('partial', (text) => {
-      const update = this.store.applyPartial(speaker, text)
+    sock.on('partial', (text, itemId) => {
+      const update = this.store.applyPartial(speaker, text, itemId)
       this.emit('update', update)
     })
 
-    sock.on('committed', (text) => {
-      const update = this.store.applyCommitted(speaker, text)
+    sock.on('committed', (text, itemId) => {
+      const update = this.store.applyCommitted(speaker, text, itemId)
       this.emit('update', update)
     })
 

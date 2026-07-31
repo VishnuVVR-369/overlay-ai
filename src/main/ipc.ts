@@ -68,8 +68,8 @@ export function registerIpc(win: BrowserWindow): void {
     return { ok: true }
   })
 
-  handleTrusted(IPC.transcriptionStop, () => {
-    transcription.stop()
+  handleTrusted(IPC.transcriptionStop, async () => {
+    await transcription.stop()
     return { ok: true }
   })
 
@@ -254,7 +254,7 @@ export function registerIpc(win: BrowserWindow): void {
     sendToActive(IPC.windowFocusState, { focused: true })
   })
   handleTrusted(IPC.windowQuit, async () => {
-    transcription.stop()
+    await transcription.stop()
     try {
       await mockInterview.stop()
       app.quit()

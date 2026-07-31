@@ -5,6 +5,7 @@ export interface OpenAITranscriptionMockHandle {
   server: Server
   clients: Set<MockClient>
   received: object[]
+  sendCommitted: (itemId: string, previousItemId?: string | null) => void
   sendDelta: (itemId: string, delta: string) => void
   sendCompleted: (itemId: string, transcript: string) => void
   sendRaw: (payload: object) => void
@@ -41,6 +42,11 @@ export function startOpenAITranscriptionMock(
     server,
     clients,
     received,
+    sendCommitted: (itemId, previousItemId = null) => broadcast({
+      type: 'input_audio_buffer.committed',
+      item_id: itemId,
+      previous_item_id: previousItemId,
+    }),
     sendDelta: (itemId, delta) => broadcast({
       type: 'conversation.item.input_audio_transcription.delta',
       item_id: itemId,

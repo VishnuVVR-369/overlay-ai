@@ -7,7 +7,7 @@ import { mockInterview } from './mock/mock-interview-service'
 import { hideWindow } from './window'
 
 export function triggerPanic(win: BrowserWindow): void {
-  try { transcription.stop() } catch { /* idempotent */ }
+  try { transcription.stopImmediately() } catch { /* idempotent */ }
   try { transcription.clear() } catch { /* idempotent */ }
   try { openaiAnswer.abort() } catch { /* idempotent */ }
   try { openaiVision.abort() } catch { /* idempotent */ }

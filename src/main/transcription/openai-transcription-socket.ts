@@ -8,10 +8,16 @@ const INPUT_SAMPLE_RATE = 24000
 const MAX_BUFFERED_BYTES = 1_000_000
 const MAX_QUEUE = 200
 const MAX_RETRIES = 8
+const DEFAULT_DRAIN_TIMEOUT_MS = 2000
+
+type TranscriptionResult =
+  | { status: 'pending' }
+  | { status: 'completed'; transcript: string }
+  | { status: 'failed' }
 
 export interface RealtimeTranscriptionEvents {
-  partial: (text: string) => void
-  committed: (text: string) => void
+  partial: (text: string, itemId: string) => void
+  committed: (text: string, itemId: string) => void
   state: (state: SocketState, message?: string) => void
 }
 
@@ -20,13 +26,26 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
   private apiKey = ''
   private queue: string[] = []
   private partials = new Map<string, string>()
+  private itemOrder: string[] = []
+  private itemResults = new Map<string, TranscriptionResult>()
   private retries = 0
   private retryTimer: NodeJS.Timeout | null = null
   private explicitClose = false
   private configured = false
+  private acceptingAudio = true
+  private hasUncommittedAudio = false
+  private draining = false
+  private commitRequested = false
+  private manualCommitPending = false
+  private drainTimer: NodeJS.Timeout | null = null
+  private drainPromise: Promise<void> | null = null
+  private resolveDrain: (() => void) | null = null
   private state: SocketState = 'idle'
 
-  constructor(public readonly stream: StreamTag) {
+  constructor(
+    public readonly stream: StreamTag,
+    private readonly drainTimeoutMs = DEFAULT_DRAIN_TIMEOUT_MS,
+  ) {
     super()
   }
 
@@ -47,26 +66,45 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
   connect(apiKey: string): void {
     this.apiKey = apiKey
     this.explicitClose = false
+    this.acceptingAudio = true
     this.openSocket()
   }
 
-  close(): void {
+  close(): Promise<void> {
+    if (this.drainPromise) return this.drainPromise
     this.explicitClose = true
+    this.acceptingAudio = false
     if (this.retryTimer) {
       clearTimeout(this.retryTimer)
       this.retryTimer = null
     }
-    if (this.ws) {
-      try { this.ws.close() } catch { /* ignore */ }
-      this.ws = null
+    if (!this.ws) {
+      this.finishClose()
+      return Promise.resolve()
     }
-    this.configured = false
-    this.queue = []
-    this.partials.clear()
-    this.setState('closed')
+
+    this.draining = true
+    const drainPromise = new Promise<void>((resolve) => {
+      this.resolveDrain = resolve
+    })
+    this.drainPromise = drainPromise
+    this.drainTimer = setTimeout(() => this.finishClose(), this.drainTimeoutMs)
+    if (this.configured && this.ws.readyState === WebSocket.OPEN) this.beginDrain()
+    return drainPromise
+  }
+
+  closeImmediately(): void {
+    this.explicitClose = true
+    this.acceptingAudio = false
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer)
+      this.retryTimer = null
+    }
+    this.finishClose()
   }
 
   send(audioBase64: string, sampleRate: number): void {
+    if (!this.acceptingAudio) return
     if (sampleRate !== INPUT_SAMPLE_RATE) {
       this.setState('error', `OpenAI transcription requires ${INPUT_SAMPLE_RATE} Hz PCM audio; received ${sampleRate} Hz.`)
       return
@@ -78,6 +116,7 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.configured) {
       if (this.ws.bufferedAmount > MAX_BUFFERED_BYTES) return
       this.ws.send(payload)
+      this.hasUncommittedAudio = true
     } else if (this.queue.length < MAX_QUEUE) {
       this.queue.push(payload)
     }
@@ -86,6 +125,9 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
   private openSocket(): void {
     this.configured = false
     this.partials.clear()
+    this.itemOrder = []
+    this.itemResults.clear()
+    this.hasUncommittedAudio = false
     this.setState(this.retries === 0 ? 'connecting' : 'reconnecting')
 
     const ws = new WebSocket(ENDPOINT, {
@@ -142,7 +184,7 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
       if (this.ws === ws) this.ws = null
       this.configured = false
       if (this.explicitClose) {
-        this.setState('closed')
+        this.finishClose()
         return
       }
       if (this.state === 'auth_error' || code === 1008 || /auth|unauthorized|forbidden|api key/i.test(reason)) {
@@ -167,30 +209,51 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
       this.configured = true
       this.setState('open')
       this.flushQueue()
+      if (this.draining) this.beginDrain()
+      return
+    }
+
+    if (type === 'input_audio_buffer.committed') {
+      const itemId = this.eventItemId(event)
+      if (!itemId) return
+      this.hasUncommittedAudio = false
+      this.manualCommitPending = false
+      if (!this.itemResults.has(itemId)) this.itemResults.set(itemId, { status: 'pending' })
+      if (!this.itemOrder.includes(itemId)) this.itemOrder.push(itemId)
+      this.flushCompletedItems()
       return
     }
 
     if (type === 'conversation.item.input_audio_transcription.delta') {
       const delta = typeof event.delta === 'string' ? event.delta : ''
       if (!delta) return
+      const itemId = this.eventItemId(event)
+      if (!itemId) return
       const key = this.itemKey(event)
       const text = `${this.partials.get(key) ?? ''}${delta}`
       this.partials.set(key, text)
-      this.emit('partial', text)
+      this.emit('partial', text, itemId)
       return
     }
 
     if (type === 'conversation.item.input_audio_transcription.completed') {
       const transcript = typeof event.transcript === 'string' ? event.transcript.trim() : ''
+      const itemId = this.eventItemId(event)
+      if (!itemId) return
       this.partials.delete(this.itemKey(event))
-      if (transcript) this.emit('committed', transcript)
+      this.itemResults.set(itemId, { status: 'completed', transcript })
+      this.flushCompletedItems()
       return
     }
 
     if (type === 'conversation.item.input_audio_transcription.failed') {
+      const itemId = this.eventItemId(event)
+      if (!itemId) return
       this.partials.delete(this.itemKey(event))
+      this.itemResults.set(itemId, { status: 'failed' })
       const message = this.errorMessage(event) ?? 'OpenAI failed to transcribe an audio turn.'
       console.warn(`[openai-transcription:${this.stream}] ${message}`)
+      this.flushCompletedItems()
       return
     }
 
@@ -203,9 +266,13 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
   }
 
   private itemKey(event: Record<string, unknown>): string {
-    const itemId = typeof event.item_id === 'string' ? event.item_id : 'unknown'
+    const itemId = this.eventItemId(event) ?? 'unknown'
     const contentIndex = typeof event.content_index === 'number' ? event.content_index : 0
     return `${itemId}:${contentIndex}`
+  }
+
+  private eventItemId(event: Record<string, unknown>): string | null {
+    return typeof event.item_id === 'string' && event.item_id ? event.item_id : null
   }
 
   private errorMessage(event: Record<string, unknown>): string | null {
@@ -238,8 +305,73 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.configured) return
     while (this.queue.length > 0) {
       const next = this.queue.shift()
-      if (next) this.ws.send(next)
+      if (next) {
+        this.ws.send(next)
+        this.hasUncommittedAudio = true
+      }
     }
+  }
+
+  private beginDrain(): void {
+    this.flushQueue()
+    if (this.hasUncommittedAudio && !this.commitRequested && this.ws?.readyState === WebSocket.OPEN) {
+      this.commitRequested = true
+      this.manualCommitPending = true
+      this.ws.send(JSON.stringify({ type: 'input_audio_buffer.commit' }))
+    }
+    this.finishDrainIfIdle()
+  }
+
+  private flushCompletedItems(): void {
+    while (this.itemOrder.length > 0) {
+      const itemId = this.itemOrder[0]
+      const result = this.itemResults.get(itemId)
+      if (!result || result.status === 'pending') break
+      this.itemOrder.shift()
+      this.itemResults.delete(itemId)
+      if (result.status === 'completed' && result.transcript) {
+        this.emit('committed', result.transcript, itemId)
+      }
+    }
+    this.finishDrainIfIdle()
+  }
+
+  private finishDrainIfIdle(): void {
+    if (
+      this.draining
+      && !this.hasUncommittedAudio
+      && !this.manualCommitPending
+      && this.itemOrder.length === 0
+      && this.itemResults.size === 0
+    ) {
+      this.finishClose()
+    }
+  }
+
+  private finishClose(): void {
+    if (this.drainTimer) {
+      clearTimeout(this.drainTimer)
+      this.drainTimer = null
+    }
+    const ws = this.ws
+    this.ws = null
+    if (ws) {
+      try { ws.close() } catch { /* ignore */ }
+    }
+    this.configured = false
+    this.draining = false
+    this.commitRequested = false
+    this.manualCommitPending = false
+    this.hasUncommittedAudio = false
+    this.queue = []
+    this.partials.clear()
+    this.itemOrder = []
+    this.itemResults.clear()
+    this.setState('closed')
+    const resolve = this.resolveDrain
+    this.resolveDrain = null
+    this.drainPromise = null
+    resolve?.()
   }
 
   private setState(state: SocketState, message?: string): void {
