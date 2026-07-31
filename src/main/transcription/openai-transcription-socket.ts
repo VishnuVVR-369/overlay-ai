@@ -4,8 +4,11 @@ import WebSocket from 'ws'
 import type { SocketState, StreamTag } from '@shared/types'
 
 const MODEL = 'gpt-live-transcribe'
-const ENDPOINT = `wss://api.openai.com/v1/realtime?model=${MODEL}`
+const ENDPOINT = 'wss://api.openai.com/v1/realtime?intent=transcription'
 const INPUT_SAMPLE_RATE = 24000
+const BYTES_PER_SAMPLE = 2
+const COMMIT_INTERVAL_MS = 2000
+const COMMIT_INTERVAL_BYTES = INPUT_SAMPLE_RATE * BYTES_PER_SAMPLE * (COMMIT_INTERVAL_MS / 1000)
 const MAX_BUFFERED_BYTES = 1_000_000
 const MAX_QUEUE = 200
 const MAX_RETRIES = 8
@@ -16,14 +19,12 @@ type TranscriptionResult =
   | { status: 'completed'; transcript: string }
   | { status: 'failed' }
 
-type TurnDetection = {
-  type: 'server_vad'
-  threshold: number
-  prefix_padding_ms: number
-  silence_duration_ms: number
-} | null
+type DrainPhase = 'idle' | 'waiting_final_commit' | 'waiting_transcripts'
 
-type DrainPhase = 'idle' | 'waiting_vad_disabled' | 'waiting_final_commit' | 'waiting_transcripts'
+interface QueuedAudio {
+  payload: string
+  byteLength: number
+}
 
 export interface RealtimeTranscriptionEvents {
   partial: (text: string, itemId: string) => void
@@ -34,7 +35,7 @@ export interface RealtimeTranscriptionEvents {
 export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
   private ws: WebSocket | null = null
   private apiKey = ''
-  private queue: string[] = []
+  private queue: QueuedAudio[] = []
   private partials = new Map<string, string>()
   private itemOrder: string[] = []
   private itemResults = new Map<string, TranscriptionResult>()
@@ -44,6 +45,8 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
   private configured = false
   private acceptingAudio = true
   private audioAppended = false
+  private bufferedAudioBytes = 0
+  private pendingCommitEventIds: string[] = []
   private draining = false
   private drainPhase: DrainPhase = 'idle'
   private drainCommitEventId: string | null = null
@@ -123,12 +126,12 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
       type: 'input_audio_buffer.append',
       audio: audioBase64,
     })
+    const byteLength = Buffer.from(audioBase64, 'base64').byteLength
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.configured) {
       if (this.ws.bufferedAmount > MAX_BUFFERED_BYTES) return
-      this.ws.send(payload)
-      this.audioAppended = true
+      this.sendAudioPayload(payload, byteLength)
     } else if (this.queue.length < MAX_QUEUE) {
-      this.queue.push(payload)
+      this.queue.push({ payload, byteLength })
     }
   }
 
@@ -138,6 +141,8 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
     this.itemOrder = []
     this.itemResults.clear()
     this.audioAppended = false
+    this.bufferedAudioBytes = 0
+    this.pendingCommitEventIds = []
     this.setState(this.retries === 0 ? 'connecting' : 'reconnecting')
 
     const ws = new WebSocket(ENDPOINT, {
@@ -149,12 +154,7 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
     this.ws = ws
 
     ws.on('open', () => {
-      this.sendSessionUpdate(ws, {
-        type: 'server_vad',
-        threshold: 0.5,
-        prefix_padding_ms: 300,
-        silence_duration_ms: 500,
-      })
+      this.sendSessionUpdate(ws)
     })
 
     ws.on('message', (raw) => this.handleMessage(raw))
@@ -195,21 +195,18 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
       this.setState('open')
       this.flushQueue()
       if (this.draining) {
-        if (this.drainPhase === 'waiting_vad_disabled' && this.isVadDisabled(event)) {
-          this.sendFinalCommit()
-        } else {
-          this.beginDrain()
-        }
+        this.beginDrain()
       }
       return
     }
 
     if (type === 'input_audio_buffer.committed') {
+      this.pendingCommitEventIds.shift()
       const itemId = this.eventItemId(event)
       if (!itemId) return
       if (!this.itemResults.has(itemId)) this.itemResults.set(itemId, { status: 'pending' })
       if (!this.itemOrder.includes(itemId)) this.itemOrder.push(itemId)
-      if (this.drainPhase === 'waiting_final_commit') {
+      if (this.drainPhase === 'waiting_final_commit' && this.pendingCommitEventIds.length === 0) {
         this.drainPhase = 'waiting_transcripts'
         this.drainCommitEventId = null
       }
@@ -253,15 +250,14 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
     if (type === 'error') {
       const message = this.errorMessage(event) ?? 'OpenAI realtime transcription error.'
       const relatedEventId = this.nestedString(event, ['error', 'event_id'])
-      if (
-        this.drainPhase === 'waiting_final_commit'
-        && relatedEventId
-        && relatedEventId === this.drainCommitEventId
-      ) {
-        this.drainPhase = 'waiting_transcripts'
-        this.drainCommitEventId = null
-        this.finishDrainIfIdle()
-        return
+      if (relatedEventId && this.pendingCommitEventIds.includes(relatedEventId)) {
+        this.pendingCommitEventIds = this.pendingCommitEventIds.filter((eventId) => eventId !== relatedEventId)
+        if (relatedEventId === this.drainCommitEventId) this.drainCommitEventId = null
+        if (this.drainPhase === 'waiting_final_commit' && this.pendingCommitEventIds.length === 0) {
+          this.drainPhase = 'waiting_transcripts'
+          this.finishDrainIfIdle()
+          return
+        }
       }
       const code = this.nestedString(event, ['error', 'code']) ?? ''
       const auth = /auth|unauthorized|forbidden|api[_ ]?key/i.test(`${code} ${message}`)
@@ -310,10 +306,17 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
     while (this.queue.length > 0) {
       const next = this.queue.shift()
       if (next) {
-        this.ws.send(next)
-        this.audioAppended = true
+        this.sendAudioPayload(next.payload, next.byteLength)
       }
     }
+  }
+
+  private sendAudioPayload(payload: string, byteLength: number): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
+    this.ws.send(payload)
+    this.audioAppended = true
+    this.bufferedAudioBytes += byteLength
+    if (this.bufferedAudioBytes >= COMMIT_INTERVAL_BYTES) this.sendCommit()
   }
 
   private beginDrain(): void {
@@ -323,8 +326,9 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
       return
     }
     if (this.audioAppended && this.ws?.readyState === WebSocket.OPEN) {
-      this.drainPhase = 'waiting_vad_disabled'
-      this.sendSessionUpdate(this.ws, null)
+      this.sendFinalCommit()
+    } else if (this.pendingCommitEventIds.length > 0) {
+      this.drainPhase = 'waiting_final_commit'
     } else {
       this.drainPhase = 'waiting_transcripts'
     }
@@ -332,16 +336,22 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
   }
 
   private sendFinalCommit(): void {
-    if (this.drainPhase !== 'waiting_vad_disabled' || this.ws?.readyState !== WebSocket.OPEN) return
+    if (this.drainPhase !== 'idle' || this.ws?.readyState !== WebSocket.OPEN) return
     this.drainPhase = 'waiting_final_commit'
-    this.drainCommitEventId = `drain_commit_${randomUUID()}`
-    this.ws.send(JSON.stringify({
-      event_id: this.drainCommitEventId,
-      type: 'input_audio_buffer.commit',
-    }))
+    this.drainCommitEventId = this.sendCommit('drain_commit')
   }
 
-  private sendSessionUpdate(ws: WebSocket, turnDetection: TurnDetection): void {
+  private sendCommit(prefix = 'periodic_commit'): string | null {
+    if (!this.audioAppended || this.ws?.readyState !== WebSocket.OPEN) return null
+    const eventId = `${prefix}_${randomUUID()}`
+    this.ws.send(JSON.stringify({ event_id: eventId, type: 'input_audio_buffer.commit' }))
+    this.pendingCommitEventIds.push(eventId)
+    this.audioAppended = false
+    this.bufferedAudioBytes = 0
+    return eventId
+  }
+
+  private sendSessionUpdate(ws: WebSocket): void {
     ws.send(JSON.stringify({
       type: 'session.update',
       session: {
@@ -364,22 +374,11 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
               languages: ['en'],
               delay: 'low',
             },
-            turn_detection: turnDetection,
+            turn_detection: null,
           },
         },
       },
     }))
-  }
-
-  private isVadDisabled(event: Record<string, unknown>): boolean {
-    const session = event.session
-    if (!session || typeof session !== 'object') return false
-    const audio = (session as Record<string, unknown>).audio
-    if (!audio || typeof audio !== 'object') return false
-    const input = (audio as Record<string, unknown>).input
-    if (!input || typeof input !== 'object') return false
-    return Object.prototype.hasOwnProperty.call(input, 'turn_detection')
-      && (input as Record<string, unknown>).turn_detection === null
   }
 
   private flushCompletedItems(): void {
@@ -422,6 +421,8 @@ export class OpenAIRealtimeTranscriptionSocket extends EventEmitter {
     this.drainPhase = 'idle'
     this.drainCommitEventId = null
     this.audioAppended = false
+    this.bufferedAudioBytes = 0
+    this.pendingCommitEventIds = []
     this.queue = []
     this.partials.clear()
     this.itemOrder = []

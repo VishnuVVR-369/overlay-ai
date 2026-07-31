@@ -78,11 +78,13 @@ describe('OpenAIRealtimeTranscriptionSocket', () => {
     await waitFor(() => states.includes('open'))
     expect(states[0]).toBe('connecting')
     const update = realtime.received.find((event) => (event as { type?: string }).type === 'session.update') as {
-      session: { type: string; audio: { input: { format: { rate: number }; transcription: { model: string } } } }
+      session: { type: string; audio: { input: { format: { rate: number }; transcription: { model: string }; turn_detection: unknown } } }
     }
+    expect(realtime.url).toBe('wss://api.openai.com/v1/realtime?intent=transcription')
     expect(update.session.type).toBe('transcription')
     expect(update.session.audio.input.format.rate).toBe(24000)
     expect(update.session.audio.input.transcription.model).toBe('gpt-live-transcribe')
+    expect(update.session.audio.input.turn_detection).toBeNull()
     await socket.close()
   })
 
@@ -157,38 +159,28 @@ describe('OpenAIRealtimeTranscriptionSocket', () => {
     expect(states.at(-1)).toBe('closed')
   })
 
-  it('uses the VAD-disabled session barrier before accepting the final commit acknowledgement', async () => {
+  it('commits buffered audio periodically and drains its in-flight transcript on close', async () => {
     const { OpenAIRealtimeTranscriptionSocket } = await loadSocket()
     const socket = new OpenAIRealtimeTranscriptionSocket('mic')
     const committed: string[] = []
     socket.on('committed', (text) => committed.push(text))
     socket.connect('key')
     await waitFor(() => realtime.received.length > 0)
-    socket.send('AAAA', 24000)
-    realtime.queueBeforeNextSessionUpdated({
-      type: 'input_audio_buffer.committed',
-      item_id: 'vad-item',
-      previous_item_id: null,
-    })
+    const frame = Buffer.alloc(12_000).toString('base64')
+    for (let i = 0; i < 7; i += 1) socket.send(frame, 24000)
+    await waitFor(() => realtime.received.filter((event) => (event as { type?: string }).type === 'input_audio_buffer.append').length === 7)
+    expect(realtime.received.some((event) => (event as { type?: string }).type === 'input_audio_buffer.commit')).toBe(false)
+    socket.send(frame, 24000)
+    await waitFor(() => realtime.received.some((event) => (event as { type?: string }).type === 'input_audio_buffer.commit'))
     let closed = false
     const closing = socket.close().then(() => { closed = true })
-    await waitFor(() => realtime.received.some((event) => (event as { type?: string }).type === 'input_audio_buffer.commit'))
-    realtime.sendCompleted('vad-item', 'Earlier words.')
     await new Promise((resolve) => setTimeout(resolve, 10))
     expect(closed).toBe(false)
-    expect(committed).toEqual(['Earlier words.'])
-    realtime.sendCommitted('final-item', 'vad-item')
-    realtime.sendCompleted('final-item', 'Final words.')
+    realtime.sendCommitted('periodic-item')
+    realtime.sendCompleted('periodic-item', 'Mid-session words.')
     await closing
-    expect(committed).toEqual(['Earlier words.', 'Final words.'])
-    const drainUpdateIndex = realtime.received.findIndex((event) => (
-      (event as { type?: string; session?: { audio?: { input?: { turn_detection?: unknown } } } }).type === 'session.update'
-      && (event as { session?: { audio?: { input?: { turn_detection?: unknown } } } })
-        .session?.audio?.input?.turn_detection === null
-    ))
-    const commitIndex = realtime.received.findIndex((event) => (event as { type?: string }).type === 'input_audio_buffer.commit')
-    expect(drainUpdateIndex).toBeGreaterThanOrEqual(0)
-    expect(commitIndex).toBeGreaterThan(drainUpdateIndex)
+    expect(committed).toEqual(['Mid-session words.'])
+    expect(realtime.received.filter((event) => (event as { type?: string }).type === 'input_audio_buffer.commit')).toHaveLength(1)
   })
 
   it('bounds ordinary drain time and keeps panic shutdown immediate', async () => {

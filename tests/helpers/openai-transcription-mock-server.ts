@@ -5,7 +5,6 @@ export interface OpenAITranscriptionMockHandle {
   server: Server
   clients: Set<MockClient>
   received: object[]
-  queueBeforeNextSessionUpdated: (payload: object) => void
   sendCommitted: (itemId: string, previousItemId?: string | null) => void
   sendDelta: (itemId: string, delta: string) => void
   sendCompleted: (itemId: string, transcript: string) => void
@@ -15,12 +14,11 @@ export interface OpenAITranscriptionMockHandle {
 }
 
 export function startOpenAITranscriptionMock(
-  url = 'wss://api.openai.com/v1/realtime?model=gpt-live-transcribe',
+  url = 'wss://api.openai.com/v1/realtime?intent=transcription',
 ): OpenAITranscriptionMockHandle {
   const server = new Server(url, { mock: false, selectProtocol: () => '' })
   const clients = new Set<MockClient>()
   const received: object[] = []
-  const beforeNextSessionUpdated: object[] = []
   server.on('connection', (socket) => {
     const client = socket as unknown as MockClient
     clients.add(client)
@@ -28,7 +26,17 @@ export function startOpenAITranscriptionMock(
       const payload = JSON.parse(raw as string) as { type?: string; session?: object }
       received.push(payload)
       if (payload.type === 'session.update') {
-        for (const event of beforeNextSessionUpdated.splice(0)) socket.send(JSON.stringify(event))
+        const session = payload.session as {
+          type?: string
+          audio?: { input?: { turn_detection?: unknown } }
+        } | undefined
+        if (session?.type === 'transcription' && session.audio?.input?.turn_detection !== null) {
+          socket.send(JSON.stringify({
+            type: 'error',
+            error: { code: 'invalid_value', message: 'Turn detection is not supported for this transcription model.' },
+          }))
+          return
+        }
         socket.send(JSON.stringify({ type: 'session.updated', session: payload.session }))
       }
     })
@@ -45,7 +53,6 @@ export function startOpenAITranscriptionMock(
     server,
     clients,
     received,
-    queueBeforeNextSessionUpdated: (payload) => beforeNextSessionUpdated.push(payload),
     sendCommitted: (itemId, previousItemId = null) => broadcast({
       type: 'input_audio_buffer.committed',
       item_id: itemId,
